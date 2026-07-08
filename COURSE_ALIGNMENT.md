@@ -39,11 +39,11 @@ La leccion espera que la app ya tenga una version funcional del dashboard y lueg
 - Prueba de prompt via OpenAI desde API route segura.
 - Seccion Workspace: Integraciones, negocio, tools, plantillas, base y equipo.
 - Webhook YCloud inicial para guardar inbound en Supabase.
-- Buffer cron inicial para generar respuestas IA y dejarlas en cola.
-- Cron de entrega inicial para enviar mensajes queued por YCloud.
+- Buffer manual/cron-ready para generar respuestas IA y dejarlas en cola.
+- Entrega manual/cron-ready para enviar mensajes queued por YCloud.
 - Vista de agencia inicial con workspaces, miembros, conversaciones e integraciones.
 - Autoetiquetado y resumen automatico del contacto desde el buffer IA.
-- Sincronizacion base de contactos a GoHighLevel con cron protegido.
+- Sincronizacion base de contactos a GoHighLevel con ruta protegida.
 - Endpoint preflight `/api/health/readiness` para validar envs, tablas y rutas.
 - Runbook de deploy en `DEPLOY_RUNBOOK.md`.
 - Health check en `/api/health/supabase`.

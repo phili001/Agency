@@ -30,9 +30,9 @@
 
 El dashboard ya usa datos reales de Supabase, tiene auth, inbox, mensajes,
 handoff, agentes, prueba de prompt con OpenAI, workspace settings,
-webhook YCloud inicial, buffer cron, entrega de mensajes queued y vista
+webhook YCloud inicial, buffer cron-ready, entrega de mensajes queued y vista
 de agencia inicial. El buffer tambien actualiza resumen y etiquetas del
-contacto para observabilidad comercial. GoHighLevel ya tiene cron base
+contacto para observabilidad comercial. GoHighLevel ya tiene ruta protegida
 para sincronizar contactos. El preflight de produccion esta en
 `/api/health/readiness` y el runbook en `DEPLOY_RUNBOOK.md`.
 

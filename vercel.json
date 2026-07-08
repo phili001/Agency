@@ -1,16 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/buffer",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/deliver",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/ghl-sync",
-      "schedule": "*/10 * * * *"
-    }
-  ]
-}
+{}

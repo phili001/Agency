@@ -51,15 +51,19 @@ Use this webhook URL:
 Enable inbound/outbound WhatsApp message events. If a custom domain is added
 later, update the webhook URL in YCloud.
 
-## 5. Vercel cron
+## 5. Cron manual durante pruebas
 
-`vercel.json` registers:
+During the first Vercel test, cron scheduling is not registered in
+`vercel.json` because the Hobby/Free plan can reject frequent cron jobs.
 
-- `/api/cron/buffer` every minute
-- `/api/cron/deliver` every minute
-- `/api/cron/ghl-sync` every 10 minutes
+Trigger these manually after receiving a WhatsApp message:
 
-Each cron requires `CRON_SECRET`.
+- `{NEXT_PUBLIC_APP_URL}/api/cron/buffer?secret={CRON_SECRET}`
+- `{NEXT_PUBLIC_APP_URL}/api/cron/deliver?secret={CRON_SECRET}`
+- `{NEXT_PUBLIC_APP_URL}/api/cron/ghl-sync?secret={CRON_SECRET}`
+
+Each route requires `CRON_SECRET`. Later, move these to Vercel Cron,
+GitHub Actions, QStash, or another scheduler according to the production plan.
 
 ## 6. GoHighLevel
 
