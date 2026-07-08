@@ -42,6 +42,7 @@ type MessageItem = {
   conversation_id: string;
   created_at: string;
   direction: string;
+  displayTime?: string;
   id: string;
   message_type: string;
   role: string;
@@ -51,6 +52,7 @@ type UsageEventItem = {
   conversation_id: string | null;
   cost_usd: number;
   created_at: string;
+  displayTokenTotal?: string;
   id: string;
   input_tokens: number;
   model: string | null;
@@ -61,6 +63,7 @@ type UsageEventItem = {
 
 type WebhookEventItem = {
   created_at: string;
+  displayTime?: string;
   error: string | null;
   event_type: string;
   id: string;
@@ -133,6 +136,35 @@ export function InboxPanel({
     Boolean(selectedConversation?.id) &&
     !selectedConversation?.id.startsWith("mock-");
 
+  function stableTime(value: string) {
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return "";
+    }
+
+    return `${String(date.getUTCHours()).padStart(2, "0")}:${String(
+      date.getUTCMinutes(),
+    ).padStart(2, "0")} UTC`;
+  }
+
+  function stableDateTime(value: string) {
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return "";
+    }
+
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
+      2,
+      "0",
+    )}-${String(date.getUTCDate()).padStart(2, "0")} ${stableTime(value)}`;
+  }
+
+  function stableNumber(value: number) {
+    return new Intl.NumberFormat("en-US").format(value);
+  }
+
   function upsertLocalMessage(message: MessageItem) {
     setLocalMessages((current) => [...current, message]);
   }
@@ -156,6 +188,7 @@ export function InboxPanel({
       conversation_id: selectedConversation.id,
       created_at: now,
       direction,
+      displayTime: stableTime(now),
       id: `local-${crypto.randomUUID()}`,
       message_type: "text",
       role,
@@ -351,9 +384,12 @@ export function InboxPanel({
                 onClick={() =>
                   updateConversation({
                     aiEnabled: !selectedConversation?.aiEnabled,
+                    rawStatus: !selectedConversation?.aiEnabled
+                      ? "open"
+                      : "pending_handoff",
                     status: !selectedConversation?.aiEnabled
                       ? "IA activa"
-                      : "IA apagada",
+                      : "Handoff",
                   })
                 }
                 type="button"
@@ -408,10 +444,7 @@ export function InboxPanel({
                     <div className="mt-2 flex items-center justify-between gap-4 text-[11px] text-[#647067]">
                                   <span>{isInternal ? "nota interna" : message.role}</span>
                       <span>
-                        {new Date(message.created_at).toLocaleTimeString("es-CO", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {message.displayTime ?? stableTime(message.created_at)}
                       </span>
                     </div>
                   </div>
@@ -544,9 +577,7 @@ export function InboxPanel({
               {selectedConversation.contactMetadata.ghl_synced_at ? (
                 <p className="mt-1">
                   Sync:{" "}
-                  {new Date(
-                    selectedConversation.contactMetadata.ghl_synced_at,
-                  ).toLocaleString("es-CO")}
+                  {stableDateTime(selectedConversation.contactMetadata.ghl_synced_at)}
                 </p>
               ) : null}
               {selectedConversation.contactMetadata.ghl_last_error ? (
@@ -564,7 +595,7 @@ export function InboxPanel({
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
           {[
-            ["Tokens", selectedTokenTotal.toLocaleString("es-CO")],
+            ["Tokens", stableNumber(selectedTokenTotal)],
             ["Costo", `$${selectedCostTotal.toFixed(4)}`],
             ["Entrantes", String(inboundCount)],
             ["Salientes", String(outboundCount)],
@@ -597,9 +628,13 @@ export function InboxPanel({
                 </div>
                 <p className="mt-1 text-xs text-[#647067]">
                   {event.model ?? "sin modelo"} ·{" "}
-                  {Number(
-                    event.total_tokens ?? event.input_tokens + event.output_tokens,
-                  ).toLocaleString("es-CO")}{" "}
+                  {event.displayTokenTotal ??
+                    stableNumber(
+                      Number(
+                        event.total_tokens ??
+                          event.input_tokens + event.output_tokens,
+                      ),
+                    )}{" "}
                   tokens
                 </p>
               </div>
@@ -638,10 +673,7 @@ export function InboxPanel({
                 </div>
                 <p className="mt-1 text-xs text-[#647067]">
                   {event.provider} -{" "}
-                  {new Date(event.created_at).toLocaleTimeString("es-CO", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  {event.displayTime ?? stableTime(event.created_at)}
                 </p>
                 {event.error ? (
                   <p className="mt-2 text-xs text-red-700">{event.error}</p>

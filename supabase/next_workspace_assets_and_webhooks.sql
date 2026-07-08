@@ -6,6 +6,12 @@
 alter table public.agents
 alter column model set default 'gpt-5.4-mini';
 
+alter table public.conversations
+alter column status set default 'pending_handoff';
+
+alter table public.conversations
+alter column ai_enabled set default false;
+
 update public.agents
 set model = case
   when model = 'openai/gpt-4o-mini' then 'gpt-4o-mini'

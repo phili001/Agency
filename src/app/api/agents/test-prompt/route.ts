@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import type { Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
 const DEFAULT_OPENAI_MODEL = "gpt-5.4-mini";
@@ -23,6 +24,54 @@ type OpenAIResponsePayload = {
     total_tokens?: number;
   };
 };
+
+type KnowledgeAsset = {
+  content: string;
+  id: string;
+  title: string;
+};
+
+function getKnowledgeAssetIds(config: Json) {
+  if (!config || typeof config !== "object" || Array.isArray(config)) {
+    return [];
+  }
+
+  return Array.isArray(config.knowledge_asset_ids)
+    ? config.knowledge_asset_ids.filter(
+        (item): item is string => typeof item === "string",
+      )
+    : [];
+}
+
+function buildInstructions(systemPrompt: string | null, assets: KnowledgeAsset[]) {
+  const basePrompt =
+    systemPrompt ||
+    "Eres un agente de WhatsApp claro, breve y orientado a resolver.";
+
+  if (assets.length === 0) {
+    return basePrompt;
+  }
+
+  const ragContext = assets
+    .map(
+      (asset, index) =>
+        `[Documento RAG ${index + 1}: ${asset.title}]\n${asset.content.trim()}`,
+    )
+    .join("\n\n");
+
+  return `Base de conocimiento asignada al agente:
+${ragContext}
+
+Reglas obligatorias sobre la base de conocimiento:
+- La base de conocimiento tiene prioridad sobre el prompt del agente.
+- Si la base contiene una instruccion directa sobre como responder, obedecela literalmente.
+- Usa estos documentos como fuente principal para responder.
+- Si la respuesta no esta en la base, dilo con claridad y pide que un humano lo confirme.
+- No inventes precios, horarios, politicas ni condiciones que no aparezcan aqui.
+
+Prompt del agente:
+${basePrompt}`;
+}
 
 function getOpenAIModel(model?: string | null) {
   if (!model) {
@@ -84,7 +133,7 @@ export async function POST(request: Request) {
 
   const { data: agent, error: agentError } = await supabase
     .from("agents")
-    .select("id, workspace_id, name, model, system_prompt, temperature")
+    .select("id, workspace_id, name, model, system_prompt, temperature, config")
     .eq("id", agentId)
     .single();
 
@@ -96,9 +145,21 @@ export async function POST(request: Request) {
   }
 
   const model = getOpenAIModel(agent.model);
-  const instructions =
-    agent.system_prompt ||
-    "Eres un agente de WhatsApp claro, breve y orientado a resolver.";
+  const knowledgeAssetIds = getKnowledgeAssetIds(agent.config);
+  const { data: knowledgeAssets } =
+    knowledgeAssetIds.length > 0
+      ? await supabase
+          .from("workspace_assets")
+          .select("id, title, content")
+          .eq("workspace_id", agent.workspace_id)
+          .eq("kind", "knowledge")
+          .neq("status", "archived")
+          .in("id", knowledgeAssetIds)
+      : { data: [] };
+  const instructions = buildInstructions(
+    agent.system_prompt,
+    (knowledgeAssets ?? []) as KnowledgeAsset[],
+  );
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     body: JSON.stringify({
@@ -134,6 +195,7 @@ export async function POST(request: Request) {
     metadata: {
       kind: "prompt_test",
       openai_response_id: payload?.id ?? null,
+      rag_document_ids: knowledgeAssetIds,
     },
     model: payload?.model ?? model,
     output_tokens: Number(usage.output_tokens ?? 0),

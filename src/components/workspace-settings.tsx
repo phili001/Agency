@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BookOpenText,
   BriefcaseBusiness,
@@ -8,12 +8,14 @@ import {
   ClipboardList,
   KeyRound,
   Loader2,
+  Plus,
   PlugZap,
   Save,
   UsersRound,
   Wrench,
 } from "lucide-react";
 
+import { AgentSettings } from "@/components/agent-settings";
 import type { Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/client";
 
@@ -44,34 +46,62 @@ type WorkspaceMember = {
   workspace_id: string;
 };
 
+type AgentItem = {
+  config: Json;
+  id: string;
+  is_active: boolean;
+  model: string;
+  name: string;
+  system_prompt: string;
+  temperature: number;
+  type: string;
+  workspace_id: string;
+};
+
 type WorkspaceSettingsProps = {
+  agents: AgentItem[];
   appUrl: string;
   assets: WorkspaceAsset[];
+  initialTab?: TabId;
   integrations: IntegrationItem[];
   members: WorkspaceMember[];
+  showNavigation?: boolean;
   workspaceId: string | null;
   workspaceName: string;
 };
 
 const tabs = [
+  { id: "agents", icon: UsersRound, label: "Agentes" },
   { id: "integrations", icon: PlugZap, label: "Integraciones" },
   { id: "business", icon: BriefcaseBusiness, label: "Negocio" },
   { id: "tools", icon: Wrench, label: "Tools" },
-  { id: "templates", icon: ClipboardList, label: "Plantillas" },
-  { id: "knowledge", icon: BookOpenText, label: "Base" },
+  { id: "templates", icon: ClipboardList, label: "Templates" },
+  { id: "knowledge", icon: BookOpenText, label: "Knowledge Base" },
   { id: "team", icon: UsersRound, label: "Equipo" },
+  { id: "automations", icon: Check, label: "Automatizaciones" },
 ] as const;
 
 type TabId = (typeof tabs)[number]["id"];
 
+const hashToTab: Record<string, TabId> = {
+  "#workspace-agents": "agents",
+  "#workspace-automations": "automations",
+  "#workspace-business": "business",
+  "#workspace-integrations": "integrations",
+  "#workspace-knowledge": "knowledge",
+  "#workspace-team": "team",
+  "#workspace-templates": "templates",
+  "#workspace-tools": "tools",
+};
+
 const providers = [
   {
-    description: "WhatsApp oficial, Phone ID, WABA ID y webhook.",
+    description: "Datos del numero conectado en YCloud.",
     fields: [
-      ["phone_e164", "Numero WhatsApp"],
-      ["waba_id", "WABA ID"],
-      ["phone_id", "Phone ID"],
-      ["webhook_secret_ref", "Webhook secret ref"],
+      ["phone_e164", "Numero WhatsApp con pais"],
+      ["waba_id", "WABA ID de YCloud"],
+      ["phone_id", "Phone ID del numero"],
+      ["webhook_secret_ref", "Nombre del secret"],
     ],
     label: "YCloud",
     provider: "ycloud",
@@ -96,6 +126,34 @@ const providers = [
   },
 ] as const;
 
+const toolPresets = [
+  {
+    content:
+      "Accion: crea una cita directamente en GoHighLevel. Inputs: nombre, telefono, fecha, hora, calendario y notas. Requiere GHL_API_KEY y Location ID.",
+    title: "Agendar en GoHighLevel",
+  },
+  {
+    content:
+      "Accion: consulta horarios disponibles en el calendario de GoHighLevel antes de reservar. Inputs: rango de fechas y calendario.",
+    title: "Consultar disponibilidad",
+  },
+  {
+    content:
+      "Accion: devuelve el link de agenda para que el contacto reserve por su cuenta. Es una tool de lectura.",
+    title: "Agendamiento por link",
+  },
+  {
+    content:
+      "Accion: herramienta de prueba que devuelve el mensaje recibido. Usala solo para validar flujos internos.",
+    title: "Echo",
+  },
+  {
+    content:
+      "Accion: llama un webhook HTTPS propio con payload JSON. Usar solo cuando el endpoint y permisos esten claros.",
+    title: "Webhook personalizado",
+  },
+] as const;
+
 function asRecord(value: Json): Record<string, string> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
@@ -116,16 +174,69 @@ function buildAssetDraft(kind: WorkspaceAsset["kind"], assets: WorkspaceAsset[])
   };
 }
 
+function stableDate(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
+    2,
+    "0",
+  )}-${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
+function fieldHelp(provider: string, key: string) {
+  if (provider === "ycloud") {
+    const helpers: Record<string, { help: string; placeholder: string }> = {
+      phone_e164: {
+        help: "El numero real conectado en YCloud. Ejemplo: +34600111222.",
+        placeholder: "+34600111222",
+      },
+      waba_id: {
+        help: "WhatsApp Business Account ID. Sale en YCloud > WhatsApp Accounts.",
+        placeholder: "123456789012345",
+      },
+      phone_id: {
+        help: "ID tecnico del numero en YCloud. No es email ni telefono.",
+        placeholder: "phone_... o el ID que muestra YCloud",
+      },
+      webhook_secret_ref: {
+        help: "Solo una etiqueta interna. El valor real va en Vercel como YCLOUD_WEBHOOK_SECRET.",
+        placeholder: "ycloud_main",
+      },
+    };
+
+    return helpers[key];
+  }
+
+  if (provider === "gohighlevel" && key === "location_id") {
+    return {
+      help: "Location ID del subaccount en GoHighLevel.",
+      placeholder: "location_id",
+    };
+  }
+
+  return {
+    help: "Referencia interna. El valor real de la API key va en Vercel.",
+    placeholder: key,
+  };
+}
+
 export function WorkspaceSettings({
+  agents,
   appUrl,
   assets,
+  initialTab = "agents",
   integrations,
   members,
+  showNavigation = true,
   workspaceId,
   workspaceName,
 }: WorkspaceSettingsProps) {
   const supabase = createClient();
-  const [activeTab, setActiveTab] = useState<TabId>("integrations");
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
   const [localIntegrations, setLocalIntegrations] = useState(integrations);
   const [localAssets, setLocalAssets] = useState(assets);
   const [integrationDrafts, setIntegrationDrafts] = useState(() =>
@@ -156,7 +267,7 @@ export function WorkspaceSettings({
   const [status, setStatus] = useState("");
   const [savingKey, setSavingKey] = useState("");
 
-  const webhookUrl = `${appUrl.replace(/\/$/, "")}/api/webhooks/ycloud`;
+  const webhookUrl = `${appUrl.replace(/\/$/, "")}/api/webhooks/ycloud?secret=TU_YCLOUD_WEBHOOK_SECRET`;
   const assetsByKind = useMemo(
     () =>
       localAssets.reduce<Record<string, WorkspaceAsset[]>>((grouped, asset) => {
@@ -166,6 +277,23 @@ export function WorkspaceSettings({
       }, {}),
     [localAssets],
   );
+  const tools = assetsByKind.tool ?? [];
+  const knowledgeAssets = assetsByKind.knowledge ?? [];
+
+  useEffect(() => {
+    function syncTabFromHash() {
+      const nextTab = hashToTab[window.location.hash];
+
+      if (nextTab) {
+        setActiveTab(nextTab);
+      }
+    }
+
+    syncTabFromHash();
+    window.addEventListener("hashchange", syncTabFromHash);
+
+    return () => window.removeEventListener("hashchange", syncTabFromHash);
+  }, []);
 
   async function saveIntegration(provider: IntegrationItem["provider"]) {
     if (!workspaceId) {
@@ -277,6 +405,75 @@ export function WorkspaceSettings({
     setSavingKey("");
   }
 
+  async function createAsset(
+    kind: WorkspaceAsset["kind"],
+    title: string,
+    content: string,
+    status: WorkspaceAsset["status"] = "active",
+  ) {
+    if (!workspaceId) {
+      setStatus("Primero necesitas un workspace activo.");
+      return;
+    }
+
+    setSavingKey(`${kind}:${title}`);
+    setStatus("");
+
+    const { data, error } = await supabase
+      .from("workspace_assets")
+      .insert({
+        content,
+        kind,
+        status,
+        title,
+        workspace_id: workspaceId,
+      })
+      .select("id, workspace_id, kind, title, content, status")
+      .single();
+
+    if (error) {
+      setStatus(
+        error.message.includes("workspace_assets")
+          ? "Falta correr el SQL de workspace_assets en Supabase."
+          : error.message,
+      );
+      setSavingKey("");
+      return;
+    }
+
+    setLocalAssets((current) => [data as WorkspaceAsset, ...current]);
+    setStatus("Recurso agregado.");
+    setSavingKey("");
+  }
+
+  function assetList(kind: WorkspaceAsset["kind"], empty: string) {
+    const currentAssets = assetsByKind[kind] ?? [];
+
+    return (
+      <div className="grid gap-2">
+        {currentAssets.map((asset) => (
+          <div
+            className="flex items-start justify-between gap-3 rounded-lg border border-[#e2e6df] p-3 text-sm"
+            key={asset.id}
+          >
+            <div className="min-w-0">
+              <p className="font-semibold">{asset.title}</p>
+              <p className="mt-1 line-clamp-2 text-[#647067]">{asset.content}</p>
+            </div>
+            <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
+              {asset.status}
+            </span>
+          </div>
+        ))}
+        {currentAssets.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
+            {empty}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
   function assetEditor({
     helper,
     kind,
@@ -356,6 +553,7 @@ export function WorkspaceSettings({
 
   return (
     <section className="rounded-lg border border-[#d9ded3] bg-white">
+      {showNavigation ? (
       <div className="border-b border-[#e2e6df] px-4 py-3">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
@@ -377,7 +575,10 @@ export function WorkspaceSettings({
                   : "bg-[#eef2eb] text-[#4d5a51]"
               }`}
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id);
+                window.history.replaceState(null, "", `#workspace-${tab.id}`);
+              }}
               type="button"
             >
               <tab.icon size={15} />
@@ -386,8 +587,18 @@ export function WorkspaceSettings({
           ))}
         </div>
       </div>
+      ) : null}
 
       <div className="p-4">
+        {activeTab === "agents" ? (
+          <AgentSettings
+            agents={agents}
+            knowledgeAssets={knowledgeAssets}
+            tools={tools}
+            workspaceId={workspaceId}
+          />
+        ) : null}
+
         {activeTab === "integrations" ? (
           <div className="grid gap-3 xl:grid-cols-3">
             {providers.map((provider) => {
@@ -420,32 +631,44 @@ export function WorkspaceSettings({
                   </div>
                   {provider.provider === "ycloud" ? (
                     <div className="rounded-lg border border-dashed border-[#cbd2c6] bg-[#fafbf8] p-2 text-xs text-[#4d5a51]">
-                      <p className="font-semibold">Webhook URL</p>
+                      <p className="font-semibold">Webhook URL para pegar en YCloud</p>
                       <p className="mt-1 break-all">{webhookUrl}</p>
+                      <p className="mt-2">
+                        Reemplaza TU_YCLOUD_WEBHOOK_SECRET por el mismo valor que
+                        guardaste en Vercel.
+                      </p>
                     </div>
                   ) : null}
-                  {provider.fields.map(([key, label]) => (
-                    <label className="grid gap-1.5 text-sm font-medium" key={key}>
-                      {label}
-                      <input
-                        className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
-                        onChange={(event) =>
-                          setIntegrationDrafts((current) => ({
-                            ...current,
-                            [provider.provider]: {
-                              ...current[provider.provider],
-                              config: {
-                                ...current[provider.provider].config,
-                                [key]: event.target.value,
+                  {provider.fields.map(([key, label]) => {
+                    const helper = fieldHelp(provider.provider, key);
+
+                    return (
+                      <label className="grid gap-1.5 text-sm font-medium" key={key}>
+                        {label}
+                        <input
+                          className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                          onChange={(event) =>
+                            setIntegrationDrafts((current) => ({
+                              ...current,
+                              [provider.provider]: {
+                                ...current[provider.provider],
+                                config: {
+                                  ...current[provider.provider].config,
+                                  [key]: event.target.value,
+                                },
                               },
-                            },
-                          }))
-                        }
-                        type={key.includes("key") || key.includes("secret") ? "password" : "text"}
-                        value={draft.config[key] ?? ""}
-                      />
-                    </label>
-                  ))}
+                            }))
+                          }
+                          placeholder={helper.placeholder}
+                          type={key.includes("key") ? "password" : "text"}
+                          value={draft.config[key] ?? ""}
+                        />
+                        <span className="text-xs font-normal text-[#647067]">
+                          {helper.help}
+                        </span>
+                      </label>
+                    );
+                  })}
                   <div className="flex flex-wrap gap-2">
                     <select
                       className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
@@ -495,35 +718,85 @@ export function WorkspaceSettings({
             })
           : null}
 
-        {activeTab === "tools"
-          ? assetEditor({
-              helper: "Define herramientas disponibles: agendar, consultar CRM, crear lead, escalar a humano.",
+        {activeTab === "tools" ? (
+          <div className="grid gap-5">
+            <div>
+              <h3 className="text-sm font-semibold">Catalogo de Tools</h3>
+              <p className="mt-1 text-sm text-[#647067]">
+                Crea capacidades reutilizables y luego asignalas a cada agente.
+              </p>
+            </div>
+            <div className="grid gap-3 xl:grid-cols-2">
+              {toolPresets.map((tool) => (
+                <div
+                  className="flex items-start justify-between gap-3 rounded-lg border border-[#e2e6df] p-3"
+                  key={tool.title}
+                >
+                  <div>
+                    <p className="text-sm font-semibold">{tool.title}</p>
+                    <p className="mt-1 text-sm text-[#647067]">{tool.content}</p>
+                  </div>
+                  <button
+                    className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]"
+                    disabled={savingKey === `tool:${tool.title}`}
+                    onClick={() => createAsset("tool", tool.title, tool.content)}
+                    type="button"
+                  >
+                    {savingKey === `tool:${tool.title}` ? (
+                      <Loader2 className="animate-spin" size={15} />
+                    ) : (
+                      <Plus size={15} />
+                    )}
+                    Agregar
+                  </button>
+                </div>
+              ))}
+            </div>
+            {assetEditor({
+              helper: "Crea una tool personalizada si necesitas un flujo que no esta en el catalogo.",
               kind: "tool",
               placeholder:
                 "Tool: agendar_cita\nCuando usarla: si el contacto pide fecha/hora\nInputs: nombre, telefono, fecha...",
-              title: "Tools del agente",
-            })
-          : null}
+              title: "Tool personalizada",
+            })}
+            <div>
+              <h3 className="mb-3 text-sm font-semibold">Tools disponibles</h3>
+              {assetList("tool", "Todavia no hay tools creadas.")}
+            </div>
+          </div>
+        ) : null}
 
-        {activeTab === "templates"
-          ? assetEditor({
-              helper: "Borradores de plantillas para aprobacion en Meta.",
+        {activeTab === "templates" ? (
+          <div className="grid gap-5">
+            {assetEditor({
+              helper: "Borradores de plantillas para aprobacion en Meta/YCloud.",
               kind: "template",
               placeholder:
                 "Nombre: recordatorio_cita\nCategoria: utility\nTexto: Hola {{1}}, te recordamos tu cita...",
-              title: "Plantillas WhatsApp",
-            })
-          : null}
+              title: "Nueva plantilla WhatsApp",
+            })}
+            <div>
+              <h3 className="mb-3 text-sm font-semibold">Mis plantillas</h3>
+              {assetList("template", "Sin plantillas. Crea una nueva o sincroniza desde YCloud.")}
+            </div>
+          </div>
+        ) : null}
 
-        {activeTab === "knowledge"
-          ? assetEditor({
-              helper: "FAQ, objeciones, datos del producto y respuestas aprobadas.",
+        {activeTab === "knowledge" ? (
+          <div className="grid gap-5">
+            {assetEditor({
+              helper: "FAQ, objeciones, politicas, precios y respuestas aprobadas para asignar a agentes.",
               kind: "knowledge",
               placeholder:
                 "Pregunta: cuanto cuesta?\nRespuesta: depende del plan...\n\nPregunta: donde estan ubicados?",
-              title: "Base de conocimiento",
-            })
-          : null}
+              title: "Agregar documento",
+            })}
+            <div>
+              <h3 className="mb-3 text-sm font-semibold">Documentos</h3>
+              {assetList("knowledge", "No hay documentos en la base de conocimiento.")}
+            </div>
+          </div>
+        ) : null}
 
         {activeTab === "team" ? (
           <div>
@@ -547,7 +820,7 @@ export function WorkspaceSettings({
                   <div className="min-w-0">
                     <p className="truncate font-medium">{member.user_id}</p>
                     <p className="mt-1 text-xs text-[#647067]">
-                      Alta {new Date(member.created_at).toLocaleDateString("es-CO")}
+                      Alta {stableDate(member.created_at)}
                     </p>
                   </div>
                   <span className="rounded-lg bg-[#e7f6ce] px-2 py-1 text-xs text-[#31521d]">
@@ -561,6 +834,17 @@ export function WorkspaceSettings({
                 </p>
               ) : null}
             </div>
+          </div>
+        ) : null}
+
+        {activeTab === "automations" ? (
+          <div className="rounded-lg border border-[#e2e6df] p-4">
+            <h3 className="text-sm font-semibold">Automatizaciones</h3>
+            <p className="mt-1 text-sm text-[#647067]">
+              Aqui vamos a conectar reglas como buffer IA, entrega de mensajes,
+              recordatorios y sincronizacion con GHL. Por ahora quedan listas las
+              bases para configurar agentes, tools y conocimiento.
+            </p>
           </div>
         ) : null}
 

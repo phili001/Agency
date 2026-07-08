@@ -1,13 +1,21 @@
 import { NextResponse } from "next/server";
 
+import type { Json } from "@/lib/supabase/database.types";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type AgentRow = {
+  config: Json;
   id: string;
   model: string;
   system_prompt: string;
   temperature: number;
   workspace_id: string;
+};
+
+type KnowledgeAsset = {
+  content: string;
+  id: string;
+  title: string;
 };
 
 type MessageRow = {
@@ -96,7 +104,53 @@ function buildTranscript(messages: MessageRow[]) {
     .join("\n");
 }
 
-async function generateReply(agent: AgentRow, messages: MessageRow[]) {
+function getKnowledgeAssetIds(config: Json) {
+  if (!config || typeof config !== "object" || Array.isArray(config)) {
+    return [];
+  }
+
+  return Array.isArray(config.knowledge_asset_ids)
+    ? config.knowledge_asset_ids.filter(
+        (item): item is string => typeof item === "string",
+      )
+    : [];
+}
+
+function buildInstructions(agent: AgentRow, assets: KnowledgeAsset[]) {
+  const basePrompt =
+    agent.system_prompt ||
+    "Eres un agente de WhatsApp claro, breve y orientado a resolver. Responde en espanol y evita sonar como robot.";
+
+  if (assets.length === 0) {
+    return basePrompt;
+  }
+
+  const ragContext = assets
+    .map(
+      (asset, index) =>
+        `[Documento RAG ${index + 1}: ${asset.title}]\n${asset.content.trim()}`,
+    )
+    .join("\n\n");
+
+  return `Base de conocimiento asignada al agente:
+${ragContext}
+
+Reglas obligatorias sobre la base de conocimiento:
+- La base de conocimiento tiene prioridad sobre el prompt del agente.
+- Si la base contiene una instruccion directa sobre como responder, obedecela literalmente.
+- Usa estos documentos como fuente principal para responder.
+- Si la respuesta no esta en la base, dilo con claridad y pide que un humano lo confirme.
+- No inventes precios, horarios, politicas ni condiciones que no aparezcan aqui.
+
+Prompt del agente:
+${basePrompt}`;
+}
+
+async function generateReply(
+  agent: AgentRow,
+  messages: MessageRow[],
+  knowledgeAssets: KnowledgeAsset[],
+) {
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
@@ -104,9 +158,7 @@ async function generateReply(agent: AgentRow, messages: MessageRow[]) {
   }
 
   const model = normalizeModel(agent.model);
-  const instructions =
-    agent.system_prompt ||
-    "Eres un agente de WhatsApp claro, breve y orientado a resolver. Responde en espanol y evita sonar como robot.";
+  const instructions = buildInstructions(agent, knowledgeAssets);
   const transcript = buildTranscript(messages);
   const response = await fetch("https://api.openai.com/v1/responses", {
     body: JSON.stringify({
@@ -246,13 +298,13 @@ export async function POST(request: Request) {
 
     const { data: agent } = conversation.agent_id
       ? await supabase
-          .from("agents")
-          .select("id, workspace_id, model, system_prompt, temperature")
+        .from("agents")
+          .select("id, workspace_id, model, system_prompt, temperature, config")
           .eq("id", conversation.agent_id)
           .single()
       : await supabase
           .from("agents")
-          .select("id, workspace_id, model, system_prompt, temperature")
+          .select("id, workspace_id, model, system_prompt, temperature, config")
           .eq("workspace_id", conversation.workspace_id)
           .eq("is_active", true)
           .order("created_at", { ascending: false })
@@ -265,9 +317,25 @@ export async function POST(request: Request) {
     }
 
     try {
-      const reply = await generateReply(agent as AgentRow, chronologicalMessages);
+      const typedAgent = agent as AgentRow;
+      const knowledgeAssetIds = getKnowledgeAssetIds(typedAgent.config);
+      const { data: knowledgeAssets } =
+        knowledgeAssetIds.length > 0
+          ? await supabase
+              .from("workspace_assets")
+              .select("id, title, content")
+              .eq("workspace_id", typedAgent.workspace_id)
+              .eq("kind", "knowledge")
+              .neq("status", "archived")
+              .in("id", knowledgeAssetIds)
+          : { data: [] };
+      const reply = await generateReply(
+        typedAgent,
+        chronologicalMessages,
+        (knowledgeAssets ?? []) as KnowledgeAsset[],
+      );
       const insights = await generateContactInsights(
-        agent as AgentRow,
+        typedAgent,
         chronologicalMessages,
       );
 
@@ -289,6 +357,7 @@ export async function POST(request: Request) {
             delivery: "queued_only",
             kind: "buffer_ai_reply",
             openai_response_id: reply.responseId,
+            rag_document_ids: knowledgeAssetIds,
           },
           output_tokens: Number(reply.usage.output_tokens ?? 0),
           role: "assistant",
@@ -310,6 +379,7 @@ export async function POST(request: Request) {
         metadata: {
           kind: "buffer_ai_reply",
           openai_response_id: reply.responseId,
+          rag_document_ids: knowledgeAssetIds,
         },
         model: reply.model,
         output_tokens: Number(reply.usage.output_tokens ?? 0),

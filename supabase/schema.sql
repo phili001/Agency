@@ -69,8 +69,8 @@ create table if not exists public.conversations (
   assigned_user_id uuid references auth.users(id) on delete set null,
   channel text not null default 'whatsapp' check (channel in ('whatsapp')),
   external_conversation_id text,
-  status text not null default 'open' check (status in ('open', 'pending_handoff', 'closed')),
-  ai_enabled boolean not null default true,
+  status text not null default 'pending_handoff' check (status in ('open', 'pending_handoff', 'closed')),
+  ai_enabled boolean not null default false,
   last_message_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

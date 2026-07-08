@@ -168,7 +168,8 @@ export async function POST(request: Request) {
               contact_id: contact.id,
               external_conversation_id: event.externalId,
               last_message_at: new Date().toISOString(),
-              status: "open",
+              ai_enabled: false,
+              status: "pending_handoff",
               workspace_id: workspaceId,
             })
             .select("id")
