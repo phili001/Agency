@@ -5,11 +5,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 type WebhookPayload = Record<string, unknown>;
 
 type NormalizedYCloudEvent = {
+  businessPhone: string | null;
   eventType: string;
   externalId: string | null;
   fromPhone: string | null;
   messageText: string | null;
   phoneId: string | null;
+  wabaId: string | null;
 };
 
 function readPath(value: unknown, paths: string[][]) {
@@ -49,6 +51,21 @@ function normalizePhone(value: string | null) {
 
 function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
   return {
+    businessPhone: normalizePhone(
+      readPath(payload, [
+        ["to"],
+        ["phone"],
+        ["phoneNumber"],
+        ["businessPhone"],
+        ["message", "to"],
+        ["data", "to"],
+        ["data", "phone"],
+        ["data", "phoneNumber"],
+        ["data", "businessPhone"],
+        ["data", "message", "to"],
+        ["data", "whatsappInboundMessage", "to"],
+      ]),
+    ),
     eventType:
       readPath(payload, [
         ["type"],
@@ -95,6 +112,16 @@ function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
       ["data", "message", "phoneId"],
       ["data", "whatsappInboundMessage", "phoneId"],
     ]),
+    wabaId: readPath(payload, [
+      ["wabaId"],
+      ["waba_id"],
+      ["whatsappBusinessAccountId"],
+      ["data", "wabaId"],
+      ["data", "waba_id"],
+      ["data", "whatsappBusinessAccountId"],
+      ["data", "whatsappInboundMessage", "wabaId"],
+      ["data", "whatsappInboundMessage", "waba_id"],
+    ]),
   };
 }
 
@@ -117,14 +144,24 @@ export async function POST(request: Request) {
   const event = normalizeEvent(payload);
   const supabase = createAdminClient();
 
-  const { data: integration } = event.phoneId
-    ? await supabase
-        .from("integrations")
-        .select("id, workspace_id")
-        .eq("provider", "ycloud")
-        .contains("config", { phone_id: event.phoneId })
-        .maybeSingle()
-    : { data: null };
+  const { data: integrations } = await supabase
+    .from("integrations")
+    .select("id, workspace_id, config")
+    .eq("provider", "ycloud");
+  const integration =
+    integrations?.find((item) => {
+      const config =
+        item.config && typeof item.config === "object" && !Array.isArray(item.config)
+          ? (item.config as Record<string, unknown>)
+          : {};
+      const configPhone = normalizePhone(String(config.phone_e164 ?? ""));
+
+      return (
+        (event.phoneId && config.phone_id === event.phoneId) ||
+        (event.wabaId && config.waba_id === event.wabaId) ||
+        (event.businessPhone && configPhone === event.businessPhone)
+      );
+    }) ?? null;
 
   const workspaceId = integration?.workspace_id ?? null;
   let status: "stored" | "ignored" | "error" = "ignored";

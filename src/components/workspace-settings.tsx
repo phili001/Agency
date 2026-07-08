@@ -100,7 +100,7 @@ const providers = [
     fields: [
       ["phone_e164", "Numero WhatsApp con pais"],
       ["waba_id", "WABA ID de YCloud"],
-      ["phone_id", "Phone ID del numero"],
+      ["phone_id", "Phone ID del numero (opcional)"],
       ["webhook_secret_ref", "Nombre del secret"],
     ],
     label: "YCloud",
@@ -199,8 +199,8 @@ function fieldHelp(provider: string, key: string) {
         placeholder: "123456789012345",
       },
       phone_id: {
-        help: "ID tecnico del numero en YCloud. No es email ni telefono.",
-        placeholder: "phone_... o el ID que muestra YCloud",
+        help: "Opcional. Si YCloud no lo muestra en esta pantalla, dejalo vacio; el webhook tambien buscara por WABA ID o numero.",
+        placeholder: "Opcional: phone_... o el ID tecnico si YCloud lo muestra",
       },
       webhook_secret_ref: {
         help: "Solo una etiqueta interna. El valor real va en Vercel como YCLOUD_WEBHOOK_SECRET.",
