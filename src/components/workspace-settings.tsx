@@ -203,8 +203,8 @@ function fieldHelp(provider: string, key: string) {
         placeholder: "Opcional: phone_... o el ID tecnico si YCloud lo muestra",
       },
       webhook_secret_ref: {
-        help: "Solo una etiqueta interna. El valor real va en Vercel como YCLOUD_WEBHOOK_SECRET.",
-        placeholder: "ycloud_main",
+        help: "Debe coincidir exactamente con YCLOUD_WEBHOOK_SECRET en Vercel. Si no quieres guardar el valor aqui, pegalo manualmente en YCloud.",
+        placeholder: "mejora_david_segura_2026",
       },
     };
 
@@ -267,7 +267,11 @@ export function WorkspaceSettings({
   const [status, setStatus] = useState("");
   const [savingKey, setSavingKey] = useState("");
 
-  const webhookUrl = `${appUrl.replace(/\/$/, "")}/api/webhooks/ycloud?secret=TU_YCLOUD_WEBHOOK_SECRET`;
+  const ycloudSecretValue = integrationDrafts.ycloud.config.webhook_secret_ref?.trim();
+  const webhookSecretParam = encodeURIComponent(
+    ycloudSecretValue || "TU_YCLOUD_WEBHOOK_SECRET",
+  );
+  const webhookUrl = `${appUrl.replace(/\/$/, "")}/api/webhooks/ycloud?secret=${webhookSecretParam}`;
   const assetsByKind = useMemo(
     () =>
       localAssets.reduce<Record<string, WorkspaceAsset[]>>((grouped, asset) => {
@@ -634,8 +638,9 @@ export function WorkspaceSettings({
                       <p className="font-semibold">Webhook URL para pegar en YCloud</p>
                       <p className="mt-1 break-all">{webhookUrl}</p>
                       <p className="mt-2">
-                        Reemplaza TU_YCLOUD_WEBHOOK_SECRET por el mismo valor que
-                        guardaste en Vercel.
+                        {ycloudSecretValue
+                          ? "Esta URL usa el valor escrito en Nombre del secret. Ese valor debe ser igual al YCLOUD_WEBHOOK_SECRET de Vercel."
+                          : "Reemplaza TU_YCLOUD_WEBHOOK_SECRET por el mismo valor que guardaste en Vercel."}
                       </p>
                     </div>
                   ) : null}

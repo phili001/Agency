@@ -57,6 +57,7 @@ function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
         ["phone"],
         ["phoneNumber"],
         ["businessPhone"],
+        ["whatsappInboundMessage", "to"],
         ["message", "to"],
         ["data", "to"],
         ["data", "phone"],
@@ -77,6 +78,7 @@ function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
     externalId: readPath(payload, [
       ["id"],
       ["messageId"],
+      ["whatsappInboundMessage", "id"],
       ["message", "id"],
       ["data", "id"],
       ["data", "message", "id"],
@@ -85,6 +87,7 @@ function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
     fromPhone: normalizePhone(
       readPath(payload, [
         ["from"],
+        ["whatsappInboundMessage", "from"],
         ["message", "from"],
         ["data", "from"],
         ["data", "message", "from"],
@@ -95,6 +98,7 @@ function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
     messageText: readPath(payload, [
       ["text"],
       ["text", "body"],
+      ["whatsappInboundMessage", "text", "body"],
       ["message", "text"],
       ["message", "text", "body"],
       ["data", "text"],
@@ -106,6 +110,7 @@ function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
     phoneId: readPath(payload, [
       ["phoneId"],
       ["phone_id"],
+      ["whatsappInboundMessage", "phoneId"],
       ["message", "phoneId"],
       ["data", "phoneId"],
       ["data", "phone_id"],
@@ -116,6 +121,8 @@ function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
       ["wabaId"],
       ["waba_id"],
       ["whatsappBusinessAccountId"],
+      ["whatsappInboundMessage", "wabaId"],
+      ["whatsappInboundMessage", "waba_id"],
       ["data", "wabaId"],
       ["data", "waba_id"],
       ["data", "whatsappBusinessAccountId"],
@@ -127,16 +134,26 @@ function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
 
 function isAuthorized(request: Request) {
   const expectedSecret = process.env.YCLOUD_WEBHOOK_SECRET;
-  const receivedSecret =
-    request.headers.get("x-webhook-secret") ??
-    request.headers.get("x-ycloud-webhook-secret") ??
-    new URL(request.url).searchParams.get("secret");
+  const receivedSecret = getReceivedSecret(request);
 
   return Boolean(expectedSecret && receivedSecret && receivedSecret === expectedSecret);
 }
 
+function getReceivedSecret(request: Request) {
+  return (
+    request.headers.get("x-webhook-secret") ??
+    request.headers.get("x-ycloud-webhook-secret") ??
+    new URL(request.url).searchParams.get("secret")
+  );
+}
+
 export async function POST(request: Request) {
   if (!isAuthorized(request)) {
+    console.warn("[ycloud:webhook] unauthorized", {
+      hasExpectedSecret: Boolean(process.env.YCLOUD_WEBHOOK_SECRET),
+      hasReceivedSecret: Boolean(getReceivedSecret(request)),
+    });
+
     return NextResponse.json({ error: "Webhook no autorizado." }, { status: 401 });
   }
 
@@ -148,7 +165,7 @@ export async function POST(request: Request) {
     .from("integrations")
     .select("id, workspace_id, config")
     .eq("provider", "ycloud");
-  const integration =
+  const matchedIntegration =
     integrations?.find((item) => {
       const config =
         item.config && typeof item.config === "object" && !Array.isArray(item.config)
@@ -162,6 +179,13 @@ export async function POST(request: Request) {
         (event.businessPhone && configPhone === event.businessPhone)
       );
     }) ?? null;
+  const integration =
+    matchedIntegration ?? (integrations?.length === 1 ? integrations[0] : null);
+  const matchedBy = matchedIntegration
+    ? "identifier"
+    : integrations?.length === 1
+      ? "single_integration_fallback"
+      : null;
 
   const workspaceId = integration?.workspace_id ?? null;
   let status: "stored" | "ignored" | "error" = "ignored";
@@ -261,8 +285,21 @@ export async function POST(request: Request) {
     workspace_id: workspaceId,
   });
 
+  console.info("[ycloud:webhook] processed", {
+    eventType: event.eventType,
+    hasBusinessPhone: Boolean(event.businessPhone),
+    hasFromPhone: Boolean(event.fromPhone),
+    hasMessageText: Boolean(event.messageText),
+    hasPhoneId: Boolean(event.phoneId),
+    hasWabaId: Boolean(event.wabaId),
+    matchedBy,
+    status,
+    workspaceId,
+  });
+
   return NextResponse.json({
     eventType: event.eventType,
+    matchedBy,
     status,
     workspaceId,
   });
