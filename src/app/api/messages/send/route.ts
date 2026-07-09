@@ -54,8 +54,8 @@ async function sendYCloudText({
       type: "text",
     }),
     headers: {
-      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
+      "X-API-Key": apiKey,
     },
     method: "POST",
   });
