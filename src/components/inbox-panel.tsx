@@ -197,6 +197,40 @@ export function InboxPanel({
     setError("");
     upsertLocalMessage(optimisticMessage);
 
+    if (direction === "outbound") {
+      const response = await fetch("/api/messages/send", {
+        body: JSON.stringify({
+          body,
+          conversationId: selectedConversation.id,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        message?: MessageItem;
+      };
+
+      if (!response.ok || !payload.message) {
+        setLocalMessages((current) =>
+          current.filter((message) => message.id !== optimisticMessage.id),
+        );
+        return {
+          errorMessage:
+            payload.error ?? "No se pudo enviar el mensaje por YCloud.",
+        };
+      }
+
+      setLocalMessages((current) =>
+        current.map((message) =>
+          message.id === optimisticMessage.id ? payload.message! : message,
+        ),
+      );
+      return { errorMessage: "" };
+    }
+
     const { data, error: insertError } = await supabase
       .from("messages")
       .insert({
