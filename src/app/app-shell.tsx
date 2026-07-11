@@ -27,7 +27,14 @@ import { redirect } from "next/navigation";
 import { signOut } from "./actions";
 import { InboxPanel } from "@/components/inbox-panel";
 import { WorkspaceSettings } from "@/components/workspace-settings";
+import {
+  DEFAULT_AGENT_PROMPT_VERSION,
+  buildDefaultAgentConfig,
+  buildDefaultAgentPrompt,
+  defaultAgentPresets,
+} from "@/lib/default-agents";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const conversations = [
   {
@@ -241,6 +248,182 @@ function getContactMetadata(metadata: unknown) {
   };
 }
 
+function getAuthDisplayName(user: {
+  email?: string;
+  user_metadata?: Record<string, unknown>;
+}) {
+  const metadataName = user.user_metadata?.full_name ?? user.user_metadata?.name;
+
+  return typeof metadataName === "string" && metadataName.trim()
+    ? metadataName.trim()
+    : user.email ?? "Usuario";
+}
+
+async function getMemberProfiles(userIds: string[]) {
+  if (userIds.length === 0) {
+    return new Map<string, { email: string; name: string }>();
+  }
+
+  try {
+    const admin = createAdminClient();
+    const entries = await Promise.all(
+      [...new Set(userIds)].map(async (userId) => {
+        const { data } = await admin.auth.admin.getUserById(userId);
+        const user = data.user;
+
+        if (!user) {
+          return null;
+        }
+
+        return [
+          userId,
+          {
+            email: user.email ?? "",
+            name: getAuthDisplayName({
+              email: user.email ?? "",
+              user_metadata: user.user_metadata,
+            }),
+          },
+        ] as const;
+      }),
+    );
+
+    return new Map(entries.filter((entry): entry is NonNullable<typeof entry> => Boolean(entry)));
+  } catch {
+    return new Map<string, { email: string; name: string }>();
+  }
+}
+
+function getDefaultWorkspaceName(user: {
+  email?: string | null;
+  user_metadata?: Record<string, unknown>;
+}) {
+  const metadataName = user.user_metadata?.full_name ?? user.user_metadata?.name;
+
+  if (typeof metadataName === "string" && metadataName.trim()) {
+    return metadataName.trim();
+  }
+
+  return user.email?.split("@")[0] || "Mi Agencia";
+}
+
+function getDefaultWorkspaceSlug(userId: string, name: string) {
+  const baseSlug =
+    name
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 32) || "workspace";
+
+  return `${baseSlug}-${userId.slice(0, 8)}`;
+}
+
+async function createDefaultWorkspace(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  user: {
+    email?: string | null;
+    id: string;
+    user_metadata?: Record<string, unknown>;
+  },
+) {
+  const workspaceName = getDefaultWorkspaceName(user);
+  const { data: workspace, error: workspaceError } = await supabase
+    .from("workspaces")
+    .insert({
+      name: workspaceName,
+      owner_id: user.id,
+      slug: getDefaultWorkspaceSlug(user.id, workspaceName),
+    })
+    .select("id, name, slug, status")
+    .single();
+
+  if (workspaceError || !workspace) {
+    return { error: workspaceError, membership: null };
+  }
+
+  const { data: membership, error: membershipError } = await supabase
+    .from("workspace_members")
+    .insert({
+      role: "owner",
+      user_id: user.id,
+      workspace_id: workspace.id,
+    })
+    .select("workspace_id, role")
+    .single();
+
+  if (membershipError || !membership) {
+    return { error: membershipError, membership: null };
+  }
+
+  await supabase.from("agents").insert(
+    defaultAgentPresets.map((preset) => ({
+      config: buildDefaultAgentConfig(preset),
+      is_active: true,
+      model: "gpt-5.5",
+      name: preset.name,
+      system_prompt: buildDefaultAgentPrompt(preset),
+      temperature: 0.3,
+      type: preset.type,
+      workspace_id: workspace.id,
+    })),
+  );
+
+  return { error: null, membership };
+}
+
+function getConfigRecord(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+async function syncDefaultAgentPrompts(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  workspaceId: string,
+) {
+  const presetNames = defaultAgentPresets.map((preset) => preset.name);
+  const { data: agents } = await supabase
+    .from("agents")
+    .select("id, name, config, system_prompt")
+    .eq("workspace_id", workspaceId)
+    .in("name", presetNames);
+
+  if (!agents?.length) {
+    return;
+  }
+
+  await Promise.all(
+    agents.map((agent) => {
+      const preset = defaultAgentPresets.find((item) => item.name === agent.name);
+      const config = getConfigRecord(agent.config);
+      const currentVersion = Number(config.default_agent_prompt_version ?? 0);
+      const alreadyUsesBusinessVariables =
+        typeof agent.system_prompt === "string" &&
+        agent.system_prompt.includes("{company_name}") &&
+        agent.system_prompt.includes("{business_hours}") &&
+        agent.system_prompt.includes("{location}");
+
+      if (!preset || (currentVersion >= DEFAULT_AGENT_PROMPT_VERSION && alreadyUsesBusinessVariables)) {
+        return Promise.resolve();
+      }
+
+      return supabase
+        .from("agents")
+        .update({
+          config: {
+            ...config,
+            ...buildDefaultAgentConfig(preset),
+          },
+          system_prompt: buildDefaultAgentPrompt(preset),
+        })
+        .eq("id", agent.id)
+        .eq("workspace_id", workspaceId);
+    }),
+  );
+}
+
 export async function AppShell({ section }: { section: AppSection }) {
   const supabase = await createClient();
   const {
@@ -251,12 +434,18 @@ export async function AppShell({ section }: { section: AppSection }) {
     redirect("/login");
   }
 
-  const { data: membership, error: membershipError } = await supabase
+  let { data: membership, error: membershipError } = await supabase
     .from("workspace_members")
     .select("workspace_id, role")
     .eq("user_id", user.id)
     .limit(1)
     .maybeSingle();
+  if (!membership && !membershipError) {
+    const created = await createDefaultWorkspace(supabase, user);
+    membership = created.membership;
+    membershipError = created.error;
+  }
+
   const { data: memberships } = await supabase
     .from("workspace_members")
     .select("workspace_id, role")
@@ -266,6 +455,9 @@ export async function AppShell({ section }: { section: AppSection }) {
   const visibleMemberships = memberships?.length ? memberships : membership ? [membership] : [];
   const workspaceIds = visibleMemberships.map((item) => item.workspace_id);
   const workspaceId = visibleMemberships[0]?.workspace_id;
+  if (workspaceId) {
+    await syncDefaultAgentPrompts(supabase, workspaceId);
+  }
   const isDashboard = section === "dashboard";
   const isClients = section === "clients";
   const isObservability = section === "observability";
@@ -354,7 +546,7 @@ export async function AppShell({ section }: { section: AppSection }) {
         needsAssets
           ? supabase
               .from("workspace_assets")
-              .select("id, workspace_id, kind, title, content, status")
+              .select("id, workspace_id, kind, title, content, status, metadata")
               .eq("workspace_id", workspaceId)
               .order("updated_at", { ascending: false })
           : Promise.resolve({ data: [], error: null }),
@@ -414,6 +606,16 @@ export async function AppShell({ section }: { section: AppSection }) {
   const realConversations = conversationsResult.data ?? [];
   const integrations = integrationsResult.data ?? [];
   const members = membersResult.data ?? [];
+  const memberProfiles = await getMemberProfiles(members.map((member) => member.user_id));
+  const displayMembers = members.map((member) => {
+    const profile = memberProfiles.get(member.user_id);
+
+    return {
+      ...member,
+      display_email: profile?.email ?? "",
+      display_name: profile?.name ?? member.user_id,
+    };
+  });
   const workspaceAssets = assetsResult.data ?? [];
   const webhookEvents = webhookEventsResult.data ?? [];
   const agencyWorkspaces = agencyWorkspacesResult.data ?? [];
@@ -659,24 +861,6 @@ export async function AppShell({ section }: { section: AppSection }) {
               ) : null}
 
               {section === "dashboard" ? (
-              <section className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {dashboardMetrics.map((item) => (
-                  <div
-                    className="min-h-28 self-start rounded-lg border border-[#d9ded3] bg-white p-4"
-                    key={item.label}
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-[#647067]">{item.label}</p>
-                      <item.icon className="text-[#35735b]" size={18} />
-                    </div>
-                    <p className="mt-3 text-2xl font-semibold">{item.value}</p>
-                    <p className="mt-1 text-xs text-[#7a847c]">{item.detail}</p>
-                  </div>
-                ))}
-              </section>
-              ) : null}
-
-              {section === "dashboard" ? (
               <section
                 className="scroll-mt-5 rounded-lg border border-[#d9ded3] bg-white"
                 id="inbox"
@@ -753,7 +937,7 @@ export async function AppShell({ section }: { section: AppSection }) {
                 assets={workspaceAssets}
                 initialTab={workspaceTab}
                 integrations={integrations}
-                members={members}
+                members={displayMembers}
                 showNavigation={false}
                 workspaceId={workspaceId ?? null}
                 workspaceName={workspace?.name ?? "Workspace"}
@@ -815,6 +999,22 @@ export async function AppShell({ section }: { section: AppSection }) {
 
             {section === "dashboard" ? (
             <aside className="grid content-start gap-5">
+              <section className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-2">
+                {dashboardMetrics.map((item) => (
+                  <div
+                    className="min-h-28 self-start rounded-lg border border-[#d9ded3] bg-white p-4"
+                    key={item.label}
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-[#647067]">{item.label}</p>
+                      <item.icon className="text-[#35735b]" size={18} />
+                    </div>
+                    <p className="mt-3 text-2xl font-semibold">{item.value}</p>
+                    <p className="mt-1 text-xs text-[#7a847c]">{item.detail}</p>
+                  </div>
+                ))}
+              </section>
+
               <section
                 className="scroll-mt-5 rounded-lg border border-[#d9ded3] bg-white p-4"
                 id="observability"

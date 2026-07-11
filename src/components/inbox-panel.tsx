@@ -361,11 +361,11 @@ export function InboxPanel({
   }
 
   return (
-    <div className="grid min-h-[430px] xl:grid-cols-[320px_1fr_300px]">
-      <div className="divide-y divide-[#edf0ea] border-b border-[#e2e6df] lg:border-b-0 lg:border-r">
+    <div className="grid h-[calc(100vh-260px)] min-h-[430px] overflow-hidden xl:grid-cols-[320px_1fr_300px]">
+      <div className="min-h-0 overflow-y-auto divide-y divide-[#edf0ea] border-b border-[#e2e6df] lg:border-b-0 lg:border-r">
         {localConversations.map((conversation) => (
           <button
-            className={`block w-full px-4 py-4 text-left transition hover:bg-[#f6f7f3] ${
+            className={`block w-full px-3 py-2.5 text-left transition hover:bg-[#f6f7f3] ${
               conversation.id === selectedConversation?.id ? "bg-[#eef6df]" : ""
             }`}
             key={conversation.id}
@@ -375,12 +375,14 @@ export function InboxPanel({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="truncate font-semibold">{conversation.name}</h3>
-                  <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
+                  <h3 className="truncate text-sm font-semibold">
+                    {conversation.name}
+                  </h3>
+                  <span className="rounded-md bg-[#eef2eb] px-1.5 py-0.5 text-[11px] text-[#4d5a51]">
                     {conversation.business}
                   </span>
                 </div>
-                <p className="mt-2 line-clamp-2 text-sm text-[#5d685f]">
+                <p className="mt-1 line-clamp-1 text-xs text-[#5d685f]">
                   {conversation.summary}
                 </p>
               </div>
@@ -388,14 +390,14 @@ export function InboxPanel({
                 {conversation.time}
               </span>
             </div>
-            <span className="mt-3 inline-flex rounded-lg border border-[#d9ded3] px-2.5 py-1 text-xs">
+            <span className="mt-2 inline-flex rounded-md border border-[#d9ded3] px-2 py-0.5 text-[11px]">
               {conversation.status}
             </span>
           </button>
         ))}
       </div>
 
-      <div className="flex min-w-0 flex-col bg-[#fafbf8]">
+      <div className="flex min-h-0 min-w-0 flex-col bg-[#fafbf8]">
         <div className="border-b border-[#e2e6df] bg-white px-4 py-3">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
@@ -450,7 +452,7 @@ export function InboxPanel({
           </div>
         </div>
 
-        <div className="flex-1 space-y-3 p-4">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
           {selectedMessages.length > 0 ? (
             selectedMessages.map((message) => {
               const isOutbound = message.direction === "outbound";
@@ -566,7 +568,7 @@ export function InboxPanel({
         </form>
       </div>
 
-      <aside className="border-t border-[#e2e6df] bg-white p-4 xl:border-l xl:border-t-0">
+      <aside className="min-h-0 overflow-y-auto border-t border-[#e2e6df] bg-white p-4 xl:border-l xl:border-t-0">
         <div className="flex items-center gap-2">
           <UserRound className="text-[#35735b]" size={18} />
           <h3 className="text-sm font-semibold">Contacto</h3>

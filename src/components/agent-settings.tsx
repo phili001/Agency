@@ -1,7 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { BookOpenText, Bot, Loader2, Play, Save, Trash2, Wrench } from "lucide-react";
+import {
+  BookOpenText,
+  Bot,
+  Loader2,
+  Play,
+  Save,
+  Trash2,
+  Wrench,
+} from "lucide-react";
 
 import type { Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/client";
@@ -37,11 +45,12 @@ type AgentSettingsProps = {
 type AgentConfig = {
   enabled_tools: string[];
   knowledge_asset_ids: string[];
+  router_description: string;
 };
 
 function getAgentConfig(config: Json): AgentConfig {
   if (!config || typeof config !== "object" || Array.isArray(config)) {
-    return { enabled_tools: [], knowledge_asset_ids: [] };
+    return { enabled_tools: [], knowledge_asset_ids: [], router_description: "" };
   }
 
   return {
@@ -53,6 +62,8 @@ function getAgentConfig(config: Json): AgentConfig {
           (item): item is string => typeof item === "string",
         )
       : [],
+    router_description:
+      typeof config.router_description === "string" ? config.router_description : "",
   };
 }
 
@@ -64,6 +75,7 @@ function mergeAgentConfig(config: Json, patch: AgentConfig): Json {
     ...current,
     enabled_tools: patch.enabled_tools,
     knowledge_asset_ids: patch.knowledge_asset_ids,
+    router_description: patch.router_description,
   };
 }
 
@@ -200,6 +212,7 @@ export function AgentSettings({
     model: selectedAgent?.model ?? "gpt-5.4-mini",
     name: selectedAgent?.name ?? "",
     rules: selectedPrompt.rules,
+    router_description: selectedConfig.router_description,
     restrictions: selectedPrompt.restrictions,
     system_prompt: selectedPrompt.system_prompt,
     temperature: getResponseStyleValue(selectedAgent?.temperature),
@@ -227,6 +240,7 @@ export function AgentSettings({
       model: agent.model,
       name: agent.name,
       rules: prompt.rules,
+      router_description: config.router_description,
       restrictions: prompt.restrictions,
       system_prompt: prompt.system_prompt,
       temperature: getResponseStyleValue(agent.temperature),
@@ -248,6 +262,7 @@ export function AgentSettings({
       config: mergeAgentConfig(selectedAgent.config, {
         enabled_tools: form.enabled_tools,
         knowledge_asset_ids: form.knowledge_asset_ids,
+        router_description: form.router_description,
       }),
       is_active: form.is_active,
       model: form.model.trim(),
@@ -297,6 +312,12 @@ export function AgentSettings({
         temperature: 0.4,
         type: "setter",
         workspace_id: workspaceId,
+        config: {
+          enabled_tools: [],
+          knowledge_asset_ids: [],
+          router_description:
+            "Usar para primeros mensajes, calificacion de leads, dudas generales y pasar a citas cuando el contacto quiera agendar.",
+        },
       })
       .select(
         "id, workspace_id, name, type, is_active, model, system_prompt, temperature, config",
@@ -319,6 +340,7 @@ export function AgentSettings({
       model: data.model,
       name: data.name,
       rules: dataPrompt.rules,
+      router_description: getAgentConfig(data.config).router_description,
       restrictions: dataPrompt.restrictions,
       system_prompt: dataPrompt.system_prompt,
       temperature: getResponseStyleValue(data.temperature),
@@ -363,6 +385,7 @@ export function AgentSettings({
         model: nextAgent.model,
         name: nextAgent.name,
         rules: prompt.rules,
+        router_description: config.router_description,
         restrictions: prompt.restrictions,
         system_prompt: prompt.system_prompt,
         temperature: getResponseStyleValue(nextAgent.temperature),
@@ -550,6 +573,24 @@ export function AgentSettings({
               </select>
             </label>
           </div>
+
+          <label className="grid gap-1.5 text-sm font-medium">
+            Descripcion para router
+            <textarea
+              className="min-h-24 rounded-lg border border-[#cbd2c6] p-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  router_description: event.target.value,
+                }))
+              }
+              placeholder="Ej: Usar este agente cuando el contacto pregunte precios, ubicacion, servicios y dudas generales."
+              value={form.router_description}
+            />
+            <span className="text-xs font-normal text-[#647067]">
+              El router compara esta descripcion con el mensaje y decide que agente activo responde.
+            </span>
+          </label>
 
           <label className="grid gap-1.5 text-sm font-medium">
             Instrucciones del agente

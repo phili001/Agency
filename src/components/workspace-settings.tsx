@@ -11,11 +11,18 @@ import {
   Plus,
   PlugZap,
   Save,
+  Trash2,
   UsersRound,
   Wrench,
 } from "lucide-react";
 
 import { AgentSettings } from "@/components/agent-settings";
+import {
+  buildBusinessProfileContent,
+  businessProfileFields,
+  getBusinessProfileMetadata,
+  normalizeVariableKey,
+} from "@/lib/business-profile";
 import type { Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/client";
 
@@ -33,6 +40,7 @@ type WorkspaceAsset = {
   content: string;
   id: string;
   kind: "business_profile" | "tool" | "template" | "knowledge";
+  metadata: Json;
   status: "draft" | "active" | "archived";
   title: string;
   workspace_id: string;
@@ -40,6 +48,8 @@ type WorkspaceAsset = {
 
 type WorkspaceMember = {
   created_at: string;
+  display_email?: string;
+  display_name?: string;
   id: string;
   role: "owner" | "admin" | "agent" | "viewer";
   user_id: string;
@@ -169,6 +179,7 @@ function buildAssetDraft(kind: WorkspaceAsset["kind"], assets: WorkspaceAsset[])
   return {
     content: current?.content ?? "",
     id: current?.id ?? "",
+    metadata: current?.metadata ?? {},
     status: current?.status ?? "draft",
     title: current?.title ?? "",
   };
@@ -238,6 +249,7 @@ export function WorkspaceSettings({
   const supabase = createClient();
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
   const [localIntegrations, setLocalIntegrations] = useState(integrations);
+  const [localMembers, setLocalMembers] = useState(members);
   const [localAssets, setLocalAssets] = useState(assets);
   const [integrationDrafts, setIntegrationDrafts] = useState(() =>
     Object.fromEntries(
@@ -265,6 +277,12 @@ export function WorkspaceSettings({
     tool: buildAssetDraft("tool", assets),
   }));
   const [status, setStatus] = useState("");
+  const [memberEmail, setMemberEmail] = useState("");
+  const [memberPassword, setMemberPassword] = useState("");
+  const [memberRole, setMemberRole] = useState<WorkspaceMember["role"]>("agent");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newPasswordConfirmation, setNewPasswordConfirmation] = useState("");
   const [savingKey, setSavingKey] = useState("");
 
   const ycloudSecretValue = integrationDrafts.ycloud.config.webhook_secret_ref?.trim();
@@ -363,6 +381,7 @@ export function WorkspaceSettings({
     const payload = {
       content: draft.content,
       kind,
+      metadata: draft.metadata,
       status: draft.status,
       title: draft.title || workspaceName,
       workspace_id: workspaceId,
@@ -372,12 +391,12 @@ export function WorkspaceSettings({
           .from("workspace_assets")
           .update(payload)
           .eq("id", existing.id)
-          .select("id, workspace_id, kind, title, content, status")
+          .select("id, workspace_id, kind, title, content, status, metadata")
           .single()
       : supabase
           .from("workspace_assets")
           .insert(payload)
-          .select("id, workspace_id, kind, title, content, status")
+          .select("id, workspace_id, kind, title, content, status, metadata")
           .single();
 
     const { data, error } = await query;
@@ -401,6 +420,7 @@ export function WorkspaceSettings({
       [kind]: {
         content: data.content,
         id: data.id,
+        metadata: data.metadata,
         status: data.status,
         title: data.title,
       },
@@ -428,11 +448,12 @@ export function WorkspaceSettings({
       .insert({
         content,
         kind,
+        metadata: {},
         status,
         title,
         workspace_id: workspaceId,
       })
-      .select("id, workspace_id, kind, title, content, status")
+      .select("id, workspace_id, kind, title, content, status, metadata")
       .single();
 
     if (error) {
@@ -448,6 +469,421 @@ export function WorkspaceSettings({
     setLocalAssets((current) => [data as WorkspaceAsset, ...current]);
     setStatus("Recurso agregado.");
     setSavingKey("");
+  }
+
+  async function addMember() {
+    if (!workspaceId) {
+      setStatus("Primero necesitas un workspace activo.");
+      return;
+    }
+
+    const email = memberEmail.trim();
+
+    if (!email) {
+      setStatus("Escribe el email de la persona.");
+      return;
+    }
+
+    if (memberPassword.trim().length < 8) {
+      setStatus("La contraseña debe tener minimo 8 caracteres.");
+      return;
+    }
+
+    setSavingKey("team:add");
+    setStatus("");
+
+    const response = await fetch("/api/team/members", {
+      body: JSON.stringify({
+        email,
+        password: memberPassword.trim(),
+        role: memberRole,
+        workspaceId,
+      }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+    });
+    const payload = (await response.json()) as {
+      error?: string;
+      member?: WorkspaceMember;
+    };
+
+    if (!response.ok || !payload.member) {
+      setStatus(payload.error ?? "No se pudo agregar el miembro.");
+      setSavingKey("");
+      return;
+    }
+
+    setLocalMembers((current) => {
+      const withoutMember = current.filter((member) => member.id !== payload.member!.id);
+      return [payload.member!, ...withoutMember];
+    });
+    setMemberEmail("");
+    setMemberPassword("");
+    setStatus("Miembro agregado al workspace.");
+    setSavingKey("");
+  }
+
+  async function changeOwnPassword() {
+    const current = currentPassword.trim();
+    const next = newPassword.trim();
+
+    if (!current) {
+      setStatus("Escribe tu contrasena actual.");
+      return;
+    }
+
+    if (next.length < 8) {
+      setStatus("La nueva contrasena debe tener minimo 8 caracteres.");
+      return;
+    }
+
+    if (next !== newPasswordConfirmation.trim()) {
+      setStatus("La confirmacion no coincide con la nueva contrasena.");
+      return;
+    }
+
+    if (current === next) {
+      setStatus("La nueva contrasena debe ser diferente a la actual.");
+      return;
+    }
+
+    setSavingKey("team:password");
+    setStatus("");
+
+    const response = await fetch("/api/account/password", {
+      body: JSON.stringify({
+        currentPassword: current,
+        newPassword: next,
+      }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+    });
+    const payload = (await response.json()) as { error?: string };
+
+    if (!response.ok) {
+      setStatus(payload.error ?? "No se pudo cambiar la contrasena.");
+      setSavingKey("");
+      return;
+    }
+
+    setCurrentPassword("");
+    setNewPassword("");
+    setNewPasswordConfirmation("");
+    setStatus("Contrasena actualizada.");
+    setSavingKey("");
+  }
+
+  async function removeMember(member: WorkspaceMember) {
+    if (!workspaceId) {
+      setStatus("Primero necesitas un workspace activo.");
+      return;
+    }
+
+    const label = member.display_email || member.display_name || member.user_id;
+    const confirmed = window.confirm(
+      `Eliminar a ${label} de este workspace? Podra volver a entrar solo si lo agregas de nuevo.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setSavingKey(`team:remove:${member.id}`);
+    setStatus("");
+
+    const response = await fetch("/api/team/members", {
+      body: JSON.stringify({
+        memberId: member.id,
+        workspaceId,
+      }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "DELETE",
+    });
+    const payload = (await response.json()) as { error?: string };
+
+    if (!response.ok) {
+      setStatus(payload.error ?? "No se pudo eliminar el miembro.");
+      setSavingKey("");
+      return;
+    }
+
+    setLocalMembers((current) =>
+      current.filter((currentMember) => currentMember.id !== member.id),
+    );
+    setStatus("Miembro eliminado del workspace.");
+    setSavingKey("");
+  }
+
+  function updateBusinessField(key: string, value: string) {
+    setAssetDrafts((current) => {
+      const draft = current.business_profile;
+      const metadata = getBusinessProfileMetadata(draft.metadata);
+      const nextMetadata = {
+        ...metadata,
+        fields: {
+          ...(metadata.fields ?? {}),
+          [key]: value,
+        },
+      };
+
+      return {
+        ...current,
+        business_profile: {
+          ...draft,
+          content: buildBusinessProfileContent(nextMetadata),
+          metadata: nextMetadata,
+          title:
+            key === "company_name" && value.trim()
+              ? value.trim()
+              : draft.title || workspaceName,
+        },
+      };
+    });
+  }
+
+  function updateBusinessCustomField(
+    index: number,
+    patch: Partial<{ key: string; label: string; value: string }>,
+  ) {
+    setAssetDrafts((current) => {
+      const draft = current.business_profile;
+      const metadata = getBusinessProfileMetadata(draft.metadata);
+      const customFields = [...(metadata.custom_fields ?? [])];
+      const currentField = customFields[index] ?? { key: "", label: "", value: "" };
+      const nextField = { ...currentField, ...patch };
+
+      if (patch.label !== undefined && patch.key === undefined && !currentField.key) {
+        nextField.key = normalizeVariableKey(patch.label);
+      }
+
+      customFields[index] = nextField;
+
+      const nextMetadata = {
+        ...metadata,
+        custom_fields: customFields,
+      };
+
+      return {
+        ...current,
+        business_profile: {
+          ...draft,
+          content: buildBusinessProfileContent(nextMetadata),
+          metadata: nextMetadata,
+        },
+      };
+    });
+  }
+
+  function addBusinessCustomField() {
+    setAssetDrafts((current) => {
+      const draft = current.business_profile;
+      const metadata = getBusinessProfileMetadata(draft.metadata);
+      const nextMetadata = {
+        ...metadata,
+        custom_fields: [
+          ...(metadata.custom_fields ?? []),
+          { key: "", label: "", value: "" },
+        ],
+      };
+
+      return {
+        ...current,
+        business_profile: {
+          ...draft,
+          metadata: nextMetadata,
+        },
+      };
+    });
+  }
+
+  function removeBusinessCustomField(index: number) {
+    setAssetDrafts((current) => {
+      const draft = current.business_profile;
+      const metadata = getBusinessProfileMetadata(draft.metadata);
+      const nextMetadata = {
+        ...metadata,
+        custom_fields: (metadata.custom_fields ?? []).filter((_, itemIndex) => itemIndex !== index),
+      };
+
+      return {
+        ...current,
+        business_profile: {
+          ...draft,
+          content: buildBusinessProfileContent(nextMetadata),
+          metadata: nextMetadata,
+        },
+      };
+    });
+  }
+
+  function businessProfileEditor() {
+    const draft = assetDrafts.business_profile;
+    const metadata = getBusinessProfileMetadata(draft.metadata);
+
+    return (
+      <div className="grid gap-5">
+        <div>
+          <h3 className="text-sm font-semibold">Info del negocio</h3>
+          <p className="mt-1 text-sm text-[#647067]">
+            Completa estos datos como en GHL. Cada campo se puede usar como
+            variable en los prompts de agentes.
+          </p>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          {businessProfileFields.map((field) => (
+            <label className="grid gap-1.5 text-sm font-medium" key={field.key}>
+              <span className="flex items-center justify-between gap-2">
+                {field.label}
+                <code className="rounded-md bg-[#eef2eb] px-1.5 py-0.5 text-[11px] font-normal text-[#4d5a51]">
+                  {field.variable}
+                </code>
+              </span>
+              <input
+                className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                onChange={(event) => updateBusinessField(field.key, event.target.value)}
+                placeholder={field.placeholder}
+                value={metadata.fields?.[field.key] ?? ""}
+              />
+              <span className="text-xs font-normal text-[#647067]">
+                {field.help}
+              </span>
+            </label>
+          ))}
+        </div>
+
+        <div className="grid gap-3 rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-sm font-semibold">Campos adicionales</h3>
+              <p className="mt-1 text-sm text-[#647067]">
+                Agrega cualquier dato propio del negocio y usalo como variable.
+              </p>
+            </div>
+            <button
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm font-medium"
+              onClick={addBusinessCustomField}
+              type="button"
+            >
+              <Plus size={15} />
+              Agregar campo
+            </button>
+          </div>
+
+          <div className="grid gap-2">
+            {(metadata.custom_fields ?? []).map((field, index) => {
+              const variableKey = normalizeVariableKey(field.key || field.label);
+
+              return (
+                <div
+                  className="grid gap-2 rounded-lg border border-[#e2e6df] bg-white p-3"
+                  key={`${index}-${field.key}`}
+                >
+                  <div className="grid gap-2 md:grid-cols-[1fr_180px]">
+                    <label className="grid gap-1.5 text-sm font-medium">
+                      Nombre visible
+                      <input
+                        className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                        onChange={(event) =>
+                          updateBusinessCustomField(index, {
+                            label: event.target.value,
+                          })
+                        }
+                        placeholder="Ej: Garantia"
+                        value={field.label}
+                      />
+                    </label>
+                    <label className="grid gap-1.5 text-sm font-medium">
+                      Variable
+                      <input
+                        className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                        onChange={(event) =>
+                          updateBusinessCustomField(index, {
+                            key: normalizeVariableKey(event.target.value),
+                          })
+                        }
+                        placeholder="garantia"
+                        value={field.key}
+                      />
+                    </label>
+                  </div>
+                  <label className="grid gap-1.5 text-sm font-medium">
+                    Valor
+                    <textarea
+                      className="min-h-20 rounded-lg border border-[#cbd2c6] p-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                      onChange={(event) =>
+                        updateBusinessCustomField(index, {
+                          value: event.target.value,
+                        })
+                      }
+                      placeholder="Ej: 30 dias para cambios por defectos de fabrica."
+                      value={field.value}
+                    />
+                  </label>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <code className="rounded-md bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
+                      {variableKey ? `{${variableKey}}` : "{variable}"}
+                    </code>
+                    <button
+                      className="h-8 rounded-lg border border-red-200 bg-white px-2 text-xs font-medium text-red-700"
+                      onClick={() => removeBusinessCustomField(index)}
+                      type="button"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+            {(metadata.custom_fields ?? []).length === 0 ? (
+              <p className="rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
+                No hay campos adicionales. Puedes agregar politicas, promociones,
+                especialidades, URLs o cualquier dato que el agente deba conocer.
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+            onChange={(event) =>
+              setAssetDrafts((current) => ({
+                ...current,
+                business_profile: {
+                  ...current.business_profile,
+                  status: event.target.value as WorkspaceAsset["status"],
+                },
+              }))
+            }
+            value={draft.status}
+          >
+            <option value="draft">Borrador</option>
+            <option value="active">Activo</option>
+            <option value="archived">Archivado</option>
+          </select>
+          <button
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]"
+            disabled={savingKey === "business_profile"}
+            onClick={() => saveAsset("business_profile")}
+            type="button"
+          >
+            {savingKey === "business_profile" ? (
+              <Loader2 className="animate-spin" size={16} />
+            ) : (
+              <Save size={16} />
+            )}
+            Guardar negocio
+          </button>
+        </div>
+      </div>
+    );
   }
 
   function assetList(kind: WorkspaceAsset["kind"], empty: string) {
@@ -713,15 +1149,7 @@ export function WorkspaceSettings({
           </div>
         ) : null}
 
-        {activeTab === "business"
-          ? assetEditor({
-              helper: "Contexto estable que el agente usa para responder como el negocio.",
-              kind: "business_profile",
-              placeholder:
-                "Servicios, horarios, ubicacion, politicas, tono de marca, precios base...",
-              title: "Info del negocio",
-            })
-          : null}
+        {activeTab === "business" ? businessProfileEditor() : null}
 
         {activeTab === "tools" ? (
           <div className="grid gap-5">
@@ -813,27 +1241,156 @@ export function WorkspaceSettings({
                 </p>
               </div>
               <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
-                {members.length} miembros
+                {localMembers.length} miembros
               </span>
             </div>
+            <div className="mt-4 grid gap-3 rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3 md:grid-cols-[1fr_180px_150px_auto]">
+              <label className="grid gap-1.5 text-sm font-medium">
+                Email
+                <input
+                  className="h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                  onChange={(event) => setMemberEmail(event.target.value)}
+                  placeholder="persona@empresa.com"
+                  type="email"
+                  value={memberEmail}
+                />
+              </label>
+              <label className="grid gap-1.5 text-sm font-medium">
+                Contraseña
+                <input
+                  className="h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                  minLength={8}
+                  onChange={(event) => setMemberPassword(event.target.value)}
+                  placeholder="Min. 8 caracteres"
+                  type="password"
+                  value={memberPassword}
+                />
+              </label>
+              <label className="grid gap-1.5 text-sm font-medium">
+                Rol
+                <select
+                  className="h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                  onChange={(event) =>
+                    setMemberRole(event.target.value as WorkspaceMember["role"])
+                  }
+                  value={memberRole}
+                >
+                  <option value="agent">Agente</option>
+                  <option value="admin">Admin</option>
+                  <option value="viewer">Viewer</option>
+                  <option value="owner">Owner</option>
+                </select>
+              </label>
+              <button
+                className="inline-flex h-10 self-end items-center justify-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]"
+                disabled={savingKey === "team:add"}
+                onClick={addMember}
+                type="button"
+              >
+                {savingKey === "team:add" ? (
+                  <Loader2 className="animate-spin" size={16} />
+                ) : (
+                  <Plus size={16} />
+                )}
+                Agregar
+              </button>
+            </div>
+            <div className="mt-4 rounded-lg border border-[#e2e6df] bg-white p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-semibold">Cambiar mi contrasena</h4>
+                  <p className="mt-1 text-sm text-[#647067]">
+                    Usa tu contrasena anterior para confirmar el cambio.
+                  </p>
+                </div>
+                <KeyRound className="shrink-0 text-[#35735b]" size={18} />
+              </div>
+              <div className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
+                <label className="grid gap-1.5 text-sm font-medium">
+                  Contrasena actual
+                  <input
+                    className="h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                    onChange={(event) => setCurrentPassword(event.target.value)}
+                    placeholder="Actual"
+                    type="password"
+                    value={currentPassword}
+                  />
+                </label>
+                <label className="grid gap-1.5 text-sm font-medium">
+                  Nueva contrasena
+                  <input
+                    className="h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                    minLength={8}
+                    onChange={(event) => setNewPassword(event.target.value)}
+                    placeholder="Min. 8 caracteres"
+                    type="password"
+                    value={newPassword}
+                  />
+                </label>
+                <label className="grid gap-1.5 text-sm font-medium">
+                  Confirmar nueva
+                  <input
+                    className="h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                    minLength={8}
+                    onChange={(event) =>
+                      setNewPasswordConfirmation(event.target.value)
+                    }
+                    placeholder="Repite la nueva"
+                    type="password"
+                    value={newPasswordConfirmation}
+                  />
+                </label>
+                <button
+                  className="inline-flex h-10 self-end items-center justify-center gap-2 rounded-lg border border-[#10231c] px-3 text-sm font-medium text-[#10231c] disabled:border-[#9aa59e] disabled:text-[#9aa59e]"
+                  disabled={savingKey === "team:password"}
+                  onClick={changeOwnPassword}
+                  type="button"
+                >
+                  {savingKey === "team:password" ? (
+                    <Loader2 className="animate-spin" size={16} />
+                  ) : (
+                    <KeyRound size={16} />
+                  )}
+                  Cambiar
+                </button>
+              </div>
+            </div>
             <div className="mt-4 grid gap-2">
-              {members.map((member) => (
+              {localMembers.map((member) => (
                 <div
-                  className="flex items-center justify-between gap-3 rounded-lg border border-[#e2e6df] p-3 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#e2e6df] p-3 text-sm"
                   key={member.id}
                 >
                   <div className="min-w-0">
-                    <p className="truncate font-medium">{member.user_id}</p>
+                    <p className="truncate font-medium">
+                      {member.display_name || member.display_email || member.user_id}
+                    </p>
                     <p className="mt-1 text-xs text-[#647067]">
-                      Alta {stableDate(member.created_at)}
+                      {member.display_email || member.user_id} - Alta{" "}
+                      {stableDate(member.created_at)}
                     </p>
                   </div>
-                  <span className="rounded-lg bg-[#e7f6ce] px-2 py-1 text-xs text-[#31521d]">
-                    {member.role}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-lg bg-[#e7f6ce] px-2 py-1 text-xs text-[#31521d]">
+                      {member.role}
+                    </span>
+                    <button
+                      className="inline-flex h-9 min-w-[94px] items-center justify-center gap-1.5 rounded-lg border border-[#efc4bd] bg-[#fff3f1] px-3 text-xs font-semibold text-[#9b2f22] shadow-sm transition hover:border-[#d96c5e] hover:bg-[#ffe4df] hover:text-[#7f2419] focus:outline-none focus:ring-2 focus:ring-[#f5b6ad]/60 disabled:cursor-not-allowed disabled:border-[#e4dfdb] disabled:bg-[#f6f4f1] disabled:text-[#9aa59e] disabled:shadow-none"
+                      disabled={savingKey === `team:remove:${member.id}`}
+                      onClick={() => removeMember(member)}
+                      type="button"
+                    >
+                      {savingKey === `team:remove:${member.id}` ? (
+                        <Loader2 className="animate-spin" size={14} />
+                      ) : (
+                        <Trash2 size={14} />
+                      )}
+                      Eliminar
+                    </button>
+                  </div>
                 </div>
               ))}
-              {members.length === 0 ? (
+              {localMembers.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
                   Aun no hay miembros visibles en este workspace.
                 </p>

@@ -2,19 +2,32 @@ import { NextResponse } from "next/server";
 
 import type { Json } from "@/lib/supabase/database.types";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  applyBusinessVariables,
+  buildBusinessContext,
+  getBusinessVariables,
+} from "@/lib/business-profile";
 
 type AgentRow = {
   config: Json;
   id: string;
   model: string;
+  name: string;
   system_prompt: string;
   temperature: number;
+  type: string;
   workspace_id: string;
 };
 
 type KnowledgeAsset = {
   content: string;
   id: string;
+  title: string;
+};
+
+type BusinessProfileAsset = {
+  content: string;
+  metadata: Json;
   title: string;
 };
 
@@ -116,13 +129,182 @@ function getKnowledgeAssetIds(config: Json) {
     : [];
 }
 
-function buildInstructions(agent: AgentRow, assets: KnowledgeAsset[]) {
+function getConfigRecord(config: Json) {
+  return config && typeof config === "object" && !Array.isArray(config)
+    ? (config as Record<string, unknown>)
+    : {};
+}
+
+function getRouterDescription(agent: AgentRow) {
+  const config = getConfigRecord(agent.config);
+  return typeof config.router_description === "string"
+    ? config.router_description
+    : "";
+}
+
+function getRoutingKeywords(agent: AgentRow) {
+  const config = getConfigRecord(agent.config);
+  return Array.isArray(config.routing_keywords)
+    ? config.routing_keywords.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function normalizeRoutingText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s_]/g, " ");
+}
+
+function getRoutingTokens(value: string) {
+  const stopWords = new Set([
+    "para",
+    "cuando",
+    "este",
+    "esta",
+    "usar",
+    "agente",
+    "contacto",
+    "quiero",
+    "quieres",
+    "tengo",
+    "duda",
+    "dudas",
+    "con",
+    "por",
+    "una",
+    "uno",
+    "los",
+    "las",
+    "del",
+    "que",
+    "como",
+    "pero",
+  ]);
+
+  return normalizeRoutingText(value)
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3 && !stopWords.has(token));
+}
+
+function getAgentIntentBoost(agent: AgentRow, messageText: string) {
+  const config = getConfigRecord(agent.config);
+  const key = String(config.default_agent_key ?? agent.type ?? "");
+  const text = normalizeRoutingText(messageText);
+  const groups: Record<string, string[]> = {
+    booking: [
+      "agenda",
+      "agendar",
+      "cita",
+      "reservar",
+      "reserva",
+      "disponibilidad",
+      "horario",
+      "hora",
+      "manana",
+      "hoy",
+      "calendario",
+      "confirmar",
+    ],
+    setter: [
+      "info",
+      "informacion",
+      "precio",
+      "precios",
+      "cuanto",
+      "servicio",
+      "servicios",
+      "ubicacion",
+      "direccion",
+      "horarios",
+      "interesa",
+    ],
+    support: [
+      "problema",
+      "ayuda",
+      "soporte",
+      "queja",
+      "reclamo",
+      "humano",
+      "asesor",
+      "persona",
+      "cancelar",
+      "cambiar",
+      "error",
+    ],
+  };
+
+  return (groups[key] ?? []).reduce(
+    (score, keyword) => score + (text.includes(keyword) ? 3 : 0),
+    0,
+  );
+}
+
+function routeAgent(agents: AgentRow[], messages: MessageRow[]) {
+  if (agents.length <= 1) {
+    return {
+      agent: agents[0] ?? null,
+      score: 0,
+      strategy: agents.length === 1 ? "single_active_agent" : "no_active_agent",
+    };
+  }
+
+  const transcript = messages.map((message) => message.body ?? "").join("\n");
+  const latest = messages.at(-1)?.body ?? "";
+  const messageTokens = new Set(getRoutingTokens(`${latest}\n${transcript}`));
+  const ranked = agents
+    .map((agent) => {
+      const description = getRouterDescription(agent);
+      const keywordText = getRoutingKeywords(agent).join(" ");
+      const routerTokens = getRoutingTokens(
+        `${agent.name} ${agent.type} ${description} ${keywordText}`,
+      );
+      const overlap = routerTokens.reduce(
+        (score, token) => score + (messageTokens.has(token) ? 2 : 0),
+        0,
+      );
+      const keywordBoost = getRoutingKeywords(agent).reduce(
+        (score, keyword) =>
+          score +
+          (normalizeRoutingText(`${latest}\n${transcript}`).includes(
+            normalizeRoutingText(keyword),
+          )
+            ? 4
+            : 0),
+        0,
+      );
+      const intentBoost = getAgentIntentBoost(agent, `${latest}\n${transcript}`);
+
+      return {
+        agent,
+        score: overlap + keywordBoost + intentBoost,
+      };
+    })
+    .sort((left, right) => right.score - left.score);
+
+  return {
+    agent: ranked[0]?.agent ?? null,
+    score: ranked[0]?.score ?? 0,
+    strategy: ranked[0]?.score ? "router_description" : "active_agent_fallback",
+  };
+}
+
+function buildInstructions(
+  agent: AgentRow,
+  assets: KnowledgeAsset[],
+  businessProfile?: BusinessProfileAsset | null,
+) {
   const basePrompt =
     agent.system_prompt ||
     "Eres un agente de WhatsApp claro, breve y orientado a resolver. Responde en espanol y evita sonar como robot.";
+  const businessVariables = getBusinessVariables(businessProfile);
+  const promptWithVariables = applyBusinessVariables(basePrompt, businessVariables);
+  const businessContext = buildBusinessContext(businessProfile);
 
   if (assets.length === 0) {
-    return basePrompt;
+    return [businessContext, promptWithVariables].filter(Boolean).join("\n\n");
   }
 
   const ragContext = assets
@@ -143,13 +325,16 @@ Reglas obligatorias sobre la base de conocimiento:
 - No inventes precios, horarios, politicas ni condiciones que no aparezcan aqui.
 
 Prompt del agente:
-${basePrompt}`;
+${promptWithVariables}
+
+${businessContext}`;
 }
 
 async function generateReply(
   agent: AgentRow,
   messages: MessageRow[],
   knowledgeAssets: KnowledgeAsset[],
+  businessProfile?: BusinessProfileAsset | null,
 ) {
   const apiKey = process.env.OPENAI_API_KEY;
 
@@ -158,7 +343,7 @@ async function generateReply(
   }
 
   const model = normalizeModel(agent.model);
-  const instructions = buildInstructions(agent, knowledgeAssets);
+  const instructions = buildInstructions(agent, knowledgeAssets, businessProfile);
   const transcript = buildTranscript(messages);
   const response = await fetch("https://api.openai.com/v1/responses", {
     body: JSON.stringify({
@@ -296,20 +481,17 @@ export async function POST(request: Request) {
       continue;
     }
 
-    const { data: agent } = conversation.agent_id
-      ? await supabase
-        .from("agents")
-          .select("id, workspace_id, model, system_prompt, temperature, config")
-          .eq("id", conversation.agent_id)
-          .single()
-      : await supabase
-          .from("agents")
-          .select("id, workspace_id, model, system_prompt, temperature, config")
-          .eq("workspace_id", conversation.workspace_id)
-          .eq("is_active", true)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+    const { data: activeAgents } = await supabase
+      .from("agents")
+      .select("id, workspace_id, name, type, model, system_prompt, temperature, config")
+      .eq("workspace_id", conversation.workspace_id)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false });
+    const routedAgent = routeAgent(
+      ((activeAgents ?? []) as AgentRow[]),
+      chronologicalMessages,
+    );
+    const agent = routedAgent.agent;
 
     if (!agent) {
       results.push({ conversationId: conversation.id, status: "no_agent" });
@@ -329,10 +511,20 @@ export async function POST(request: Request) {
               .neq("status", "archived")
               .in("id", knowledgeAssetIds)
           : { data: [] };
+      const { data: businessProfile } = await supabase
+        .from("workspace_assets")
+        .select("title, content, metadata")
+        .eq("workspace_id", typedAgent.workspace_id)
+        .eq("kind", "business_profile")
+        .eq("status", "active")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
       const reply = await generateReply(
         typedAgent,
         chronologicalMessages,
         (knowledgeAssets ?? []) as KnowledgeAsset[],
+        businessProfile as BusinessProfileAsset | null,
       );
       const insights = await generateContactInsights(
         typedAgent,
@@ -358,6 +550,12 @@ export async function POST(request: Request) {
             kind: "buffer_ai_reply",
             openai_response_id: reply.responseId,
             rag_document_ids: knowledgeAssetIds,
+            router: {
+              agent_id: typedAgent.id,
+              agent_name: typedAgent.name,
+              score: routedAgent.score,
+              strategy: routedAgent.strategy,
+            },
           },
           output_tokens: Number(reply.usage.output_tokens ?? 0),
           role: "assistant",
@@ -380,6 +578,12 @@ export async function POST(request: Request) {
           kind: "buffer_ai_reply",
           openai_response_id: reply.responseId,
           rag_document_ids: knowledgeAssetIds,
+          router: {
+            agent_id: typedAgent.id,
+            agent_name: typedAgent.name,
+            score: routedAgent.score,
+            strategy: routedAgent.strategy,
+          },
         },
         model: reply.model,
         output_tokens: Number(reply.usage.output_tokens ?? 0),
@@ -394,6 +598,12 @@ export async function POST(request: Request) {
         metadata: {
           kind: "contact_insights",
           openai_response_id: insights.responseId,
+          router: {
+            agent_id: typedAgent.id,
+            agent_name: typedAgent.name,
+            score: routedAgent.score,
+            strategy: routedAgent.strategy,
+          },
         },
         model: insights.model,
         output_tokens: Number(insights.usage.output_tokens ?? 0),
@@ -429,11 +639,21 @@ export async function POST(request: Request) {
 
       await supabase
         .from("conversations")
-        .update({ last_message_at: message.created_at })
+        .update({
+          agent_id: typedAgent.id,
+          last_message_at: message.created_at,
+        })
         .eq("id", conversation.id)
         .eq("workspace_id", conversation.workspace_id);
 
-      results.push({ conversationId: conversation.id, status: "queued" });
+      results.push({
+        agentId: typedAgent.id,
+        agentName: typedAgent.name,
+        conversationId: conversation.id,
+        routerScore: routedAgent.score,
+        routerStrategy: routedAgent.strategy,
+        status: "queued",
+      });
     } catch (error) {
       results.push({
         conversationId: conversation.id,

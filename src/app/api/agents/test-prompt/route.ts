@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 
 import type { Json } from "@/lib/supabase/database.types";
+import {
+  applyBusinessVariables,
+  buildBusinessContext,
+  getBusinessVariables,
+} from "@/lib/business-profile";
 import { createClient } from "@/lib/supabase/server";
 
 const DEFAULT_OPENAI_MODEL = "gpt-5.4-mini";
@@ -31,6 +36,12 @@ type KnowledgeAsset = {
   title: string;
 };
 
+type BusinessProfileAsset = {
+  content: string;
+  metadata: Json;
+  title: string;
+};
+
 function getKnowledgeAssetIds(config: Json) {
   if (!config || typeof config !== "object" || Array.isArray(config)) {
     return [];
@@ -43,13 +54,20 @@ function getKnowledgeAssetIds(config: Json) {
     : [];
 }
 
-function buildInstructions(systemPrompt: string | null, assets: KnowledgeAsset[]) {
+function buildInstructions(
+  systemPrompt: string | null,
+  assets: KnowledgeAsset[],
+  businessProfile?: BusinessProfileAsset | null,
+) {
   const basePrompt =
     systemPrompt ||
     "Eres un agente de WhatsApp claro, breve y orientado a resolver.";
+  const businessVariables = getBusinessVariables(businessProfile);
+  const promptWithVariables = applyBusinessVariables(basePrompt, businessVariables);
+  const businessContext = buildBusinessContext(businessProfile);
 
   if (assets.length === 0) {
-    return basePrompt;
+    return [businessContext, promptWithVariables].filter(Boolean).join("\n\n");
   }
 
   const ragContext = assets
@@ -70,7 +88,9 @@ Reglas obligatorias sobre la base de conocimiento:
 - No inventes precios, horarios, politicas ni condiciones que no aparezcan aqui.
 
 Prompt del agente:
-${basePrompt}`;
+${promptWithVariables}
+
+${businessContext}`;
 }
 
 function getOpenAIModel(model?: string | null) {
@@ -146,6 +166,15 @@ export async function POST(request: Request) {
 
   const model = getOpenAIModel(agent.model);
   const knowledgeAssetIds = getKnowledgeAssetIds(agent.config);
+  const { data: businessProfile } = await supabase
+    .from("workspace_assets")
+    .select("title, content, metadata")
+    .eq("workspace_id", agent.workspace_id)
+    .eq("kind", "business_profile")
+    .eq("status", "active")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
   const { data: knowledgeAssets } =
     knowledgeAssetIds.length > 0
       ? await supabase
@@ -159,6 +188,7 @@ export async function POST(request: Request) {
   const instructions = buildInstructions(
     agent.system_prompt,
     (knowledgeAssets ?? []) as KnowledgeAsset[],
+    businessProfile as BusinessProfileAsset | null,
   );
 
   const response = await fetch("https://api.openai.com/v1/responses", {

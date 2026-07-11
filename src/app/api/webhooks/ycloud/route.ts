@@ -6,6 +6,8 @@ type WebhookPayload = Record<string, unknown>;
 
 type NormalizedYCloudEvent = {
   businessPhone: string | null;
+  contactEmail: string | null;
+  contactName: string | null;
   eventType: string;
   externalId: string | null;
   fromPhone: string | null;
@@ -67,6 +69,46 @@ function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
         ["data", "whatsappInboundMessage", "to"],
       ]),
     ),
+    contactEmail: readPath(payload, [
+      ["contact", "email"],
+      ["customer", "email"],
+      ["customerProfile", "email"],
+      ["whatsappInboundMessage", "customerProfile", "email"],
+      ["message", "customerProfile", "email"],
+      ["data", "contact", "email"],
+      ["data", "customer", "email"],
+      ["data", "customerProfile", "email"],
+      ["data", "message", "customerProfile", "email"],
+      ["data", "whatsappInboundMessage", "customerProfile", "email"],
+    ]),
+    contactName: readPath(payload, [
+      ["fromName"],
+      ["profileName"],
+      ["contact", "name"],
+      ["contact", "displayName"],
+      ["customer", "name"],
+      ["customerProfile", "name"],
+      ["contacts", "0", "profile", "name"],
+      ["whatsappInboundMessage", "fromName"],
+      ["whatsappInboundMessage", "profileName"],
+      ["whatsappInboundMessage", "customerProfile", "name"],
+      ["message", "fromName"],
+      ["message", "profileName"],
+      ["message", "customerProfile", "name"],
+      ["data", "fromName"],
+      ["data", "profileName"],
+      ["data", "contact", "name"],
+      ["data", "contact", "displayName"],
+      ["data", "customer", "name"],
+      ["data", "customerProfile", "name"],
+      ["data", "contacts", "0", "profile", "name"],
+      ["data", "message", "fromName"],
+      ["data", "message", "profileName"],
+      ["data", "message", "customerProfile", "name"],
+      ["data", "whatsappInboundMessage", "fromName"],
+      ["data", "whatsappInboundMessage", "profileName"],
+      ["data", "whatsappInboundMessage", "customerProfile", "name"],
+    ]),
     eventType:
       readPath(payload, [
         ["type"],
@@ -132,6 +174,12 @@ function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
   };
 }
 
+function getMetadataRecord(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
 function isAuthorized(request: Request) {
   const expectedSecret = process.env.YCLOUD_WEBHOOK_SECRET;
   const receivedSecret = getReceivedSecret(request);
@@ -193,11 +241,36 @@ export async function POST(request: Request) {
 
   try {
     if (workspaceId && event.fromPhone && event.messageText) {
+      const { data: existingContact } = await supabase
+        .from("contacts")
+        .select("id, full_name, email, metadata")
+        .eq("workspace_id", workspaceId)
+        .eq("phone_e164", event.fromPhone)
+        .maybeSingle();
+      const existingMetadata = getMetadataRecord(existingContact?.metadata);
+      const ycloudMetadata = getMetadataRecord(existingMetadata.ycloud);
       const { data: contact, error: contactError } = await supabase
         .from("contacts")
         .upsert(
           {
-            metadata: { source: "ycloud" },
+            email: event.contactEmail ?? existingContact?.email ?? null,
+            full_name: event.contactName ?? existingContact?.full_name ?? null,
+            metadata: {
+              ...existingMetadata,
+              source: existingMetadata.source ?? "ycloud",
+              ycloud: {
+                ...ycloudMetadata,
+                business_phone: event.businessPhone ?? ycloudMetadata.business_phone,
+                contact_email: event.contactEmail ?? ycloudMetadata.contact_email,
+                contact_name: event.contactName ?? ycloudMetadata.contact_name,
+                external_id: event.externalId,
+                last_event_type: event.eventType,
+                phone_id: event.phoneId ?? ycloudMetadata.phone_id,
+                raw_from: event.fromPhone,
+                updated_at: new Date().toISOString(),
+                waba_id: event.wabaId ?? ycloudMetadata.waba_id,
+              },
+            },
             phone_e164: event.fromPhone,
             workspace_id: workspaceId,
           },
