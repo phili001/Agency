@@ -20,12 +20,14 @@ import {
   WalletCards,
   LogOut,
   Wrench,
+  Shield,
 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { signOut } from "./actions";
 import { InboxPanel } from "@/components/inbox-panel";
+import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { WorkspaceSettings } from "@/components/workspace-settings";
 import {
   DEFAULT_AGENT_PROMPT_VERSION,
@@ -35,6 +37,8 @@ import {
 } from "@/lib/default-agents";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPlatformAdmin } from "@/lib/platform-admin";
+import { getActiveWorkspaceId } from "@/lib/workspaces";
 
 const conversations = [
   {
@@ -77,7 +81,7 @@ const modules = [
   { name: "IA + humano con handoff", state: "Activo", icon: Headphones },
   { name: "Buffer inteligente", state: "Cron listo", icon: Clock3 },
   { name: "Audios transcritos", state: "Pendiente", icon: Mic },
-  { name: "Supabase multi-tenant", state: "Schema listo", icon: Database },
+  { name: "Empresas aisladas", state: "Listo", icon: Database },
   { name: "YCloud oficial", state: "Webhook listo", icon: PlugZap },
 ];
 
@@ -94,28 +98,23 @@ const roadmap = [
 
 const deployChecks = [
   {
-    description: "Cliente y service role disponibles",
+    description: "Base de datos y autenticacion disponibles",
     envKeys: [
       "NEXT_PUBLIC_SUPABASE_URL",
       "NEXT_PUBLIC_SUPABASE_ANON_KEY",
       "SUPABASE_SERVICE_ROLE_KEY",
     ],
-    label: "Supabase",
+    label: "Datos",
   },
   {
-    description: "Prueba de prompt y buffer IA",
-    envKeys: ["OPENAI_API_KEY"],
+    description: "Llave maestra para proteger API keys por empresa",
+    envKeys: ["INTEGRATION_ENCRYPTION_KEY"],
     label: "OpenAI",
   },
   {
-    description: "Envio saliente de WhatsApp",
-    envKeys: ["YCLOUD_API_KEY"],
+    description: "Endpoint publico para recibir mensajes",
+    envKeys: ["NEXT_PUBLIC_APP_URL"],
     label: "YCloud API",
-  },
-  {
-    description: "Validacion de webhooks inbound",
-    envKeys: ["YCLOUD_WEBHOOK_SECRET"],
-    label: "Webhook secret",
   },
   {
     description: "Proteccion de cron buffer/deliver",
@@ -128,8 +127,8 @@ const deployChecks = [
     label: "App URL",
   },
   {
-    description: "Sincronizacion de contactos/leads",
-    envKeys: ["GHL_API_KEY"],
+    description: "Sincronizacion de contactos/leads por empresa",
+    envKeys: ["INTEGRATION_ENCRYPTION_KEY"],
     label: "GoHighLevel",
   },
 ];
@@ -197,7 +196,7 @@ const sectionTitles: Record<AppSection, { eyebrow: string; title: string }> = {
   automations: { eyebrow: "Workspace", title: "Automatizaciones" },
   business: { eyebrow: "Workspace", title: "Negocio" },
   clients: { eyebrow: "CRM", title: "Clientes" },
-  dashboard: { eyebrow: "Paso 2 del curso", title: "Dashboard de agentes de WhatsApp" },
+  dashboard: { eyebrow: "Operaciones", title: "Dashboard de agentes de WhatsApp" },
   integrations: { eyebrow: "Workspace", title: "Integraciones" },
   knowledge: { eyebrow: "Workspace", title: "Knowledge Base" },
   observability: { eyebrow: "Sistema", title: "Observabilidad" },
@@ -294,85 +293,6 @@ async function getMemberProfiles(userIds: string[]) {
   }
 }
 
-function getDefaultWorkspaceName(user: {
-  email?: string | null;
-  user_metadata?: Record<string, unknown>;
-}) {
-  const metadataName = user.user_metadata?.full_name ?? user.user_metadata?.name;
-
-  if (typeof metadataName === "string" && metadataName.trim()) {
-    return metadataName.trim();
-  }
-
-  return user.email?.split("@")[0] || "Mi Agencia";
-}
-
-function getDefaultWorkspaceSlug(userId: string, name: string) {
-  const baseSlug =
-    name
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 32) || "workspace";
-
-  return `${baseSlug}-${userId.slice(0, 8)}`;
-}
-
-async function createDefaultWorkspace(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  user: {
-    email?: string | null;
-    id: string;
-    user_metadata?: Record<string, unknown>;
-  },
-) {
-  const workspaceName = getDefaultWorkspaceName(user);
-  const { data: workspace, error: workspaceError } = await supabase
-    .from("workspaces")
-    .insert({
-      name: workspaceName,
-      owner_id: user.id,
-      slug: getDefaultWorkspaceSlug(user.id, workspaceName),
-    })
-    .select("id, name, slug, status")
-    .single();
-
-  if (workspaceError || !workspace) {
-    return { error: workspaceError, membership: null };
-  }
-
-  const { data: membership, error: membershipError } = await supabase
-    .from("workspace_members")
-    .insert({
-      role: "owner",
-      user_id: user.id,
-      workspace_id: workspace.id,
-    })
-    .select("workspace_id, role")
-    .single();
-
-  if (membershipError || !membership) {
-    return { error: membershipError, membership: null };
-  }
-
-  await supabase.from("agents").insert(
-    defaultAgentPresets.map((preset) => ({
-      config: buildDefaultAgentConfig(preset),
-      is_active: true,
-      model: "gpt-5.5",
-      name: preset.name,
-      system_prompt: buildDefaultAgentPrompt(preset),
-      temperature: 0.3,
-      type: preset.type,
-      workspace_id: workspace.id,
-    })),
-  );
-
-  return { error: null, membership };
-}
-
 function getConfigRecord(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -434,27 +354,28 @@ export async function AppShell({ section }: { section: AppSection }) {
     redirect("/login");
   }
 
-  let { data: membership, error: membershipError } = await supabase
-    .from("workspace_members")
-    .select("workspace_id, role")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!membership && !membershipError) {
-    const created = await createDefaultWorkspace(supabase, user);
-    membership = created.membership;
-    membershipError = created.error;
-  }
-
-  const { data: memberships } = await supabase
+  const platformAdmin = await isPlatformAdmin(user);
+  const { data: memberships, error: membershipError } = await supabase
     .from("workspace_members")
     .select("workspace_id, role")
     .eq("user_id", user.id)
     .order("created_at", { ascending: true });
 
-  const visibleMemberships = memberships?.length ? memberships : membership ? [membership] : [];
+  if (membershipError || !memberships?.length) {
+    if (platformAdmin) {
+      redirect("/admin");
+    }
+
+    redirect(
+      `/login?error=${encodeURIComponent(
+        "Tu usuario aun no tiene una empresa asignada. Pide al administrador que cree o vincule tu empresa.",
+      )}`,
+    );
+  }
+
+  const visibleMemberships = memberships;
   const workspaceIds = visibleMemberships.map((item) => item.workspace_id);
-  const workspaceId = visibleMemberships[0]?.workspace_id;
+  const workspaceId = await getActiveWorkspaceId(workspaceIds);
   if (workspaceId) {
     await syncDefaultAgentPrompts(supabase, workspaceId);
   }
@@ -472,7 +393,7 @@ export async function AppShell({ section }: { section: AppSection }) {
   const needsAssets = isWorkspaceSection;
   const needsAgents = isWorkspaceSection;
   const needsWebhooks = isDashboard || isObservability;
-  const needsAgency = isDashboard;
+  const needsAgency = true;
   const [
     workspaceResult,
     contactsResult,
@@ -491,7 +412,7 @@ export async function AppShell({ section }: { section: AppSection }) {
     ? await Promise.all([
         supabase
           .from("workspaces")
-          .select("id, name, slug, status")
+          .select("*")
           .eq("id", workspaceId)
           .single(),
         needsContacts
@@ -561,7 +482,7 @@ export async function AppShell({ section }: { section: AppSection }) {
         needsAgency && workspaceIds.length > 0
           ? supabase
               .from("workspaces")
-              .select("id, name, slug, status")
+              .select("*")
               .in("id", workspaceIds)
               .order("created_at", { ascending: false })
           : Promise.resolve({ data: [], error: null }),
@@ -658,7 +579,7 @@ export async function AppShell({ section }: { section: AppSection }) {
             summary:
               conversation.status === "pending_handoff"
                 ? "Conversacion esperando atencion humana."
-                : "Conversacion sincronizada desde Supabase.",
+                : "Conversacion sincronizada desde WhatsApp.",
             time: conversation.last_message_at
               ? stableTime(conversation.last_message_at)
               : "Nueva",
@@ -675,7 +596,7 @@ export async function AppShell({ section }: { section: AppSection }) {
           name: contact.full_name ?? contact.phone_e164,
           rawStatus: "open",
           status: "Handoff",
-          summary: "Contacto creado en Supabase; falta abrir conversacion.",
+          summary: "Contacto creado; falta abrir conversacion.",
           time: "Seed",
           workspaceId,
         }));
@@ -715,6 +636,10 @@ export async function AppShell({ section }: { section: AppSection }) {
       activeAi: workspaceConversations.filter((conversation) => conversation.ai_enabled)
         .length,
       activeProviders,
+      companyCode:
+        "company_code" in agencyWorkspace && typeof agencyWorkspace.company_code === "string"
+          ? agencyWorkspace.company_code
+          : null,
       conversationCount: workspaceConversations.length,
       handoffCount: workspaceConversations.filter(
         (conversation) => conversation.status === "pending_handoff",
@@ -727,17 +652,30 @@ export async function AppShell({ section }: { section: AppSection }) {
       status: agencyWorkspace.status,
     };
   });
+  const workspaceOptions = agencyWorkspaces.map((agencyWorkspace) => ({
+    companyCode:
+      "company_code" in agencyWorkspace && typeof agencyWorkspace.company_code === "string"
+        ? agencyWorkspace.company_code
+        : null,
+    id: agencyWorkspace.id,
+    name: agencyWorkspace.name,
+    role: membershipRoleByWorkspaceId.get(agencyWorkspace.id) ?? "viewer",
+    slug: agencyWorkspace.slug,
+  }));
+  const activeRole = workspaceId
+    ? membershipRoleByWorkspaceId.get(workspaceId) ?? "viewer"
+    : "sin acceso";
   const dashboardMetrics = [
     {
-      label: "Workspaces",
-      value: workspace ? "1" : "0",
-      detail: membership?.role ? `rol ${membership.role}` : "sin membresia",
+      label: "Empresas",
+      value: String(workspaceOptions.length),
+      detail: `rol activo ${activeRole}`,
       icon: UsersRound,
     },
     {
       label: "Conversaciones",
       value: String(realConversations.length),
-      detail: "desde Supabase",
+      detail: "chats del numero conectado",
       icon: MessageSquareText,
     },
     {
@@ -772,12 +710,22 @@ export async function AppShell({ section }: { section: AppSection }) {
               <Bot size={22} />
             </div>
             <div>
-              <p className="text-sm font-semibold">WhatsApp SaaS</p>
-              <p className="text-xs text-[#b7c4bd]">Imperio Agentico</p>
+              <p className="text-sm font-semibold">Levi</p>
+              <p className="text-xs text-[#b7c4bd]">Panel de empresas</p>
             </div>
           </div>
 
           <nav className="mt-8 grid gap-1 text-sm">
+            {platformAdmin ? (
+              <Link
+                className="flex h-10 items-center gap-3 rounded-lg px-3 text-left text-[#dbe5df] transition hover:bg-white/10"
+                href="/admin"
+                prefetch
+              >
+                <Shield size={17} />
+                <span>Superadmin</span>
+              </Link>
+            ) : null}
             {sidebarItems.map((item) => (
               <Link
                 className={`flex h-10 items-center gap-3 rounded-lg px-3 text-left transition ${
@@ -796,17 +744,11 @@ export async function AppShell({ section }: { section: AppSection }) {
           </nav>
 
           <div className="mt-8 border-t border-white/10 pt-5">
-            <p className="text-xs font-medium uppercase text-[#94a39a]">
-              Workspace activo
-            </p>
-            <div className="mt-3 rounded-lg border border-white/10 bg-white/5 p-3">
-              <p className="text-sm font-semibold">
-                {workspace?.name ?? "Sin workspace"}
-              </p>
-              <p className="mt-1 text-xs text-[#b7c4bd]">
-                {contacts[0]?.phone_e164 ?? user.email}
-              </p>
-            </div>
+            <WorkspaceSwitcher
+              activeWorkspaceId={workspaceId ?? null}
+              workspaces={workspaceOptions}
+            />
+            <p className="mt-3 text-xs text-[#b7c4bd]">{user.email}</p>
           </div>
         </aside>
 
@@ -824,11 +766,11 @@ export async function AppShell({ section }: { section: AppSection }) {
               <div className="flex flex-wrap gap-2">
                 <button className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm font-medium">
                   <GitBranch size={16} />
-                  Git listo
+                  Sistema listo
                 </button>
                 <button className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white">
                   <ShieldCheck size={16} />
-                  Supabase conectado
+                  Datos protegidos
                 </button>
                 <form action={signOut}>
                   <button className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm font-medium">
@@ -850,11 +792,10 @@ export async function AppShell({ section }: { section: AppSection }) {
                 <section className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                   <AlertCircle className="mt-0.5 shrink-0" size={18} />
                   <div>
-                    <p className="font-semibold">Falta enlazar tu usuario.</p>
+                    <p className="font-semibold">Falta crear una empresa.</p>
                     <p className="mt-1">
-                      No encontre un workspace visible para {user.email}. Revisa
-                      que `workspace_members.user_id` sea el UUID exacto de este
-                      usuario y que el rol sea `owner`.
+                      Entra al onboarding para crear tu empresa y conectar el primer
+                      numero de WhatsApp.
                     </p>
                   </div>
                 </section>
@@ -869,11 +810,11 @@ export async function AppShell({ section }: { section: AppSection }) {
                   <div>
                     <h2 className="text-base font-semibold">Inbox vivo</h2>
                     <p className="text-sm text-[#647067]">
-                      Conversaciones y mensajes leidos desde Supabase.
+                      Conversaciones y mensajes del numero conectado.
                     </p>
                   </div>
                   <span className="rounded-lg bg-[#e7f6ce] px-2.5 py-1 text-xs font-semibold text-[#31521d]">
-                    {realConversations.length > 0 ? "Supabase" : "Contactos"}
+                    {realConversations.length > 0 ? "En vivo" : "Contactos"}
                   </span>
                 </div>
                 <InboxPanel
@@ -894,7 +835,7 @@ export async function AppShell({ section }: { section: AppSection }) {
                   <div>
                     <h2 className="text-base font-semibold">Clientes</h2>
                     <p className="mt-1 text-sm text-[#647067]">
-                      Contactos sincronizados para este workspace.
+                      Contactos guardados para esta empresa.
                     </p>
                   </div>
                   <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
@@ -939,6 +880,11 @@ export async function AppShell({ section }: { section: AppSection }) {
                 integrations={integrations}
                 members={displayMembers}
                 showNavigation={false}
+                workspaceCode={
+                  workspace && "company_code" in workspace && typeof workspace.company_code === "string"
+                    ? workspace.company_code
+                    : null
+                }
                 workspaceId={workspaceId ?? null}
                 workspaceName={workspace?.name ?? "Workspace"}
               />
@@ -1092,7 +1038,7 @@ export async function AppShell({ section }: { section: AppSection }) {
                               {agencyWorkspace.name}
                             </p>
                             <p className="mt-1 text-xs text-[#647067]">
-                              {agencyWorkspace.slug} - {agencyWorkspace.role}
+                              {agencyWorkspace.companyCode ?? agencyWorkspace.slug} - {agencyWorkspace.role}
                             </p>
                           </div>
                           <span className="rounded-lg bg-white px-2 py-1 text-xs text-[#4d5a51]">

@@ -11,14 +11,15 @@ export default async function LoginPage({
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#f6f7f3] p-5 text-[#20231f]">
-      <section className="w-full max-w-md rounded-lg border border-[#d9ded3] bg-white p-6 shadow-sm">
+      <section className="grid w-full max-w-4xl gap-5 md:grid-cols-2">
+      <div className="rounded-lg border border-[#d9ded3] bg-white p-6 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="flex size-11 items-center justify-center rounded-lg bg-[#10231c] text-[#d2f36b]">
             <Bot size={23} />
           </div>
           <div>
-            <p className="text-sm font-semibold text-[#647067]">WhatsApp SaaS</p>
-            <h1 className="text-xl font-semibold">Entrar al dashboard</h1>
+            <p className="text-sm font-semibold text-[#647067]">Levi</p>
+            <h1 className="text-xl font-semibold">Entrar</h1>
           </div>
         </div>
 
@@ -60,10 +61,32 @@ export default async function LoginPage({
         <div className="mt-5 flex gap-2 rounded-lg bg-[#eef2eb] p-3 text-sm text-[#4d5a51]">
           <ShieldCheck className="mt-0.5 shrink-0 text-[#35735b]" size={17} />
           <p>
-            Usa el usuario que creaste en Supabase Auth. Los datos del dashboard
-            se filtran por tu workspace con RLS.
+            Entra para gestionar tus empresas, agentes, numeros y equipo.
           </p>
         </div>
+      </div>
+
+      <div className="rounded-lg border border-[#d9ded3] bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex size-11 items-center justify-center rounded-lg bg-[#d2f36b] text-[#10231c]">
+            <Bot size={23} />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-[#647067]">Nuevo cliente</p>
+            <h1 className="text-xl font-semibold">Acceso por invitacion</h1>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-3 rounded-lg bg-[#eef2eb] p-4 text-sm text-[#4d5a51]">
+          <p>
+            Tu cuenta debe ser creada o vinculada por un superadmin antes de entrar.
+          </p>
+          <p>
+            Cuando recibas tu correo y contrasena temporal, entra desde el formulario
+            de la izquierda y continuaras el onboarding de tu empresa.
+          </p>
+        </div>
+      </div>
       </section>
     </main>
   );

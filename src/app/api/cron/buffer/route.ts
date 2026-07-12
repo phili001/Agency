@@ -7,6 +7,7 @@ import {
   buildBusinessContext,
   getBusinessVariables,
 } from "@/lib/business-profile";
+import { getWorkspaceOpenAIKey } from "@/lib/integrations/openai";
 
 type AgentRow = {
   config: Json;
@@ -336,10 +337,10 @@ async function generateReply(
   knowledgeAssets: KnowledgeAsset[],
   businessProfile?: BusinessProfileAsset | null,
 ) {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = await getWorkspaceOpenAIKey(agent.workspace_id);
 
   if (!apiKey) {
-    throw new Error("Falta OPENAI_API_KEY.");
+    throw new Error("OpenAI no esta conectado para este workspace.");
   }
 
   const model = normalizeModel(agent.model);
@@ -374,10 +375,10 @@ async function generateReply(
 }
 
 async function generateContactInsights(agent: AgentRow, messages: MessageRow[]) {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = await getWorkspaceOpenAIKey(agent.workspace_id);
 
   if (!apiKey) {
-    throw new Error("Falta OPENAI_API_KEY.");
+    throw new Error("OpenAI no esta conectado para este workspace.");
   }
 
   const model = normalizeModel(agent.model);

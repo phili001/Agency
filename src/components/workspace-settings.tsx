@@ -76,6 +76,7 @@ type WorkspaceSettingsProps = {
   integrations: IntegrationItem[];
   members: WorkspaceMember[];
   showNavigation?: boolean;
+  workspaceCode?: string | null;
   workspaceId: string | null;
   workspaceName: string;
 };
@@ -108,10 +109,11 @@ const providers = [
   {
     description: "Datos del numero conectado en YCloud.",
     fields: [
+      ["api_key", "YCloud API key"],
       ["phone_e164", "Numero WhatsApp con pais"],
       ["waba_id", "WABA ID de YCloud"],
       ["phone_id", "Phone ID del numero (opcional)"],
-      ["webhook_secret_ref", "Nombre del secret"],
+      ["webhook_secret", "Secreto webhook"],
     ],
     label: "YCloud",
     provider: "ycloud",
@@ -119,7 +121,7 @@ const providers = [
   {
     description: "API key server-side y modelo base del agente.",
     fields: [
-      ["api_key_ref", "API key ref"],
+      ["api_key", "OpenAI API key"],
       ["default_model", "Modelo default"],
     ],
     label: "OpenAI",
@@ -129,7 +131,7 @@ const providers = [
     description: "CRM para contactos, oportunidades y agenda.",
     fields: [
       ["location_id", "Location ID"],
-      ["api_key_ref", "API key ref"],
+      ["api_key", "GoHighLevel API key"],
     ],
     label: "GoHighLevel",
     provider: "gohighlevel",
@@ -139,7 +141,7 @@ const providers = [
 const toolPresets = [
   {
     content:
-      "Accion: crea una cita directamente en GoHighLevel. Inputs: nombre, telefono, fecha, hora, calendario y notas. Requiere GHL_API_KEY y Location ID.",
+      "Accion: crea una cita directamente en GoHighLevel. Inputs: nombre, telefono, fecha, hora, calendario y notas. Requiere GoHighLevel conectado en esta empresa.",
     title: "Agendar en GoHighLevel",
   },
   {
@@ -213,9 +215,13 @@ function fieldHelp(provider: string, key: string) {
         help: "Opcional. Si YCloud no lo muestra en esta pantalla, dejalo vacio; el webhook tambien buscara por WABA ID o numero.",
         placeholder: "Opcional: phone_... o el ID tecnico si YCloud lo muestra",
       },
-      webhook_secret_ref: {
-        help: "Debe coincidir exactamente con YCLOUD_WEBHOOK_SECRET en Vercel. Si no quieres guardar el valor aqui, pegalo manualmente en YCloud.",
-        placeholder: "mejora_david_segura_2026",
+      webhook_secret: {
+        help: "Se usara solo para generar y validar la URL del webhook de esta empresa.",
+        placeholder: "Dejalo vacio para generar uno automaticamente",
+      },
+      api_key: {
+        help: "Se cifra en el backend y se usa solo para enviar mensajes de este numero.",
+        placeholder: "YCloud API key",
       },
     };
 
@@ -229,8 +235,22 @@ function fieldHelp(provider: string, key: string) {
     };
   }
 
+  if (provider === "gohighlevel" && key === "api_key") {
+    return {
+      help: "Se cifra en el backend y se usa solo para sincronizar contactos de esta empresa.",
+      placeholder: "GHL API key",
+    };
+  }
+
+  if (provider === "openai" && key === "api_key") {
+    return {
+      help: "Se cifra en el backend y se usa solo para los agentes de esta empresa.",
+      placeholder: "sk-...",
+    };
+  }
+
   return {
-    help: "Referencia interna. El valor real de la API key va en Vercel.",
+    help: "Dato de configuracion de esta integracion.",
     placeholder: key,
   };
 }
@@ -243,6 +263,7 @@ export function WorkspaceSettings({
   integrations,
   members,
   showNavigation = true,
+  workspaceCode,
   workspaceId,
   workspaceName,
 }: WorkspaceSettingsProps) {
@@ -278,18 +299,19 @@ export function WorkspaceSettings({
   }));
   const [status, setStatus] = useState("");
   const [memberEmail, setMemberEmail] = useState("");
-  const [memberPassword, setMemberPassword] = useState("");
   const [memberRole, setMemberRole] = useState<WorkspaceMember["role"]>("agent");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState("");
   const [savingKey, setSavingKey] = useState("");
 
-  const ycloudSecretValue = integrationDrafts.ycloud.config.webhook_secret_ref?.trim();
+  const ycloudSecretValue = integrationDrafts.ycloud.config.webhook_secret?.trim();
   const webhookSecretParam = encodeURIComponent(
-    ycloudSecretValue || "TU_YCLOUD_WEBHOOK_SECRET",
+    ycloudSecretValue || "SECRETO_WEBHOOK_EMPRESA",
   );
-  const webhookUrl = `${appUrl.replace(/\/$/, "")}/api/webhooks/ycloud?secret=${webhookSecretParam}`;
+  const webhookUrl = workspaceId
+    ? `${appUrl.replace(/\/$/, "")}/api/webhooks/ycloud/${workspaceCode ?? workspaceId}?secret=${webhookSecretParam}`
+    : "";
   const assetsByKind = useMemo(
     () =>
       localAssets.reduce<Record<string, WorkspaceAsset[]>>((grouped, asset) => {
@@ -327,6 +349,77 @@ export function WorkspaceSettings({
     setStatus("");
 
     const draft = integrationDrafts[provider];
+
+    if (provider === "openai" || provider === "ycloud" || provider === "gohighlevel") {
+      const endpoint =
+        provider === "openai"
+          ? "/api/integrations/openai"
+          : provider === "ycloud"
+            ? "/api/integrations/ycloud"
+            : "/api/integrations/gohighlevel";
+      const requestBody =
+        provider === "openai"
+          ? {
+              apiKey: draft.config.api_key,
+              defaultModel: draft.config.default_model,
+              workspaceId,
+            }
+          : provider === "ycloud"
+            ? {
+                apiKey: draft.config.api_key,
+                phoneE164: draft.config.phone_e164,
+                phoneId: draft.config.phone_id,
+                wabaId: draft.config.waba_id,
+                webhookSecret: draft.config.webhook_secret,
+                workspaceId,
+              }
+            : {
+                apiKey: draft.config.api_key,
+                locationId: draft.config.location_id,
+                workspaceId,
+              };
+      const response = await fetch(endpoint, {
+        body: JSON.stringify(requestBody),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        integration?: IntegrationItem;
+        webhookSecret?: string;
+        webhookUrl?: string;
+      };
+
+      if (!response.ok || !payload.integration) {
+        setStatus(payload.error ?? "No se pudo guardar la integracion.");
+        setSavingKey("");
+        return;
+      }
+
+      if (payload.webhookSecret) {
+        setIntegrationDrafts((current) => ({
+          ...current,
+          ycloud: {
+            ...current.ycloud,
+            config: {
+              ...current.ycloud.config,
+              webhook_secret: payload.webhookSecret ?? "",
+            },
+          },
+        }));
+      }
+
+      setLocalIntegrations((current) => {
+        const withoutProvider = current.filter(
+          (integration) => integration.provider !== provider,
+        );
+        return [...withoutProvider, payload.integration!];
+      });
+      setStatus("Integracion conectada.");
+      setSavingKey("");
+      return;
+    }
+
     const existing = localIntegrations.find(
       (integration) => integration.provider === provider,
     );
@@ -484,18 +577,12 @@ export function WorkspaceSettings({
       return;
     }
 
-    if (memberPassword.trim().length < 8) {
-      setStatus("La contraseña debe tener minimo 8 caracteres.");
-      return;
-    }
-
     setSavingKey("team:add");
     setStatus("");
 
     const response = await fetch("/api/team/members", {
       body: JSON.stringify({
         email,
-        password: memberPassword.trim(),
         role: memberRole,
         workspaceId,
       }),
@@ -520,8 +607,7 @@ export function WorkspaceSettings({
       return [payload.member!, ...withoutMember];
     });
     setMemberEmail("");
-    setMemberPassword("");
-    setStatus("Miembro agregado al workspace.");
+    setStatus("Invitacion enviada o miembro agregado al espacio.");
     setSavingKey("");
   }
 
@@ -1075,8 +1161,8 @@ export function WorkspaceSettings({
                       <p className="mt-1 break-all">{webhookUrl}</p>
                       <p className="mt-2">
                         {ycloudSecretValue
-                          ? "Esta URL usa el valor escrito en Nombre del secret. Ese valor debe ser igual al YCLOUD_WEBHOOK_SECRET de Vercel."
-                          : "Reemplaza TU_YCLOUD_WEBHOOK_SECRET por el mismo valor que guardaste en Vercel."}
+                          ? "Esta URL usa el secreto de esta empresa."
+                          : "Guarda YCloud para generar un secreto unico y pegar esta URL en YCloud."}
                       </p>
                     </div>
                   ) : null}
@@ -1237,14 +1323,14 @@ export function WorkspaceSettings({
               <div>
                 <h3 className="text-sm font-semibold">Equipo del workspace</h3>
                 <p className="mt-1 text-sm text-[#647067]">
-                  Miembros actuales y roles visibles por RLS.
+                  Personas que pueden atender chats, configurar agentes o revisar datos.
                 </p>
               </div>
               <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
                 {localMembers.length} miembros
               </span>
             </div>
-            <div className="mt-4 grid gap-3 rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3 md:grid-cols-[1fr_180px_150px_auto]">
+            <div className="mt-4 grid gap-3 rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3 md:grid-cols-[1fr_150px_auto]">
               <label className="grid gap-1.5 text-sm font-medium">
                 Email
                 <input
@@ -1253,17 +1339,6 @@ export function WorkspaceSettings({
                   placeholder="persona@empresa.com"
                   type="email"
                   value={memberEmail}
-                />
-              </label>
-              <label className="grid gap-1.5 text-sm font-medium">
-                Contraseña
-                <input
-                  className="h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
-                  minLength={8}
-                  onChange={(event) => setMemberPassword(event.target.value)}
-                  placeholder="Min. 8 caracteres"
-                  type="password"
-                  value={memberPassword}
                 />
               </label>
               <label className="grid gap-1.5 text-sm font-medium">

@@ -6,6 +6,7 @@ import {
   buildBusinessContext,
   getBusinessVariables,
 } from "@/lib/business-profile";
+import { getWorkspaceOpenAIKey } from "@/lib/integrations/openai";
 import { createClient } from "@/lib/supabase/server";
 
 const DEFAULT_OPENAI_MODEL = "gpt-5.4-mini";
@@ -124,15 +125,6 @@ function getResponseText(payload: OpenAIResponsePayload) {
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "Falta OPENAI_API_KEY en .env.local." },
-      { status: 500 },
-    );
-  }
-
   const { agentId, message } = await request.json();
 
   if (!agentId || !message) {
@@ -165,6 +157,14 @@ export async function POST(request: Request) {
   }
 
   const model = getOpenAIModel(agent.model);
+  const apiKey = await getWorkspaceOpenAIKey(agent.workspace_id);
+
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "Conecta OpenAI en Integraciones antes de probar el agente." },
+      { status: 400 },
+    );
+  }
   const knowledgeAssetIds = getKnowledgeAssetIds(agent.config);
   const { data: businessProfile } = await supabase
     .from("workspace_assets")

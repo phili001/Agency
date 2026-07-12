@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "WhatsApp SaaS",
+  title: "Levi",
   description: "Dashboard multi-tenant de agentes de WhatsApp con IA.",
 };
 

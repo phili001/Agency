@@ -54,6 +54,7 @@ export type Database = {
       };
       integrations: {
         Row: {
+          connected_at: string | null;
           config: Json;
           created_at: string;
           id: string;
@@ -61,6 +62,17 @@ export type Database = {
           provider: "ycloud" | "openai" | "gohighlevel";
           secret_ref: string | null;
           status: "pending" | "active" | "error" | "disabled";
+          updated_at: string;
+          workspace_id: string;
+        };
+      };
+      integration_secrets: {
+        Row: {
+          ciphertext: string;
+          created_at: string;
+          id: string;
+          kind: string;
+          provider: "ycloud" | "openai" | "gohighlevel";
           updated_at: string;
           workspace_id: string;
         };
@@ -139,10 +151,13 @@ export type Database = {
       };
       workspaces: {
         Row: {
+          company_code: string;
           created_at: string;
           id: string;
           name: string;
           owner_id: string;
+          onboarding_completed_at: string | null;
+          onboarding_state: Json;
           slug: string;
           status: "active" | "paused" | "archived";
           updated_at: string;

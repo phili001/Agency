@@ -18,6 +18,7 @@ $$;
 
 create table if not exists public.workspaces (
   id uuid primary key default gen_random_uuid(),
+  company_code text not null unique check (company_code ~ '^[A-Z]{3}[0-9]{3}$'),
   name text not null,
   slug text not null unique,
   owner_id uuid not null references auth.users(id) on delete cascade,
@@ -108,6 +109,17 @@ create table if not exists public.integrations (
   unique (workspace_id, provider)
 );
 
+create table if not exists public.integration_secrets (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  provider text not null check (provider in ('ycloud', 'openai', 'gohighlevel')),
+  kind text not null,
+  ciphertext text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (workspace_id, provider, kind)
+);
+
 create table if not exists public.usage_events (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
@@ -156,6 +168,7 @@ create index if not exists idx_conversations_contact_id on public.conversations(
 create index if not exists idx_messages_conversation_id_created_at on public.messages(conversation_id, created_at);
 create index if not exists idx_messages_workspace_id_created_at on public.messages(workspace_id, created_at);
 create index if not exists idx_integrations_workspace_id on public.integrations(workspace_id);
+create index if not exists idx_integration_secrets_workspace_provider on public.integration_secrets(workspace_id, provider);
 create index if not exists idx_usage_events_workspace_id_created_at on public.usage_events(workspace_id, created_at);
 create index if not exists idx_workspace_assets_workspace_id_kind on public.workspace_assets(workspace_id, kind);
 create index if not exists idx_webhook_events_workspace_id_created_at on public.webhook_events(workspace_id, created_at);
@@ -179,6 +192,10 @@ for each row execute function public.set_updated_at();
 
 create or replace trigger set_integrations_updated_at
 before update on public.integrations
+for each row execute function public.set_updated_at();
+
+create or replace trigger set_integration_secrets_updated_at
+before update on public.integration_secrets
 for each row execute function public.set_updated_at();
 
 create or replace trigger set_workspace_assets_updated_at
@@ -235,9 +252,13 @@ alter table public.agents enable row level security;
 alter table public.conversations enable row level security;
 alter table public.messages enable row level security;
 alter table public.integrations enable row level security;
+alter table public.integration_secrets enable row level security;
 alter table public.usage_events enable row level security;
 alter table public.workspace_assets enable row level security;
 alter table public.webhook_events enable row level security;
+
+revoke all on public.integration_secrets from anon;
+revoke all on public.integration_secrets from authenticated;
 
 drop policy if exists "Members can view workspaces" on public.workspaces;
 drop policy if exists "Users can create owned workspaces" on public.workspaces;

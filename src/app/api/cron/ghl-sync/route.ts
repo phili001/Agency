@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getWorkspaceGoHighLevelKey } from "@/lib/integrations/gohighlevel";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type ContactRow = {
@@ -62,18 +63,14 @@ function metadataTags(metadata: Record<string, unknown> | null) {
 }
 
 async function upsertHighLevelContact({
+  apiKey,
   contact,
   locationId,
 }: {
+  apiKey: string;
   contact: ContactRow;
   locationId: string;
 }) {
-  const apiKey = process.env.GHL_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("Falta GHL_API_KEY.");
-  }
-
   const { firstName, lastName } = splitName(contact.full_name);
   const apiBase = process.env.GHL_API_BASE ?? "https://services.leadconnectorhq.com";
   const response = await fetch(`${apiBase.replace(/\/$/, "")}/contacts/upsert`, {
@@ -127,10 +124,19 @@ export async function POST(request: Request) {
 
   for (const integration of (integrations ?? []) as IntegrationRow[]) {
     const locationId = configString(integration.config ?? {}, "location_id");
+    const apiKey = await getWorkspaceGoHighLevelKey(integration.workspace_id);
 
     if (!locationId) {
       results.push({
         status: "missing_location_id",
+        workspaceId: integration.workspace_id,
+      });
+      continue;
+    }
+
+    if (!apiKey) {
+      results.push({
+        status: "missing_api_key",
         workspaceId: integration.workspace_id,
       });
       continue;
@@ -156,7 +162,11 @@ export async function POST(request: Request) {
       const currentMetadata = contact.metadata ?? {};
 
       try {
-        const highLevel = await upsertHighLevelContact({ contact, locationId });
+        const highLevel = await upsertHighLevelContact({
+          apiKey,
+          contact,
+          locationId,
+        });
 
         await supabase
           .from("contacts")

@@ -15,16 +15,12 @@ const requiredEnv = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
-  "OPENAI_API_KEY",
+  "INTEGRATION_ENCRYPTION_KEY",
   "CRON_SECRET",
   "NEXT_PUBLIC_APP_URL",
 ];
 
-const recommendedEnv = [
-  "YCLOUD_API_KEY",
-  "YCLOUD_WEBHOOK_SECRET",
-  "GHL_API_KEY",
-];
+const recommendedEnv: string[] = [];
 
 const requiredTables = [
   "workspaces",
@@ -37,7 +33,7 @@ const requiredTables = [
   "usage_events",
 ];
 
-const incrementalTables = ["workspace_assets", "webhook_events"];
+const incrementalTables = ["workspace_assets", "webhook_events", "integration_secrets"];
 
 async function tableCheck(
   supabase: SupabaseClient | null,
@@ -115,7 +111,7 @@ export async function GET() {
         deliverCron: "/api/cron/deliver",
         ghlSyncCron: "/api/cron/ghl-sync",
         supabaseHealth: "/api/health/supabase",
-        ycloudWebhook: "/api/webhooks/ycloud",
+        ycloudWebhook: "/api/webhooks/ycloud/AAA001?secret=...",
       },
     },
     { status: requiredOk ? 200 : 503 },

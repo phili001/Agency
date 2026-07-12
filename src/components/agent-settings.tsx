@@ -437,7 +437,7 @@ export function AgentSettings({
           <h2 className="text-base font-semibold">Configuracion de agentes</h2>
         </div>
         <p className="mt-3 text-sm text-[#647067]">
-          Crea un agente en Supabase para configurar prompt, modelo y pruebas.
+          Crea un agente para configurar instrucciones, modelo y pruebas.
         </p>
         {status ? <p className="mt-3 text-sm text-[#647067]">{status}</p> : null}
         <button

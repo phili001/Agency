@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getWorkspaceYCloudKey } from "@/lib/integrations/ycloud";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type QueuedMessage = {
@@ -42,20 +43,16 @@ function configString(config: Record<string, unknown>, key: string) {
 }
 
 async function sendYCloudText({
+  apiKey,
   body,
   from,
   to,
 }: {
+  apiKey: string;
   body: string;
   from: string;
   to: string;
 }) {
-  const apiKey = process.env.YCLOUD_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("Falta YCLOUD_API_KEY.");
-  }
-
   const apiBase = process.env.YCLOUD_API_BASE ?? "https://api.ycloud.com/v2";
   const response = await fetch(`${apiBase.replace(/\/$/, "")}/whatsapp/messages/sendDirectly`, {
     body: JSON.stringify({
@@ -137,16 +134,22 @@ export async function POST(request: Request) {
       }
 
       const config = (integration as IntegrationRow).config ?? {};
+      const apiKey = await getWorkspaceYCloudKey(message.workspace_id);
       const from =
         configString(config, "phone_id") ??
         configString(config, "phone_e164") ??
         configString(config, "from");
+
+      if (!apiKey) {
+        throw new Error("YCloud no tiene API key guardada para este workspace.");
+      }
 
       if (!from) {
         throw new Error("Falta phone_id o numero emisor en Integraciones > YCloud.");
       }
 
       const ycloudResult = await sendYCloudText({
+        apiKey,
         body: message.body,
         from,
         to: (contact as ContactRow).phone_e164,
