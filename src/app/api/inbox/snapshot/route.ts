@@ -25,6 +25,14 @@ function getMetadataRecord(value: unknown) {
     : {};
 }
 
+function getYCloudContactName(metadata: Record<string, unknown>) {
+  const ycloud = getMetadataRecord(metadata.ycloud);
+
+  return typeof ycloud.contact_name === "string" && ycloud.contact_name.trim()
+    ? ycloud.contact_name.trim()
+    : null;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -72,6 +80,7 @@ export async function GET(request: Request) {
       conversations: (conversations ?? []).map((conversation) => {
         const contact = contactById.get(conversation.contact_id);
         const metadata = getMetadataRecord(contact?.metadata);
+        const ycloudName = getYCloudContactName(metadata);
 
         return {
           aiEnabled: conversation.ai_enabled,
@@ -80,7 +89,7 @@ export async function GET(request: Request) {
           contactMetadata: metadata,
           contactPhone: contact?.phone_e164,
           id: conversation.id,
-          name: contact?.full_name ?? contact?.phone_e164 ?? "Contacto",
+          name: contact?.full_name ?? ycloudName ?? contact?.phone_e164 ?? "Contacto",
           rawStatus: conversation.status,
           status: conversation.ai_enabled ? "IA activa" : "Handoff",
           summary:

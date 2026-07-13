@@ -26,6 +26,7 @@ type ConversationItem = {
     ghl_contact_id?: string;
     ghl_last_error?: string;
     ghl_synced_at?: string;
+    ycloud_contact_name?: string;
   } | null;
   contactPhone?: string | null;
   id: string;

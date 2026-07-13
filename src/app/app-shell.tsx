@@ -207,6 +207,10 @@ function getContactMetadata(metadata: unknown) {
   }
 
   const record = metadata as Record<string, unknown>;
+  const ycloud =
+    record.ycloud && typeof record.ycloud === "object" && !Array.isArray(record.ycloud)
+      ? (record.ycloud as Record<string, unknown>)
+      : {};
 
   return {
     ai_summary:
@@ -220,6 +224,8 @@ function getContactMetadata(metadata: unknown) {
       typeof record.ghl_last_error === "string" ? record.ghl_last_error : undefined,
     ghl_synced_at:
       typeof record.ghl_synced_at === "string" ? record.ghl_synced_at : undefined,
+    ycloud_contact_name:
+      typeof ycloud.contact_name === "string" ? ycloud.contact_name : undefined,
   };
 }
 
@@ -544,13 +550,18 @@ export async function AppShell({ section }: { section: AppSection }) {
     realConversations.length > 0
       ? realConversations.map((conversation) => {
           const contact = contactById.get(conversation.contact_id);
+          const contactMetadata = getContactMetadata(contact?.metadata);
           return {
             aiEnabled: conversation.ai_enabled,
             business: workspace?.name ?? "Workspace",
             contactId: conversation.contact_id,
-            contactMetadata: getContactMetadata(contact?.metadata),
+            contactMetadata,
             contactPhone: contact?.phone_e164,
-            name: contact?.full_name ?? contact?.phone_e164 ?? "Contacto",
+            name:
+              contact?.full_name ??
+              contactMetadata?.ycloud_contact_name ??
+              contact?.phone_e164 ??
+              "Contacto",
             id: conversation.id,
             rawStatus: conversation.status,
             status: conversation.ai_enabled ? "IA activa" : "Handoff",
@@ -571,7 +582,10 @@ export async function AppShell({ section }: { section: AppSection }) {
           contactMetadata: getContactMetadata(contact.metadata),
           contactPhone: contact.phone_e164,
           id: contact.id,
-          name: contact.full_name ?? contact.phone_e164,
+          name:
+            contact.full_name ??
+            getContactMetadata(contact.metadata)?.ycloud_contact_name ??
+            contact.phone_e164,
           rawStatus: "open",
           status: "Handoff",
           summary: "Contacto creado; falta abrir conversacion.",

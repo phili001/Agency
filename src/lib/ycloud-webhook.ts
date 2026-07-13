@@ -305,6 +305,46 @@ function getMetadataRecord(value: unknown) {
     : {};
 }
 
+function cleanDisplayName(value: string | null | undefined) {
+  const cleanValue = value?.replace(/\s+/g, " ").trim();
+
+  return cleanValue || null;
+}
+
+function pickBestContactName({
+  currentName,
+  incomingName,
+  phone,
+}: {
+  currentName?: string | null;
+  incomingName?: string | null;
+  phone: string;
+}) {
+  const current = cleanDisplayName(currentName);
+  const incoming = cleanDisplayName(incomingName);
+
+  if (!incoming) {
+    return current;
+  }
+
+  if (!current || current === phone) {
+    return incoming;
+  }
+
+  const currentWordCount = current.split(" ").filter(Boolean).length;
+  const incomingWordCount = incoming.split(" ").filter(Boolean).length;
+
+  if (
+    incoming.length > current.length ||
+    incomingWordCount > currentWordCount ||
+    current.toLowerCase().includes(incoming.toLowerCase())
+  ) {
+    return incoming;
+  }
+
+  return current;
+}
+
 function getReceivedSecret(request: Request) {
   return (
     request.headers.get("x-webhook-secret") ??
@@ -350,12 +390,21 @@ async function storeYCloudMessage({
     .maybeSingle();
   const existingMetadata = getMetadataRecord(existingContact?.metadata);
   const ycloudMetadata = getMetadataRecord(existingMetadata.ycloud);
+  const bestContactName = pickBestContactName({
+    currentName:
+      existingContact?.full_name ??
+      (typeof ycloudMetadata.contact_name === "string"
+        ? ycloudMetadata.contact_name
+        : null),
+    incomingName: event.contactName,
+    phone: event.contactPhone,
+  });
   const { data: contact, error: contactError } = await supabase
     .from("contacts")
     .upsert(
       {
         email: event.contactEmail ?? existingContact?.email ?? null,
-        full_name: event.contactName ?? existingContact?.full_name ?? null,
+        full_name: bestContactName,
         metadata: {
           ...existingMetadata,
           source: existingMetadata.source ?? "ycloud",
@@ -363,7 +412,8 @@ async function storeYCloudMessage({
             ...ycloudMetadata,
             business_phone: event.businessPhone ?? ycloudMetadata.business_phone,
             contact_email: event.contactEmail ?? ycloudMetadata.contact_email,
-            contact_name: event.contactName ?? ycloudMetadata.contact_name,
+            contact_name: bestContactName ?? ycloudMetadata.contact_name,
+            last_received_name: cleanDisplayName(event.contactName),
             external_id: event.externalId,
             last_event_type: event.eventType,
             phone_id: event.phoneId ?? ycloudMetadata.phone_id,
