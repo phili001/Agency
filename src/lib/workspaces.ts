@@ -175,6 +175,15 @@ export function isChecklistComplete(checklist: OnboardingChecklist) {
   );
 }
 
+function isAgentConfiguredForOnboarding(config: unknown) {
+  return (
+    Boolean(config) &&
+    typeof config === "object" &&
+    !Array.isArray(config) &&
+    (config as Record<string, unknown>).onboarding_agent_configured === true
+  );
+}
+
 export async function getOnboardingChecklist(workspaceId: string) {
   const admin = createAdminClient();
   const [
@@ -198,10 +207,10 @@ export async function getOnboardingChecklist(workspaceId: string) {
       .limit(1),
     admin
       .from("agents")
-      .select("id")
+      .select("id, config")
       .eq("workspace_id", workspaceId)
       .eq("is_active", true)
-      .limit(1),
+      .limit(10),
     admin
       .from("workspace_members")
       .select("id")
@@ -227,7 +236,7 @@ export async function getOnboardingChecklist(workspaceId: string) {
   );
 
   return {
-    agentReady: Boolean(agents?.length),
+    agentReady: Boolean(agents?.some((agent) => isAgentConfiguredForOnboarding(agent.config))),
     businessReady: Boolean(businessProfile?.length),
     firstSignalReady: Boolean(webhooks?.length || sentMessages?.length),
     openaiReady: activeProviders.has("openai"),

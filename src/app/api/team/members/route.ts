@@ -55,12 +55,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No autenticado." }, { status: 401 });
   }
 
-  const { email, role, workspaceId } = (await request.json()) as {
+  const { email, resetPassword, role, temporaryPassword, workspaceId } =
+    (await request.json()) as {
     email?: string;
+    resetPassword?: boolean;
     role?: TeamRole;
+    temporaryPassword?: string;
     workspaceId?: string;
   };
   const normalizedEmail = email?.trim().toLowerCase();
+  const cleanTemporaryPassword = temporaryPassword?.trim();
 
   if (!workspaceId || !normalizedEmail || !role || !allowedRoles.includes(role)) {
     return NextResponse.json(
@@ -85,37 +89,72 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
   let targetUser = await findAuthUserByEmail(admin, normalizedEmail);
+  let passwordChanged = false;
+  let userCreated = false;
 
   if (!targetUser) {
-    const invited = await admin.auth.admin.inviteUserByEmail(normalizedEmail, {
-      data: { full_name: normalizedEmail.split("@")[0] },
+    if (!cleanTemporaryPassword || cleanTemporaryPassword.length < 8) {
+      return NextResponse.json(
+        {
+          error:
+            "Ese usuario no existe. Ingresa una contrasena temporal de minimo 8 caracteres para crearlo.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const created = await admin.auth.admin.createUser({
+      email: normalizedEmail,
+      email_confirm: true,
+      password: cleanTemporaryPassword,
+      user_metadata: {
+        full_name: normalizedEmail.split("@")[0],
+      },
     });
 
-    if (invited.data.user) {
-      targetUser = invited.data.user;
-    } else {
-      const created = await admin.auth.admin.createUser({
-        email: normalizedEmail,
-        email_confirm: false,
-        user_metadata: {
-          full_name: normalizedEmail.split("@")[0],
+    if (created.error || !created.data.user) {
+      return NextResponse.json(
+        {
+          error:
+            created.error?.message ??
+            "No se pudo crear el usuario en Supabase Auth.",
         },
-      });
-
-      if (created.error || !created.data.user) {
-        return NextResponse.json(
-          {
-            error:
-              invited.error?.message ??
-              created.error?.message ??
-              "No se pudo invitar el usuario en Supabase Auth.",
-          },
-          { status: 400 },
-        );
-      }
-
-      targetUser = created.data.user;
+        { status: 400 },
+      );
     }
+
+    targetUser = created.data.user;
+    passwordChanged = true;
+    userCreated = true;
+  } else if (resetPassword) {
+    if (!cleanTemporaryPassword || cleanTemporaryPassword.length < 8) {
+      return NextResponse.json(
+        {
+          error:
+            "Para resetear la contrasena, ingresa una contrasena temporal de minimo 8 caracteres.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const updated = await admin.auth.admin.updateUserById(targetUser.id, {
+      email_confirm: true,
+      password: cleanTemporaryPassword,
+    });
+
+    if (updated.error || !updated.data.user) {
+      return NextResponse.json(
+        {
+          error:
+            updated.error?.message ??
+            "No se pudo actualizar la contrasena del usuario.",
+        },
+        { status: 400 },
+      );
+    }
+
+    targetUser = updated.data.user;
+    passwordChanged = true;
   }
 
   const { data: member, error: memberError } = await admin
@@ -146,6 +185,110 @@ export async function POST(request: Request) {
         email: targetUser.email ?? normalizedEmail,
         user_metadata: targetUser.user_metadata,
       }),
+    },
+    passwordChanged,
+    userCreated,
+  });
+}
+
+export async function PATCH(request: Request) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "No autenticado." }, { status: 401 });
+  }
+
+  const { memberId, role, workspaceId } = (await request.json()) as {
+    memberId?: string;
+    role?: TeamRole;
+    workspaceId?: string;
+  };
+
+  if (!memberId || !workspaceId || !role || !allowedRoles.includes(role)) {
+    return NextResponse.json(
+      { error: "workspaceId, memberId y role son requeridos." },
+      { status: 400 },
+    );
+  }
+
+  const { data: currentMember } = await supabase
+    .from("workspace_members")
+    .select("role")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!currentMember || currentMember.role !== "owner") {
+    return NextResponse.json(
+      { error: "Solo owner puede cambiar permisos de miembros." },
+      { status: 403 },
+    );
+  }
+
+  const admin = createAdminClient();
+  const { data: targetMember, error: targetError } = await admin
+    .from("workspace_members")
+    .select("id, workspace_id, user_id, role, created_at")
+    .eq("id", memberId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+
+  if (targetError || !targetMember) {
+    return NextResponse.json(
+      { error: targetError?.message ?? "No se encontro el miembro." },
+      { status: 404 },
+    );
+  }
+
+  if (targetMember.role === "owner" && role !== "owner") {
+    const { count, error: countError } = await admin
+      .from("workspace_members")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", workspaceId)
+      .eq("role", "owner");
+
+    if (countError) {
+      return NextResponse.json({ error: countError.message }, { status: 500 });
+    }
+
+    if ((count ?? 0) <= 1) {
+      return NextResponse.json(
+        { error: "No puedes cambiar el rol del ultimo owner del workspace." },
+        { status: 400 },
+      );
+    }
+  }
+
+  const { data: member, error: updateError } = await admin
+    .from("workspace_members")
+    .update({ role })
+    .eq("id", memberId)
+    .eq("workspace_id", workspaceId)
+    .select("id, workspace_id, user_id, role, created_at")
+    .single();
+
+  if (updateError || !member) {
+    return NextResponse.json(
+      { error: updateError?.message ?? "No se pudo actualizar el rol." },
+      { status: 500 },
+    );
+  }
+
+  const { data: authUser } = await admin.auth.admin.getUserById(member.user_id);
+
+  return NextResponse.json({
+    member: {
+      ...member,
+      display_email: authUser.user?.email ?? "",
+      display_name: authUser.user
+        ? getUserDisplayName({
+            email: authUser.user.email ?? "",
+            user_metadata: authUser.user.user_metadata,
+          })
+        : member.user_id,
     },
   });
 }

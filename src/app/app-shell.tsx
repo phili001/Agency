@@ -874,6 +874,7 @@ export async function AppShell({ section }: { section: AppSection }) {
 
               {isWorkspaceSection ? (
               <WorkspaceSettings
+                activeRole={activeRole}
                 agents={agents}
                 appUrl={process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}
                 assets={workspaceAssets}

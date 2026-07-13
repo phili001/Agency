@@ -26,9 +26,9 @@ export async function signIn(formData: FormData) {
 
   const { data: memberships } = await supabase
     .from("workspace_members")
-    .select("workspace_id")
+    .select("workspace_id, role")
     .eq("user_id", user.id)
-    .limit(1);
+    .limit(50);
 
   if (!memberships?.length) {
     await supabase.auth.signOut();
@@ -40,6 +40,9 @@ export async function signIn(formData: FormData) {
   }
 
   const workspaceIds = memberships.map((membership) => membership.workspace_id);
+  const canConfigureOnboarding = memberships.some((membership) =>
+    ["owner", "admin"].includes(membership.role),
+  );
   const { data: workspaces } = await supabase
     .from("workspaces")
     .select("*")
@@ -49,7 +52,7 @@ export async function signIn(formData: FormData) {
       "onboarding_completed_at" in workspace && Boolean(workspace.onboarding_completed_at),
   );
 
-  if (!hasCompletedWorkspace) {
+  if (!hasCompletedWorkspace && canConfigureOnboarding) {
     redirect("/onboarding");
   }
 

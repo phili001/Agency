@@ -69,6 +69,7 @@ type AgentItem = {
 };
 
 type WorkspaceSettingsProps = {
+  activeRole?: WorkspaceMember["role"] | "sin acceso";
   agents: AgentItem[];
   appUrl: string;
   assets: WorkspaceAsset[];
@@ -256,6 +257,7 @@ function fieldHelp(provider: string, key: string) {
 }
 
 export function WorkspaceSettings({
+  activeRole = "viewer",
   agents,
   appUrl,
   assets,
@@ -299,11 +301,14 @@ export function WorkspaceSettings({
   }));
   const [status, setStatus] = useState("");
   const [memberEmail, setMemberEmail] = useState("");
+  const [memberResetPassword, setMemberResetPassword] = useState(false);
   const [memberRole, setMemberRole] = useState<WorkspaceMember["role"]>("agent");
+  const [memberTemporaryPassword, setMemberTemporaryPassword] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState("");
   const [savingKey, setSavingKey] = useState("");
+  const canChangeMemberRoles = activeRole === "owner";
 
   const ycloudSecretValue = integrationDrafts.ycloud.config.webhook_secret?.trim();
   const webhookSecretParam = encodeURIComponent(
@@ -583,7 +588,9 @@ export function WorkspaceSettings({
     const response = await fetch("/api/team/members", {
       body: JSON.stringify({
         email,
+        resetPassword: memberResetPassword,
         role: memberRole,
+        temporaryPassword: memberTemporaryPassword,
         workspaceId,
       }),
       headers: {
@@ -607,7 +614,11 @@ export function WorkspaceSettings({
       return [payload.member!, ...withoutMember];
     });
     setMemberEmail("");
-    setStatus("Invitacion enviada o miembro agregado al espacio.");
+    setMemberResetPassword(false);
+    setMemberTemporaryPassword("");
+    setStatus(
+      "Miembro agregado. Si creaste o reseteaste la contrasena, ya puede iniciar sesion y cambiar de empresa desde el selector.",
+    );
     setSavingKey("");
   }
 
@@ -703,6 +714,58 @@ export function WorkspaceSettings({
       current.filter((currentMember) => currentMember.id !== member.id),
     );
     setStatus("Miembro eliminado del workspace.");
+    setSavingKey("");
+  }
+
+  async function updateMemberRole(member: WorkspaceMember, role: WorkspaceMember["role"]) {
+    if (!workspaceId) {
+      setStatus("Primero necesitas un workspace activo.");
+      return;
+    }
+
+    if (member.role === role) {
+      return;
+    }
+
+    setSavingKey(`team:role:${member.id}`);
+    setStatus("");
+
+    const response = await fetch("/api/team/members", {
+      body: JSON.stringify({
+        memberId: member.id,
+        role,
+        workspaceId,
+      }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "PATCH",
+    });
+    const payload = (await response.json()) as {
+      error?: string;
+      member?: WorkspaceMember;
+    };
+
+    if (!response.ok || !payload.member) {
+      setStatus(payload.error ?? "No se pudo cambiar el permiso.");
+      setSavingKey("");
+      return;
+    }
+
+    const updatedMember = payload.member;
+    setLocalMembers((current) =>
+      current.map((currentMember) =>
+        currentMember.id === updatedMember.id
+          ? {
+              ...currentMember,
+              ...updatedMember,
+              display_email: updatedMember.display_email || currentMember.display_email,
+              display_name: updatedMember.display_name || currentMember.display_name,
+            }
+          : currentMember,
+      ),
+    );
+    setStatus("Permiso actualizado.");
     setSavingKey("");
   }
 
@@ -1330,7 +1393,7 @@ export function WorkspaceSettings({
                 {localMembers.length} miembros
               </span>
             </div>
-            <div className="mt-4 grid gap-3 rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3 md:grid-cols-[1fr_150px_auto]">
+            <div className="mt-4 grid gap-3 rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3 md:grid-cols-[1fr_180px_150px_auto]">
               <label className="grid gap-1.5 text-sm font-medium">
                 Email
                 <input
@@ -1339,6 +1402,17 @@ export function WorkspaceSettings({
                   placeholder="persona@empresa.com"
                   type="email"
                   value={memberEmail}
+                />
+              </label>
+              <label className="grid gap-1.5 text-sm font-medium">
+                Contrasena temporal
+                <input
+                  className="h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                  minLength={8}
+                  onChange={(event) => setMemberTemporaryPassword(event.target.value)}
+                  placeholder="Min. 8 caracteres"
+                  type="password"
+                  value={memberTemporaryPassword}
                 />
               </label>
               <label className="grid gap-1.5 text-sm font-medium">
@@ -1369,6 +1443,19 @@ export function WorkspaceSettings({
                 )}
                 Agregar
               </button>
+              <label className="flex items-center gap-2 text-sm text-[#4d5a51] md:col-span-4">
+                <input
+                  checked={memberResetPassword}
+                  className="size-4 rounded border-[#cbd2c6]"
+                  onChange={(event) => setMemberResetPassword(event.target.checked)}
+                  type="checkbox"
+                />
+                Resetear contrasena si este correo ya existe
+              </label>
+              <p className="text-xs text-[#647067] md:col-span-4">
+                Para un usuario nuevo, la contrasena temporal es obligatoria. Para un
+                usuario existente, no se cambia su contrasena salvo que marques el reset.
+              </p>
             </div>
             <div className="mt-4 rounded-lg border border-[#e2e6df] bg-white p-3">
               <div className="flex items-center justify-between gap-3">
@@ -1445,10 +1532,33 @@ export function WorkspaceSettings({
                       {stableDate(member.created_at)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-lg bg-[#e7f6ce] px-2 py-1 text-xs text-[#31521d]">
-                      {member.role}
-                    </span>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {canChangeMemberRoles ? (
+                      <select
+                        aria-label={`Permiso de ${member.display_email || member.user_id}`}
+                        className="h-9 rounded-lg border border-[#cbd2c6] bg-white px-2 text-xs font-semibold text-[#31521d] outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50 disabled:bg-[#eef2eb] disabled:text-[#7b877e]"
+                        disabled={savingKey === `team:role:${member.id}`}
+                        onChange={(event) =>
+                          updateMemberRole(
+                            member,
+                            event.target.value as WorkspaceMember["role"],
+                          )
+                        }
+                        value={member.role}
+                      >
+                        <option value="owner">owner</option>
+                        <option value="admin">admin</option>
+                        <option value="agent">agent</option>
+                        <option value="viewer">viewer</option>
+                      </select>
+                    ) : (
+                      <span className="rounded-lg bg-[#e7f6ce] px-2 py-1 text-xs text-[#31521d]">
+                        {member.role}
+                      </span>
+                    )}
+                    {savingKey === `team:role:${member.id}` ? (
+                      <Loader2 className="animate-spin text-[#35735b]" size={14} />
+                    ) : null}
                     <button
                       className="inline-flex h-9 min-w-[94px] items-center justify-center gap-1.5 rounded-lg border border-[#efc4bd] bg-[#fff3f1] px-3 text-xs font-semibold text-[#9b2f22] shadow-sm transition hover:border-[#d96c5e] hover:bg-[#ffe4df] hover:text-[#7f2419] focus:outline-none focus:ring-2 focus:ring-[#f5b6ad]/60 disabled:cursor-not-allowed disabled:border-[#e4dfdb] disabled:bg-[#f6f4f1] disabled:text-[#9aa59e] disabled:shadow-none"
                       disabled={savingKey === `team:remove:${member.id}`}

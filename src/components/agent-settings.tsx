@@ -45,12 +45,18 @@ type AgentSettingsProps = {
 type AgentConfig = {
   enabled_tools: string[];
   knowledge_asset_ids: string[];
+  onboarding_agent_configured?: boolean;
   router_description: string;
 };
 
 function getAgentConfig(config: Json): AgentConfig {
   if (!config || typeof config !== "object" || Array.isArray(config)) {
-    return { enabled_tools: [], knowledge_asset_ids: [], router_description: "" };
+    return {
+      enabled_tools: [],
+      knowledge_asset_ids: [],
+      onboarding_agent_configured: false,
+      router_description: "",
+    };
   }
 
   return {
@@ -62,6 +68,7 @@ function getAgentConfig(config: Json): AgentConfig {
           (item): item is string => typeof item === "string",
         )
       : [],
+    onboarding_agent_configured: config.onboarding_agent_configured === true,
     router_description:
       typeof config.router_description === "string" ? config.router_description : "",
   };
@@ -70,11 +77,15 @@ function getAgentConfig(config: Json): AgentConfig {
 function mergeAgentConfig(config: Json, patch: AgentConfig): Json {
   const current =
     config && typeof config === "object" && !Array.isArray(config) ? config : {};
+  const currentConfigured =
+    (current as Record<string, unknown>).onboarding_agent_configured === true;
 
   return {
     ...current,
     enabled_tools: patch.enabled_tools,
     knowledge_asset_ids: patch.knowledge_asset_ids,
+    onboarding_agent_configured:
+      patch.onboarding_agent_configured ?? currentConfigured,
     router_description: patch.router_description,
   };
 }
@@ -262,6 +273,7 @@ export function AgentSettings({
       config: mergeAgentConfig(selectedAgent.config, {
         enabled_tools: form.enabled_tools,
         knowledge_asset_ids: form.knowledge_asset_ids,
+        onboarding_agent_configured: true,
         router_description: form.router_description,
       }),
       is_active: form.is_active,
@@ -315,6 +327,7 @@ export function AgentSettings({
         config: {
           enabled_tools: [],
           knowledge_asset_ids: [],
+          onboarding_agent_configured: true,
           router_description:
             "Usar para primeros mensajes, calificacion de leads, dudas generales y pasar a citas cuando el contacto quiera agendar.",
         },
