@@ -315,7 +315,7 @@ export function WorkspaceSettings({
     ycloudSecretValue || "SECRETO_WEBHOOK_EMPRESA",
   );
   const webhookUrl = workspaceId
-    ? `${appUrl.replace(/\/$/, "")}/api/webhooks/ycloud/${workspaceCode ?? workspaceId}?secret=${webhookSecretParam}`
+    ? `${appUrl}/api/webhooks/ycloud/${workspaceCode ?? workspaceId}/${webhookSecretParam}`
     : "";
   const assetsByKind = useMemo(
     () =>
@@ -462,6 +462,32 @@ export function WorkspaceSettings({
       return [...withoutProvider, data as IntegrationItem];
     });
     setStatus("Integracion guardada.");
+    setSavingKey("");
+  }
+
+  async function testIntegration(provider: Extract<IntegrationItem["provider"], "openai" | "ycloud">) {
+    if (!workspaceId) {
+      setStatus("Primero necesitas un workspace activo.");
+      return;
+    }
+
+    setSavingKey(`${provider}:test`);
+    setStatus("");
+
+    const response = await fetch(`/api/integrations/${provider}/test`, {
+      body: JSON.stringify({ workspaceId }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    const payload = (await response.json()) as { error?: string; ok?: boolean };
+
+    if (!response.ok || !payload.ok) {
+      setStatus(payload.error ?? `No se pudo probar ${provider}.`);
+      setSavingKey("");
+      return;
+    }
+
+    setStatus(provider === "ycloud" ? "YCloud respondio correctamente." : "OpenAI respondio correctamente.");
     setSavingKey("");
   }
 
@@ -1291,6 +1317,21 @@ export function WorkspaceSettings({
                       )}
                       Guardar
                     </button>
+                    {provider.provider === "ycloud" || provider.provider === "openai" ? (
+                      <button
+                        className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#10231c] px-3 text-sm font-medium text-[#10231c] disabled:border-[#9aa59e] disabled:text-[#9aa59e]"
+                        disabled={savingKey === `${provider.provider}:test`}
+                        onClick={() => testIntegration(provider.provider)}
+                        type="button"
+                      >
+                        {savingKey === `${provider.provider}:test` ? (
+                          <Loader2 className="animate-spin" size={16} />
+                        ) : (
+                          <PlugZap size={16} />
+                        )}
+                        Probar
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               );

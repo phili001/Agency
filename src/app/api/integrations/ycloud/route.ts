@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireWorkspaceRole } from "@/lib/authz";
+import { normalizeAppUrl } from "@/lib/app-url";
 import {
   generateWebhookSecret,
   hashSecret,
@@ -83,12 +84,12 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const appUrl = normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL);
 
     return NextResponse.json({
       integration: data,
       webhookSecret: secret,
-      webhookUrl: `${appUrl.replace(/\/$/, "")}/api/webhooks/ycloud/${companyCode}?secret=${encodeURIComponent(secret)}`,
+      webhookUrl: `${appUrl}/api/webhooks/ycloud/${companyCode}/${encodeURIComponent(secret)}`,
     });
   } catch (error) {
     return NextResponse.json(

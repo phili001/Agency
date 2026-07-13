@@ -253,11 +253,15 @@ function looksLikeCompanyCode(value: string) {
   return /^[A-Z]{3}[0-9]{3}$/.test(value.toUpperCase());
 }
 
-export async function handleYCloudWebhook(request: Request, workspaceId: string) {
+export async function handleYCloudWebhook(
+  request: Request,
+  workspaceId: string,
+  secretOverride?: string,
+) {
   const payload = (await request.json()) as WebhookPayload;
   const event = normalizeEvent(payload);
   const supabase = createAdminClient();
-  const receivedSecret = getReceivedSecret(request);
+  const receivedSecret = secretOverride ?? getReceivedSecret(request);
   const normalizedIdentifier = workspaceId.trim();
   const workspaceQuery = looksLikeCompanyCode(normalizedIdentifier)
     ? await supabase
@@ -283,8 +287,25 @@ export async function handleYCloudWebhook(request: Request, workspaceId: string)
       ? integrationConfig.webhook_secret_hash
       : null;
 
-  if (!integration || !receivedSecret || !expectedWebhookHash || hashSecret(receivedSecret) !== expectedWebhookHash) {
-    return NextResponse.json({ error: "Webhook no autorizado." }, { status: 401 });
+  if (!integration || !expectedWebhookHash) {
+    return NextResponse.json(
+      { error: "Webhook no autorizado. YCloud no esta conectado para esta empresa." },
+      { status: 401 },
+    );
+  }
+
+  if (!receivedSecret) {
+    return NextResponse.json(
+      { error: "Webhook no autorizado. Falta el secreto en la URL o header." },
+      { status: 401 },
+    );
+  }
+
+  if (hashSecret(receivedSecret) !== expectedWebhookHash) {
+    return NextResponse.json(
+      { error: "Webhook no autorizado. El secreto no coincide con esta empresa." },
+      { status: 401 },
+    );
   }
 
   const configPhone = normalizePhone(String(integrationConfig.phone_e164 ?? ""));

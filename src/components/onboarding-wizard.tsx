@@ -109,7 +109,7 @@ export function OnboardingWizard({
       return "";
     }
 
-    return `${appUrl.replace(/\/$/, "")}/api/webhooks/ycloud/${activeWorkspace.company_code ?? activeWorkspace.id}?secret=${encodeURIComponent(
+    return `${appUrl}/api/webhooks/ycloud/${activeWorkspace.company_code ?? activeWorkspace.id}/${encodeURIComponent(
       webhookSecret,
     )}`;
   }, [activeWorkspace, appUrl, webhookSecret]);

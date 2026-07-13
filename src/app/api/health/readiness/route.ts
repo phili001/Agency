@@ -111,7 +111,7 @@ export async function GET() {
         deliverCron: "/api/cron/deliver",
         ghlSyncCron: "/api/cron/ghl-sync",
         supabaseHealth: "/api/health/supabase",
-        ycloudWebhook: "/api/webhooks/ycloud/AAA001?secret=...",
+        ycloudWebhook: "/api/webhooks/ycloud/AAA001/secret",
       },
     },
     { status: requiredOk ? 200 : 503 },

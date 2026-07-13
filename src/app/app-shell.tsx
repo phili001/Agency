@@ -24,6 +24,7 @@ import { signOut } from "./actions";
 import { InboxPanel } from "@/components/inbox-panel";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { WorkspaceSettings } from "@/components/workspace-settings";
+import { normalizeAppUrl } from "@/lib/app-url";
 import {
   DEFAULT_AGENT_PROMPT_VERSION,
   buildDefaultAgentConfig,
@@ -852,7 +853,7 @@ export async function AppShell({ section }: { section: AppSection }) {
               <WorkspaceSettings
                 activeRole={activeRole}
                 agents={agents}
-                appUrl={process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}
+                appUrl={normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL)}
                 assets={workspaceAssets}
                 initialTab={workspaceTab}
                 integrations={integrations}

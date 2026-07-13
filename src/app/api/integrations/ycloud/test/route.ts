@@ -3,6 +3,22 @@ import { NextResponse } from "next/server";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { getWorkspaceYCloudKey } from "@/lib/integrations/ycloud";
 
+type YCloudErrorPayload = {
+  error?: { message?: string };
+  message?: string;
+};
+
+async function readResponsePayload(response: Response) {
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (contentType.includes("application/json")) {
+    return (await response.json()) as YCloudErrorPayload;
+  }
+
+  const text = await response.text();
+  return { message: text.slice(0, 300) };
+}
+
 export async function POST(request: Request) {
   try {
     const { workspaceId } = (await request.json()) as { workspaceId?: string };
@@ -22,15 +38,21 @@ export async function POST(request: Request) {
     const response = await fetch(`${apiBase.replace(/\/$/, "")}/whatsapp/numbers`, {
       headers: { "X-API-Key": apiKey },
     });
+    const payload = await readResponsePayload(response);
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: "YCloud rechazo la API key o el endpoint de numeros." },
+        {
+          error:
+            payload.error?.message ??
+            payload.message ??
+            `YCloud rechazo la prueba. HTTP ${response.status}.`,
+        },
         { status: response.status },
       );
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, sample: payload });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Error desconocido." },

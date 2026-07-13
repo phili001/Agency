@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { OnboardingWizard } from "@/components/onboarding-wizard";
+import { normalizeAppUrl } from "@/lib/app-url";
 import { isPlatformAdmin } from "@/lib/platform-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -62,7 +63,7 @@ export default async function OnboardingPage() {
 
   return (
     <OnboardingWizard
-      appUrl={process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}
+      appUrl={normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL)}
       businessProfile={businessProfile}
       checklist={checklist}
       integrations={(integrations ?? []) as never}
