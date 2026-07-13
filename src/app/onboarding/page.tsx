@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { OnboardingWizard } from "@/components/onboarding-wizard";
 import { isPlatformAdmin } from "@/lib/platform-admin";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveWorkspaceId, getOnboardingChecklist } from "@/lib/workspaces";
 
@@ -15,7 +16,8 @@ export default async function OnboardingPage() {
     redirect("/login");
   }
 
-  const { data: memberships } = await supabase
+  const admin = createAdminClient();
+  const { data: memberships } = await admin
     .from("workspace_members")
     .select("workspace_id, role")
     .eq("user_id", user.id)
@@ -36,7 +38,7 @@ export default async function OnboardingPage() {
 
   const workspaceId = await getActiveWorkspaceId(workspaceIds);
   const { data: workspaces } = workspaceIds.length
-    ? await supabase
+    ? await admin
         .from("workspaces")
         .select("*")
         .in("id", workspaceIds)

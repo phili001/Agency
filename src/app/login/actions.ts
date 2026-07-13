@@ -3,7 +3,9 @@
 import { redirect } from "next/navigation";
 
 import { isPlatformAdmin } from "@/lib/platform-admin";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { setActiveWorkspaceId } from "@/lib/workspaces";
 
 export async function signIn(formData: FormData) {
   const email = String(formData.get("email") ?? "");
@@ -24,10 +26,12 @@ export async function signIn(formData: FormData) {
     redirect("/admin");
   }
 
-  const { data: memberships } = await supabase
+  const admin = createAdminClient();
+  const { data: memberships } = await admin
     .from("workspace_members")
     .select("workspace_id, role")
     .eq("user_id", user.id)
+    .order("created_at", { ascending: true })
     .limit(50);
 
   if (!memberships?.length) {
@@ -43,7 +47,7 @@ export async function signIn(formData: FormData) {
   const canConfigureOnboarding = memberships.some((membership) =>
     ["owner", "admin"].includes(membership.role),
   );
-  const { data: workspaces } = await supabase
+  const { data: workspaces } = await admin
     .from("workspaces")
     .select("*")
     .in("id", workspaceIds);
@@ -51,6 +55,13 @@ export async function signIn(formData: FormData) {
     (workspace) =>
       "onboarding_completed_at" in workspace && Boolean(workspace.onboarding_completed_at),
   );
+  const preferredWorkspaceId =
+    (workspaces ?? []).find(
+      (workspace) =>
+        "onboarding_completed_at" in workspace && Boolean(workspace.onboarding_completed_at),
+    )?.id ?? workspaceIds[0];
+
+  await setActiveWorkspaceId(preferredWorkspaceId);
 
   if (!hasCompletedWorkspace && canConfigureOnboarding) {
     redirect("/onboarding");

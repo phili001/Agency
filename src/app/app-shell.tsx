@@ -354,8 +354,9 @@ export async function AppShell({ section }: { section: AppSection }) {
     redirect("/login");
   }
 
+  const admin = createAdminClient();
   const platformAdmin = await isPlatformAdmin(user);
-  const { data: memberships, error: membershipError } = await supabase
+  const { data: memberships, error: membershipError } = await admin
     .from("workspace_members")
     .select("workspace_id, role")
     .eq("user_id", user.id)
