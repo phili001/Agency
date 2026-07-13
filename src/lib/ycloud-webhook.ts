@@ -416,7 +416,7 @@ async function storeYCloudMessage({
   }
 
   const messageProviderId = event.providerMessageId ?? event.externalId;
-  const { data: existingMessage } = messageProviderId
+  let { data: existingMessage } = messageProviderId
     ? await supabase
         .from("messages")
         .select("id, created_at")
@@ -424,6 +424,37 @@ async function storeYCloudMessage({
         .eq("provider_message_id", messageProviderId)
         .maybeSingle()
     : { data: null };
+
+  if (!existingMessage && event.direction === "outbound" && event.messageText) {
+    const since = new Date(Date.now() - 1000 * 60 * 10).toISOString();
+    const { data: matchingMessages } = await supabase
+      .from("messages")
+      .select("id, created_at")
+      .eq("workspace_id", resolvedWorkspaceId)
+      .eq("conversation_id", conversationId)
+      .eq("direction", "outbound")
+      .eq("body", event.messageText)
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    existingMessage = matchingMessages?.[0] ?? null;
+
+    if (existingMessage && messageProviderId) {
+      await supabase
+        .from("messages")
+        .update({
+          metadata: {
+            deduped_from_ycloud_status: event.status,
+            raw_event_type: event.eventType,
+          },
+          provider_message_id: messageProviderId,
+          status: normalizeMessageStatus(event.status) ?? "sent",
+        })
+        .eq("id", existingMessage.id)
+        .eq("workspace_id", resolvedWorkspaceId);
+    }
+  }
 
   if (existingMessage) {
     await supabase
@@ -591,6 +622,47 @@ export async function handleYCloudWebhook(
             .eq("workspace_id", resolvedWorkspaceId);
 
           updated = true;
+        }
+      }
+
+      if (!updated && event.direction === "outbound" && event.messageText && event.contactPhone) {
+        const { data: contact } = await supabase
+          .from("contacts")
+          .select("id")
+          .eq("workspace_id", resolvedWorkspaceId)
+          .eq("phone_e164", event.contactPhone)
+          .maybeSingle();
+
+        if (contact) {
+          const since = new Date(Date.now() - 1000 * 60 * 10).toISOString();
+          const { data: matchingMessages } = await supabase
+            .from("messages")
+            .select("id")
+            .eq("workspace_id", resolvedWorkspaceId)
+            .eq("contact_id", contact.id)
+            .eq("direction", "outbound")
+            .eq("body", event.messageText)
+            .gte("created_at", since)
+            .order("created_at", { ascending: false })
+            .limit(1);
+          const matchingMessage = matchingMessages?.[0];
+
+          if (matchingMessage && nextStatus) {
+            await supabase
+              .from("messages")
+              .update({
+                metadata: {
+                  deduped_from_ycloud_status: event.status,
+                  raw_event_type: event.eventType,
+                },
+                provider_message_id: event.providerMessageId ?? event.externalId,
+                status: nextStatus,
+              })
+              .eq("id", matchingMessage.id)
+              .eq("workspace_id", resolvedWorkspaceId);
+
+            updated = true;
+          }
         }
       }
 
