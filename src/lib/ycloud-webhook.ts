@@ -329,6 +329,152 @@ function normalizeMessageStatus(value: string | null) {
   }
 }
 
+async function storeYCloudMessage({
+  event,
+  resolvedWorkspaceId,
+  supabase,
+}: {
+  event: NormalizedYCloudEvent;
+  resolvedWorkspaceId: string;
+  supabase: ReturnType<typeof createAdminClient>;
+}) {
+  if (!event.contactPhone) {
+    throw new Error("El webhook no incluye telefono de contacto.");
+  }
+
+  const { data: existingContact } = await supabase
+    .from("contacts")
+    .select("id, full_name, email, metadata")
+    .eq("workspace_id", resolvedWorkspaceId)
+    .eq("phone_e164", event.contactPhone)
+    .maybeSingle();
+  const existingMetadata = getMetadataRecord(existingContact?.metadata);
+  const ycloudMetadata = getMetadataRecord(existingMetadata.ycloud);
+  const { data: contact, error: contactError } = await supabase
+    .from("contacts")
+    .upsert(
+      {
+        email: event.contactEmail ?? existingContact?.email ?? null,
+        full_name: event.contactName ?? existingContact?.full_name ?? null,
+        metadata: {
+          ...existingMetadata,
+          source: existingMetadata.source ?? "ycloud",
+          ycloud: {
+            ...ycloudMetadata,
+            business_phone: event.businessPhone ?? ycloudMetadata.business_phone,
+            contact_email: event.contactEmail ?? ycloudMetadata.contact_email,
+            contact_name: event.contactName ?? ycloudMetadata.contact_name,
+            external_id: event.externalId,
+            last_event_type: event.eventType,
+            phone_id: event.phoneId ?? ycloudMetadata.phone_id,
+            raw_from: event.fromPhone,
+            raw_to: event.businessPhone,
+            updated_at: new Date().toISOString(),
+            waba_id: event.wabaId ?? ycloudMetadata.waba_id,
+          },
+        },
+        phone_e164: event.contactPhone,
+        workspace_id: resolvedWorkspaceId,
+      },
+      { onConflict: "workspace_id,phone_e164" },
+    )
+    .select("id")
+    .single();
+
+  if (contactError) {
+    throw contactError;
+  }
+
+  const { data: existingConversation } = await supabase
+    .from("conversations")
+    .select("id")
+    .eq("workspace_id", resolvedWorkspaceId)
+    .eq("contact_id", contact.id)
+    .neq("status", "closed")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const conversationId =
+    existingConversation?.id ??
+    (
+      await supabase
+        .from("conversations")
+        .insert({
+          contact_id: contact.id,
+          external_conversation_id: event.externalId,
+          last_message_at: new Date().toISOString(),
+          ai_enabled: false,
+          status: "pending_handoff",
+          workspace_id: resolvedWorkspaceId,
+        })
+        .select("id")
+        .single()
+    ).data?.id;
+
+  if (!conversationId) {
+    throw new Error("No se pudo crear la conversacion.");
+  }
+
+  const messageProviderId = event.providerMessageId ?? event.externalId;
+  const { data: existingMessage } = messageProviderId
+    ? await supabase
+        .from("messages")
+        .select("id, created_at")
+        .eq("workspace_id", resolvedWorkspaceId)
+        .eq("provider_message_id", messageProviderId)
+        .maybeSingle()
+    : { data: null };
+
+  if (existingMessage) {
+    await supabase
+      .from("conversations")
+      .update({ last_message_at: existingMessage.created_at })
+      .eq("id", conversationId)
+      .eq("workspace_id", resolvedWorkspaceId);
+
+    return;
+  }
+
+  const { data: message, error: messageError } = await supabase
+    .from("messages")
+    .insert({
+      body: event.messageText,
+      contact_id: contact.id,
+      conversation_id: conversationId,
+      direction: event.direction,
+      message_type: event.messageText ? "text" : event.messageType,
+      metadata: {
+        raw_event_type: event.eventType,
+        ycloud_message_type: event.messageType,
+        ycloud_status: event.status,
+      },
+      provider_message_id: messageProviderId,
+      role:
+        event.direction === "outbound"
+          ? "human"
+          : event.messageText
+            ? "user"
+            : "system",
+      status:
+        event.direction === "outbound"
+          ? normalizeMessageStatus(event.status) ?? "sent"
+          : "stored",
+      workspace_id: resolvedWorkspaceId,
+    })
+    .select("id, created_at")
+    .single();
+
+  if (messageError) {
+    throw messageError;
+  }
+
+  await supabase
+    .from("conversations")
+    .update({ last_message_at: message.created_at })
+    .eq("id", conversationId)
+    .eq("workspace_id", resolvedWorkspaceId);
+}
+
 export async function handleYCloudWebhook(
   request: Request,
   workspaceId: string,
@@ -448,140 +594,18 @@ export async function handleYCloudWebhook(
         }
       }
 
-      status = updated ? "stored" : "ignored";
-      errorMessage = updated
-        ? null
-        : "Actualizacion de estado sin mensaje saliente previo en Levi.";
-    } else if (event.contactPhone) {
-      const { data: existingContact } = await supabase
-        .from("contacts")
-        .select("id, full_name, email, metadata")
-        .eq("workspace_id", resolvedWorkspaceId)
-        .eq("phone_e164", event.contactPhone)
-        .maybeSingle();
-      const existingMetadata = getMetadataRecord(existingContact?.metadata);
-      const ycloudMetadata = getMetadataRecord(existingMetadata.ycloud);
-      const { data: contact, error: contactError } = await supabase
-        .from("contacts")
-        .upsert(
-          {
-            email: event.contactEmail ?? existingContact?.email ?? null,
-            full_name: event.contactName ?? existingContact?.full_name ?? null,
-            metadata: {
-              ...existingMetadata,
-              source: existingMetadata.source ?? "ycloud",
-              ycloud: {
-                ...ycloudMetadata,
-                business_phone: event.businessPhone ?? ycloudMetadata.business_phone,
-                contact_email: event.contactEmail ?? ycloudMetadata.contact_email,
-                contact_name: event.contactName ?? ycloudMetadata.contact_name,
-                external_id: event.externalId,
-                last_event_type: event.eventType,
-                phone_id: event.phoneId ?? ycloudMetadata.phone_id,
-                raw_from: event.fromPhone,
-                raw_to: event.businessPhone,
-                updated_at: new Date().toISOString(),
-                waba_id: event.wabaId ?? ycloudMetadata.waba_id,
-              },
-            },
-            phone_e164: event.contactPhone,
-            workspace_id: resolvedWorkspaceId,
-          },
-          { onConflict: "workspace_id,phone_e164" },
-        )
-        .select("id")
-        .single();
-
-      if (contactError) {
-        throw contactError;
-      }
-
-      const { data: existingConversation } = await supabase
-        .from("conversations")
-        .select("id")
-        .eq("workspace_id", resolvedWorkspaceId)
-        .eq("contact_id", contact.id)
-        .neq("status", "closed")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      const conversationId =
-        existingConversation?.id ??
-        (
-          await supabase
-            .from("conversations")
-            .insert({
-              contact_id: contact.id,
-              external_conversation_id: event.externalId,
-              last_message_at: new Date().toISOString(),
-              ai_enabled: false,
-              status: "pending_handoff",
-              workspace_id: resolvedWorkspaceId,
-            })
-            .select("id")
-            .single()
-        ).data?.id;
-
-      if (!conversationId) {
-        throw new Error("No se pudo crear la conversacion.");
-      }
-
-      const messageProviderId = event.providerMessageId ?? event.externalId;
-      const { data: existingMessage } = messageProviderId
-        ? await supabase
-            .from("messages")
-            .select("id, created_at")
-            .eq("workspace_id", resolvedWorkspaceId)
-            .eq("provider_message_id", messageProviderId)
-            .maybeSingle()
-        : { data: null };
-
-      if (existingMessage) {
-        await supabase
-          .from("conversations")
-          .update({ last_message_at: existingMessage.created_at })
-          .eq("id", conversationId)
-          .eq("workspace_id", resolvedWorkspaceId);
-
+      if (updated) {
+        status = "stored";
+      } else if (event.messageText && event.contactPhone) {
+        await storeYCloudMessage({ event, resolvedWorkspaceId, supabase });
         status = "stored";
       } else {
-      const { data: message, error: messageError } = await supabase
-        .from("messages")
-        .insert({
-          body: event.messageText,
-          contact_id: contact.id,
-          conversation_id: conversationId,
-          direction: event.direction,
-          message_type: event.messageText ? "text" : event.messageType,
-          metadata: {
-            raw_event_type: event.eventType,
-            ycloud_message_type: event.messageType,
-          },
-          provider_message_id: messageProviderId,
-          role:
-            event.direction === "outbound"
-              ? "human"
-              : event.messageText
-                ? "user"
-                : "system",
-          status: event.direction === "outbound" ? "sent" : "stored",
-          workspace_id: resolvedWorkspaceId,
-        })
-        .select("id, created_at")
-        .single();
-
-      if (messageError) {
-        throw messageError;
+        status = "ignored";
+        errorMessage = "Actualizacion de estado sin mensaje saliente previo en Levi.";
       }
-
-      await supabase
-        .from("conversations")
-        .update({ last_message_at: message.created_at })
-        .eq("id", conversationId)
-        .eq("workspace_id", resolvedWorkspaceId);
-
+    } else if (event.contactPhone) {
+      await storeYCloudMessage({ event, resolvedWorkspaceId, supabase });
       status = "stored";
-      }
     } else {
       errorMessage = "El webhook no incluye telefono de contacto.";
     }
