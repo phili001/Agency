@@ -5,14 +5,9 @@ import {
   Bot,
   CalendarCheck,
   Check,
-  CheckCircle2,
   ClipboardList,
-  Clock3,
-  Database,
   GitBranch,
-  Headphones,
   MessageSquareText,
-  Mic,
   PlugZap,
   BriefcaseBusiness,
   ShieldCheck,
@@ -74,26 +69,6 @@ const conversations = [
     time: "09:18",
     workspaceId: null,
   },
-];
-
-const modules = [
-  { name: "Inbox WhatsApp Web", state: "Operable", icon: MessageSquareText },
-  { name: "IA + humano con handoff", state: "Activo", icon: Headphones },
-  { name: "Buffer inteligente", state: "Cron listo", icon: Clock3 },
-  { name: "Audios transcritos", state: "Pendiente", icon: Mic },
-  { name: "Empresas aisladas", state: "Listo", icon: Database },
-  { name: "YCloud oficial", state: "Webhook listo", icon: PlugZap },
-];
-
-const roadmap = [
-  "Base Next.js + Tailwind creada",
-  "Dashboard operativo inicial",
-  "Modelo de datos multi-tenant",
-  "Inbox operable con handoff",
-  "Contacto y observabilidad",
-  "Agente IA con OpenAI",
-  "Webhook YCloud + buffer cron",
-  "Agenda y leads en GoHighLevel",
 ];
 
 const deployChecks = [
@@ -1092,46 +1067,6 @@ export async function AppShell({ section }: { section: AppSection }) {
                 </div>
               </section>
 
-              <section className="rounded-lg border border-[#d9ded3] bg-white p-4">
-                <h2 className="text-base font-semibold">Modulos del sistema</h2>
-                <div className="mt-4 grid gap-3">
-                  {modules.map((module) => (
-                    <div
-                      className="flex items-center justify-between gap-3"
-                      key={module.name}
-                    >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#eef2eb] text-[#35735b]">
-                          <module.icon size={17} />
-                        </div>
-                        <p className="truncate text-sm font-medium">
-                          {module.name}
-                        </p>
-                      </div>
-                      <span className="shrink-0 rounded-lg bg-[#f3f4ef] px-2 py-1 text-xs text-[#647067]">
-                        {module.state}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              <section className="rounded-lg border border-[#d9ded3] bg-white p-4">
-                <h2 className="text-base font-semibold">Ruta paso a paso</h2>
-                <ol className="mt-4 grid gap-3">
-                  {roadmap.map((step, index) => (
-                    <li className="flex gap-3 text-sm" key={step}>
-                      <CheckCircle2
-                        className={index < 3 ? "text-[#35735b]" : "text-[#a8b0aa]"}
-                        size={18}
-                      />
-                      <span className={index < 3 ? "font-medium" : "text-[#647067]"}>
-                        {step}
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              </section>
             </aside>
             ) : null}
           </div>
