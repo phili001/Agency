@@ -421,7 +421,7 @@ export async function AppShell({ section }: { section: AppSection }) {
               .select("id, full_name, phone_e164, email, metadata, created_at")
               .eq("workspace_id", workspaceId)
               .order("created_at", { ascending: false })
-              .limit(isClients ? 50 : 10)
+              .limit(isClients ? 200 : 200)
           : Promise.resolve({ data: [], error: null }),
         needsAgents
           ? supabase
@@ -438,7 +438,7 @@ export async function AppShell({ section }: { section: AppSection }) {
               .select("id, contact_id, status, ai_enabled, last_message_at, created_at")
               .eq("workspace_id", workspaceId)
               .order("last_message_at", { ascending: false, nullsFirst: false })
-              .limit(10)
+              .limit(100)
           : Promise.resolve({ data: [], error: null }),
         needsUsage
           ? supabase
@@ -448,7 +448,7 @@ export async function AppShell({ section }: { section: AppSection }) {
               )
               .eq("workspace_id", workspaceId)
               .order("created_at", { ascending: false })
-              .limit(100)
+              .limit(500)
           : Promise.resolve({ data: [], error: null }),
         needsIntegrations
           ? supabase
@@ -556,6 +556,7 @@ export async function AppShell({ section }: { section: AppSection }) {
           .eq("workspace_id", workspaceId)
           .in("conversation_id", conversationIds)
           .order("created_at", { ascending: true })
+          .limit(2000)
       : { data: [] };
   const usageEvents = usageResult.data ?? [];
   const totalCost = usageEvents.reduce(

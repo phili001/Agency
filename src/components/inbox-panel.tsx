@@ -213,9 +213,19 @@ export function InboxPanel({
         message?: MessageItem;
       };
 
-      if (!response.ok || !payload.message) {
+      if (payload.message) {
         setLocalMessages((current) =>
-          current.filter((message) => message.id !== optimisticMessage.id),
+          current.map((message) =>
+            message.id === optimisticMessage.id ? payload.message! : message,
+          ),
+        );
+      }
+
+      if (!response.ok) {
+        setLocalMessages((current) =>
+          payload.message
+            ? current
+            : current.filter((message) => message.id !== optimisticMessage.id),
         );
         return {
           errorMessage:
@@ -223,11 +233,13 @@ export function InboxPanel({
         };
       }
 
-      setLocalMessages((current) =>
-        current.map((message) =>
-          message.id === optimisticMessage.id ? payload.message! : message,
-        ),
-      );
+      if (!payload.message) {
+        setLocalMessages((current) =>
+          current.filter((message) => message.id !== optimisticMessage.id),
+        );
+        return { errorMessage: "El mensaje se envio pero la respuesta vino vacia." };
+      }
+
       return { errorMessage: "" };
     }
 
