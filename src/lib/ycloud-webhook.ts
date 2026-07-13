@@ -9,8 +9,10 @@ type WebhookPayload = Record<string, unknown>;
 
 type NormalizedYCloudEvent = {
   businessPhone: string | null;
+  contactPhone: string | null;
   contactEmail: string | null;
   contactName: string | null;
+  direction: "inbound" | "outbound";
   eventType: string;
   externalId: string | null;
   fromPhone: string | null;
@@ -70,26 +72,49 @@ function normalizePhone(value: string | null) {
 }
 
 function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
+  const eventType =
+    readPath(payload, [
+      ["type"],
+      ["event"],
+      ["event_type"],
+      ["data", "type"],
+      ["data", "event"],
+    ]) ?? "ycloud.webhook";
+  const isOutboundEcho = eventType.toLowerCase().includes("echo");
+  const inboundFromPhone = normalizePhone(
+    readPath(payload, [
+      ["from"],
+      ["whatsappInboundMessage", "from"],
+      ["whatsappMessage", "from"],
+      ["message", "from"],
+      ["data", "from"],
+      ["data", "message", "from"],
+      ["data", "whatsappInboundMessage", "from"],
+      ["data", "whatsappInboundMessage", "customerProfile", "whatsapp"],
+      ["data", "whatsappMessage", "from"],
+      ["data", "whatsappMessage", "customerProfile", "whatsapp"],
+      ["data", "object", "messages", "0", "from"],
+      ["data", "object", "contacts", "0", "wa_id"],
+    ]),
+  );
+  const toPhone = normalizePhone(
+    readPath(payload, [
+      ["to"],
+      ["whatsappInboundMessage", "to"],
+      ["whatsappMessage", "to"],
+      ["message", "to"],
+      ["data", "to"],
+      ["data", "message", "to"],
+      ["data", "whatsappInboundMessage", "to"],
+      ["data", "whatsappMessage", "to"],
+    ]),
+  );
+  const businessPhone = isOutboundEcho ? inboundFromPhone : toPhone;
+  const contactPhone = isOutboundEcho ? toPhone : inboundFromPhone;
+
   return {
-    businessPhone: normalizePhone(
-      readPath(payload, [
-        ["to"],
-        ["phone"],
-        ["phoneNumber"],
-        ["businessPhone"],
-        ["whatsappInboundMessage", "to"],
-        ["whatsappMessage", "to"],
-        ["message", "to"],
-        ["data", "to"],
-        ["data", "phone"],
-        ["data", "phoneNumber"],
-        ["data", "businessPhone"],
-        ["data", "message", "to"],
-        ["data", "whatsappInboundMessage", "to"],
-        ["data", "whatsappMessage", "to"],
-        ["data", "object", "metadata", "display_phone_number"],
-      ]),
-    ),
+    businessPhone,
+    contactPhone,
     contactEmail: readPath(payload, [
       ["contact", "email"],
       ["customer", "email"],
@@ -139,42 +164,29 @@ function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
       ["data", "whatsappMessage", "customerProfile", "name"],
       ["data", "object", "contacts", "0", "profile", "name"],
     ]),
-    eventType:
-      readPath(payload, [
-        ["type"],
-        ["event"],
-        ["event_type"],
-        ["data", "type"],
-        ["data", "event"],
-      ]) ?? "ycloud.webhook",
+    direction: isOutboundEcho ? "outbound" : "inbound",
+    eventType,
     externalId: readPath(payload, [
+      ["wamid"],
       ["id"],
       ["messageId"],
+      ["whatsappInboundMessage", "wamid"],
       ["whatsappInboundMessage", "id"],
+      ["whatsappMessage", "wamid"],
       ["whatsappMessage", "id"],
+      ["message", "wamid"],
       ["message", "id"],
+      ["data", "wamid"],
       ["data", "id"],
+      ["data", "message", "wamid"],
       ["data", "message", "id"],
+      ["data", "whatsappInboundMessage", "wamid"],
       ["data", "whatsappInboundMessage", "id"],
+      ["data", "whatsappMessage", "wamid"],
       ["data", "whatsappMessage", "id"],
       ["data", "object", "messages", "0", "id"],
     ]),
-    fromPhone: normalizePhone(
-      readPath(payload, [
-        ["from"],
-        ["whatsappInboundMessage", "from"],
-        ["whatsappMessage", "from"],
-        ["message", "from"],
-        ["data", "from"],
-        ["data", "message", "from"],
-        ["data", "whatsappInboundMessage", "from"],
-        ["data", "whatsappInboundMessage", "customerProfile", "whatsapp"],
-        ["data", "whatsappMessage", "from"],
-        ["data", "whatsappMessage", "customerProfile", "whatsapp"],
-        ["data", "object", "messages", "0", "from"],
-        ["data", "object", "contacts", "0", "wa_id"],
-      ]),
-    ),
+    fromPhone: inboundFromPhone,
     messageType: normalizeMessageType(
       readPath(payload, [
         ["type"],
@@ -320,12 +332,12 @@ export async function handleYCloudWebhook(
   try {
     if (!identifierMatches) {
       errorMessage = "El webhook no coincide con el numero configurado para esta empresa.";
-    } else if (event.fromPhone) {
+    } else if (event.contactPhone) {
       const { data: existingContact } = await supabase
         .from("contacts")
         .select("id, full_name, email, metadata")
         .eq("workspace_id", resolvedWorkspaceId)
-        .eq("phone_e164", event.fromPhone)
+        .eq("phone_e164", event.contactPhone)
         .maybeSingle();
       const existingMetadata = getMetadataRecord(existingContact?.metadata);
       const ycloudMetadata = getMetadataRecord(existingMetadata.ycloud);
@@ -347,11 +359,12 @@ export async function handleYCloudWebhook(
                 last_event_type: event.eventType,
                 phone_id: event.phoneId ?? ycloudMetadata.phone_id,
                 raw_from: event.fromPhone,
+                raw_to: event.businessPhone,
                 updated_at: new Date().toISOString(),
                 waba_id: event.wabaId ?? ycloudMetadata.waba_id,
               },
             },
-            phone_e164: event.fromPhone,
+            phone_e164: event.contactPhone,
             workspace_id: resolvedWorkspaceId,
           },
           { onConflict: "workspace_id,phone_e164" },
@@ -393,21 +406,44 @@ export async function handleYCloudWebhook(
         throw new Error("No se pudo crear la conversacion.");
       }
 
+      const { data: existingMessage } = event.externalId
+        ? await supabase
+            .from("messages")
+            .select("id, created_at")
+            .eq("workspace_id", resolvedWorkspaceId)
+            .eq("provider_message_id", event.externalId)
+            .maybeSingle()
+        : { data: null };
+
+      if (existingMessage) {
+        await supabase
+          .from("conversations")
+          .update({ last_message_at: existingMessage.created_at })
+          .eq("id", conversationId)
+          .eq("workspace_id", resolvedWorkspaceId);
+
+        status = "stored";
+      } else {
       const { data: message, error: messageError } = await supabase
         .from("messages")
         .insert({
           body: event.messageText,
           contact_id: contact.id,
           conversation_id: conversationId,
-          direction: "inbound",
+          direction: event.direction,
           message_type: event.messageText ? "text" : event.messageType,
           metadata: {
             raw_event_type: event.eventType,
             ycloud_message_type: event.messageType,
           },
           provider_message_id: event.externalId,
-          role: event.messageText ? "user" : "system",
-          status: "stored",
+          role:
+            event.direction === "outbound"
+              ? "human"
+              : event.messageText
+                ? "user"
+                : "system",
+          status: event.direction === "outbound" ? "sent" : "stored",
           workspace_id: resolvedWorkspaceId,
         })
         .select("id, created_at")
@@ -424,6 +460,7 @@ export async function handleYCloudWebhook(
         .eq("workspace_id", resolvedWorkspaceId);
 
       status = "stored";
+      }
     } else {
       errorMessage = "El webhook no incluye telefono de contacto.";
     }

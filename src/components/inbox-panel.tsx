@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bot,
   CircleDollarSign,
@@ -76,6 +76,7 @@ type InboxPanelProps = {
   messages: MessageItem[];
   usageEvents: UsageEventItem[];
   webhookEvents: WebhookEventItem[];
+  workspaceId: string | null;
 };
 
 export function InboxPanel({
@@ -83,6 +84,7 @@ export function InboxPanel({
   messages,
   usageEvents,
   webhookEvents,
+  workspaceId,
 }: InboxPanelProps) {
   const supabase = createClient();
   const [localConversations, setLocalConversations] = useState(conversations);
@@ -94,7 +96,6 @@ export function InboxPanel({
   const [error, setError] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isSavingNote, setIsSavingNote] = useState(false);
-  const [isUpdatingConversation, setIsUpdatingConversation] = useState(false);
   const [localMessages, setLocalMessages] = useState<MessageItem[]>(messages);
   const selectedConversation =
     localConversations.find(
@@ -166,8 +167,58 @@ export function InboxPanel({
   }
 
   function upsertLocalMessage(message: MessageItem) {
-    setLocalMessages((current) => [...current, message]);
+    setLocalMessages((current) => {
+      const withoutMessage = current.filter((item) => item.id !== message.id);
+      return [...withoutMessage, message];
+    });
   }
+
+  useEffect(() => {
+    if (!workspaceId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function refreshSnapshot() {
+      const response = await fetch(
+        `/api/inbox/snapshot?workspaceId=${encodeURIComponent(workspaceId!)}`,
+      );
+
+      if (!response.ok) {
+        return;
+      }
+
+      const payload = (await response.json()) as {
+        conversations?: ConversationItem[];
+        messages?: MessageItem[];
+      };
+
+      if (cancelled) {
+        return;
+      }
+
+      if (payload.conversations?.length) {
+        setLocalConversations(payload.conversations);
+        setSelectedConversationId((current) => current || payload.conversations?.[0]?.id || "");
+      }
+
+      if (payload.messages) {
+        setLocalMessages((current) => {
+          const localPending = current.filter((message) => message.id.startsWith("local-"));
+          return [...payload.messages!, ...localPending];
+        });
+      }
+    }
+
+    const interval = window.setInterval(refreshSnapshot, 3500);
+    void refreshSnapshot();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [workspaceId]);
 
   async function insertMessage({
     body,
@@ -288,18 +339,18 @@ export function InboxPanel({
 
     setDraft("");
     setIsSending(true);
-    const { errorMessage } = await insertMessage({
+    void insertMessage({
       body,
       direction: "outbound",
       role: "human",
+    }).then(({ errorMessage }) => {
+      if (errorMessage) {
+        setError(errorMessage);
+        setDraft(body);
+      }
+
+      setIsSending(false);
     });
-
-    if (errorMessage) {
-      setError(errorMessage);
-      setDraft(body);
-    }
-
-    setIsSending(false);
   }
 
   async function handleInternalNote(formData: FormData) {
@@ -311,18 +362,18 @@ export function InboxPanel({
 
     setNoteDraft("");
     setIsSavingNote(true);
-    const { errorMessage } = await insertMessage({
+    void insertMessage({
       body,
       direction: "internal",
       role: "human",
+    }).then(({ errorMessage }) => {
+      if (errorMessage) {
+        setError(errorMessage);
+        setNoteDraft(body);
+      }
+
+      setIsSavingNote(false);
     });
-
-    if (errorMessage) {
-      setError(errorMessage);
-      setNoteDraft(body);
-    }
-
-    setIsSavingNote(false);
   }
 
   async function updateConversation(next: {
@@ -335,8 +386,6 @@ export function InboxPanel({
     }
 
     setError("");
-    setIsUpdatingConversation(true);
-
     const previous = selectedConversation;
     setLocalConversations((current) =>
       current.map((conversation) =>
@@ -351,25 +400,24 @@ export function InboxPanel({
       ),
     );
 
-    const { error: updateError } = await supabase
+    void supabase
       .from("conversations")
       .update({
         ...(next.aiEnabled !== undefined ? { ai_enabled: next.aiEnabled } : {}),
         ...(next.rawStatus ? { status: next.rawStatus } : {}),
       })
       .eq("id", selectedConversation.id)
-      .eq("workspace_id", selectedConversation.workspaceId);
-
-    if (updateError) {
-      setLocalConversations((current) =>
-        current.map((conversation) =>
-          conversation.id === selectedConversation.id ? previous : conversation,
-        ),
-      );
-      setError(updateError.message);
-    }
-
-    setIsUpdatingConversation(false);
+      .eq("workspace_id", selectedConversation.workspaceId)
+      .then(({ error: updateError }) => {
+        if (updateError) {
+          setLocalConversations((current) =>
+            current.map((conversation) =>
+              conversation.id === selectedConversation.id ? previous : conversation,
+            ),
+          );
+          setError(updateError.message);
+        }
+      });
   }
 
   return (
@@ -428,7 +476,7 @@ export function InboxPanel({
                     ? "bg-[#e7f6ce] text-[#31521d]"
                     : "bg-[#eef2eb] text-[#4d5a51]"
                 }`}
-                disabled={!canSend || isUpdatingConversation}
+                disabled={!canSend}
                 onClick={() =>
                   updateConversation({
                     aiEnabled: !selectedConversation?.aiEnabled,
@@ -447,7 +495,7 @@ export function InboxPanel({
               </button>
               <button
                 className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm font-medium"
-                disabled={!canSend || isUpdatingConversation}
+                disabled={!canSend}
                 onClick={() =>
                   updateConversation({
                     aiEnabled: false,
@@ -526,7 +574,7 @@ export function InboxPanel({
           <div className="flex gap-2">
             <input
               className="h-11 min-w-0 flex-1 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none transition focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50 disabled:bg-[#f3f4ef]"
-              disabled={!canSend || isSending}
+              disabled={!canSend}
               name="body"
               onChange={(event) => setDraft(event.target.value)}
               placeholder={
@@ -538,7 +586,7 @@ export function InboxPanel({
             />
             <button
               className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#10231c] text-white disabled:cursor-not-allowed disabled:bg-[#9aa59e]"
-              disabled={!canSend || isSending || draft.trim().length === 0}
+              disabled={!canSend || draft.trim().length === 0}
               title="Enviar"
               type="submit"
             >
@@ -558,7 +606,7 @@ export function InboxPanel({
           <div className="flex gap-2">
             <input
               className="h-10 min-w-0 flex-1 rounded-lg border border-amber-200 bg-amber-50 px-3 text-sm outline-none transition placeholder:text-amber-700/70 focus:border-amber-400 focus:ring-2 focus:ring-amber-200 disabled:bg-[#f3f4ef]"
-              disabled={!canSend || isSavingNote}
+              disabled={!canSend}
               name="note"
               onChange={(event) => setNoteDraft(event.target.value)}
               placeholder="Nota interna: no se envia al contacto"
@@ -566,7 +614,7 @@ export function InboxPanel({
             />
             <button
               className="inline-flex h-10 items-center gap-2 rounded-lg border border-amber-200 bg-white px-3 text-sm font-medium text-amber-900 disabled:cursor-not-allowed disabled:bg-[#f3f4ef]"
-              disabled={!canSend || isSavingNote || noteDraft.trim().length === 0}
+              disabled={!canSend || noteDraft.trim().length === 0}
               type="submit"
             >
               {isSavingNote ? (

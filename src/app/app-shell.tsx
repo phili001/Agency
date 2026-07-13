@@ -800,6 +800,7 @@ export async function AppShell({ section }: { section: AppSection }) {
                   messages={displayMessages}
                   usageEvents={displayUsageEvents}
                   webhookEvents={displayWebhookEvents}
+                  workspaceId={workspaceId ?? null}
                 />
               </section>
               ) : null}
