@@ -187,12 +187,19 @@ export async function POST(request: Request) {
     });
     const providerMessageId =
       ycloudResult.id ?? ycloudResult.messageId ?? String(crypto.randomUUID());
+    const providerWamid =
+      typeof ycloudResult.wamid === "string"
+        ? ycloudResult.wamid
+        : typeof ycloudResult.whatsappMessageId === "string"
+          ? ycloudResult.whatsappMessageId
+          : null;
 
     await admin
       .from("messages")
       .update({
         metadata: {
           delivery: "ycloud",
+          provider_wamid: providerWamid,
           ycloud_response: ycloudResult,
         },
         provider_message_id: providerMessageId,

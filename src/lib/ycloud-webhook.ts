@@ -15,8 +15,11 @@ type NormalizedYCloudEvent = {
   direction: "inbound" | "outbound";
   eventType: string;
   externalId: string | null;
+  providerMessageId: string | null;
   fromPhone: string | null;
+  isStatusUpdate: boolean;
   messageType: "text" | "audio" | "image" | "file" | "event";
+  status: string | null;
   messageText: string | null;
   phoneId: string | null;
   wabaId: string | null;
@@ -80,7 +83,23 @@ function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
       ["data", "type"],
       ["data", "event"],
     ]) ?? "ycloud.webhook";
-  const isOutboundEcho = eventType.toLowerCase().includes("echo");
+  const normalizedEventType = eventType.toLowerCase();
+  const statusValue = readPath(payload, [
+    ["status"],
+    ["whatsappInboundMessage", "status"],
+    ["whatsappMessage", "status"],
+    ["message", "status"],
+    ["data", "status"],
+    ["data", "message", "status"],
+    ["data", "whatsappInboundMessage", "status"],
+    ["data", "whatsappMessage", "status"],
+  ]);
+  const isStatusUpdate =
+    normalizedEventType.includes("message.updated") ||
+    normalizedEventType.includes("status") ||
+    ["sent", "delivered", "read", "failed"].includes(statusValue?.toLowerCase() ?? "");
+  const isOutboundEcho =
+    normalizedEventType.includes("echo") || isStatusUpdate;
   const inboundFromPhone = normalizePhone(
     readPath(payload, [
       ["from"],
@@ -167,26 +186,58 @@ function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
     direction: isOutboundEcho ? "outbound" : "inbound",
     eventType,
     externalId: readPath(payload, [
-      ["wamid"],
-      ["id"],
-      ["messageId"],
       ["whatsappInboundMessage", "wamid"],
-      ["whatsappInboundMessage", "id"],
       ["whatsappMessage", "wamid"],
-      ["whatsappMessage", "id"],
       ["message", "wamid"],
-      ["message", "id"],
-      ["data", "wamid"],
-      ["data", "id"],
       ["data", "message", "wamid"],
-      ["data", "message", "id"],
       ["data", "whatsappInboundMessage", "wamid"],
-      ["data", "whatsappInboundMessage", "id"],
       ["data", "whatsappMessage", "wamid"],
+      ["wamid"],
+      ["messageId"],
+      ["id"],
+      ["whatsappInboundMessage", "messageId"],
+      ["whatsappMessage", "messageId"],
+      ["message", "messageId"],
+      ["data", "messageId"],
+      ["data", "message", "messageId"],
+      ["data", "whatsappInboundMessage", "messageId"],
+      ["data", "whatsappMessage", "messageId"],
+      ["whatsappInboundMessage", "id"],
+      ["whatsappMessage", "id"],
+      ["message", "id"],
+      ["data", "id"],
+      ["data", "message", "id"],
+      ["data", "whatsappInboundMessage", "id"],
+      ["data", "whatsappMessage", "id"],
+      ["data", "object", "messages", "0", "id"],
+    ]),
+    providerMessageId: readPath(payload, [
+      ["whatsappInboundMessage", "wamid"],
+      ["whatsappMessage", "wamid"],
+      ["message", "wamid"],
+      ["data", "message", "wamid"],
+      ["data", "whatsappInboundMessage", "wamid"],
+      ["data", "whatsappMessage", "wamid"],
+      ["wamid"],
+      ["messageId"],
+      ["whatsappInboundMessage", "messageId"],
+      ["whatsappMessage", "messageId"],
+      ["message", "messageId"],
+      ["data", "messageId"],
+      ["data", "message", "messageId"],
+      ["data", "whatsappInboundMessage", "messageId"],
+      ["data", "whatsappMessage", "messageId"],
+      ["whatsappInboundMessage", "id"],
+      ["whatsappMessage", "id"],
+      ["message", "id"],
+      ["data", "id"],
+      ["data", "message", "id"],
+      ["data", "whatsappInboundMessage", "id"],
       ["data", "whatsappMessage", "id"],
       ["data", "object", "messages", "0", "id"],
     ]),
     fromPhone: inboundFromPhone,
+    isStatusUpdate,
     messageType: normalizeMessageType(
       readPath(payload, [
         ["type"],
@@ -215,6 +266,7 @@ function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
       ["data", "whatsappMessage", "text", "body"],
       ["data", "object", "messages", "0", "text", "body"],
     ]),
+    status: statusValue,
     phoneId: readPath(payload, [
       ["phoneId"],
       ["phone_id"],
@@ -263,6 +315,18 @@ function getReceivedSecret(request: Request) {
 
 function looksLikeCompanyCode(value: string) {
   return /^[A-Z]{3}[0-9]{3}$/.test(value.toUpperCase());
+}
+
+function normalizeMessageStatus(value: string | null) {
+  switch (value?.toLowerCase()) {
+    case "delivered":
+    case "failed":
+    case "read":
+    case "sent":
+      return value.toLowerCase();
+    default:
+      return null;
+  }
 }
 
 export async function handleYCloudWebhook(
@@ -332,6 +396,62 @@ export async function handleYCloudWebhook(
   try {
     if (!identifierMatches) {
       errorMessage = "El webhook no coincide con el numero configurado para esta empresa.";
+    } else if (event.isStatusUpdate) {
+      const providerIds = [
+        event.providerMessageId,
+        event.externalId,
+      ].filter(Boolean) as string[];
+      const nextStatus = normalizeMessageStatus(event.status);
+      let updated = false;
+
+      if (providerIds.length > 0 && nextStatus) {
+        let { data: existingMessages } = await supabase
+          .from("messages")
+          .select("id, conversation_id")
+          .eq("workspace_id", resolvedWorkspaceId)
+          .in("provider_message_id", providerIds)
+          .limit(1);
+        if (!existingMessages?.length) {
+          const { data } = await supabase
+            .from("messages")
+            .select("id, conversation_id")
+            .eq("workspace_id", resolvedWorkspaceId)
+            .or(
+              providerIds
+                .flatMap((id) => [
+                  `metadata->>provider_wamid.eq.${id}`,
+                  `metadata->ycloud_response->>wamid.eq.${id}`,
+                  `metadata->ycloud_response->>whatsappMessageId.eq.${id}`,
+                ])
+                .join(","),
+            )
+            .limit(1);
+
+          existingMessages = data;
+        }
+        const existingMessage = existingMessages?.[0];
+
+        if (existingMessage) {
+          await supabase
+            .from("messages")
+            .update({
+              metadata: {
+                raw_event_type: event.eventType,
+                ycloud_status: event.status,
+              },
+              status: nextStatus,
+            })
+            .eq("id", existingMessage.id)
+            .eq("workspace_id", resolvedWorkspaceId);
+
+          updated = true;
+        }
+      }
+
+      status = updated ? "stored" : "ignored";
+      errorMessage = updated
+        ? null
+        : "Actualizacion de estado sin mensaje saliente previo en Levi.";
     } else if (event.contactPhone) {
       const { data: existingContact } = await supabase
         .from("contacts")
@@ -406,12 +526,13 @@ export async function handleYCloudWebhook(
         throw new Error("No se pudo crear la conversacion.");
       }
 
-      const { data: existingMessage } = event.externalId
+      const messageProviderId = event.providerMessageId ?? event.externalId;
+      const { data: existingMessage } = messageProviderId
         ? await supabase
             .from("messages")
             .select("id, created_at")
             .eq("workspace_id", resolvedWorkspaceId)
-            .eq("provider_message_id", event.externalId)
+            .eq("provider_message_id", messageProviderId)
             .maybeSingle()
         : { data: null };
 
@@ -436,7 +557,7 @@ export async function handleYCloudWebhook(
             raw_event_type: event.eventType,
             ycloud_message_type: event.messageType,
           },
-          provider_message_id: event.externalId,
+          provider_message_id: messageProviderId,
           role:
             event.direction === "outbound"
               ? "human"
