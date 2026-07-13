@@ -344,6 +344,54 @@ export function WorkspaceSettings({
     return () => window.removeEventListener("hashchange", syncTabFromHash);
   }, []);
 
+  useEffect(() => {
+    const hasYCloud = localIntegrations.some(
+      (integration) =>
+        integration.provider === "ycloud" && integration.status === "active",
+    );
+
+    if (!workspaceId || !hasYCloud || ycloudSecretValue) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadYCloudWebhookUrl() {
+      const response = await fetch(
+        `/api/integrations/ycloud?workspaceId=${encodeURIComponent(workspaceId!)}`,
+      );
+
+      if (!response.ok) {
+        return;
+      }
+
+      const payload = (await response.json()) as {
+        webhookSecret?: string;
+      };
+
+      if (cancelled || !payload.webhookSecret) {
+        return;
+      }
+
+      setIntegrationDrafts((current) => ({
+        ...current,
+        ycloud: {
+          ...current.ycloud,
+          config: {
+            ...current.ycloud.config,
+            webhook_secret: payload.webhookSecret ?? "",
+          },
+        },
+      }));
+    }
+
+    void loadYCloudWebhookUrl();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [localIntegrations, workspaceId, ycloudSecretValue]);
+
   async function saveIntegration(provider: IntegrationItem["provider"]) {
     if (!workspaceId) {
       setStatus("Primero necesitas un workspace activo.");

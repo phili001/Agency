@@ -261,7 +261,7 @@ export async function handleYCloudWebhook(
   const payload = (await request.json()) as WebhookPayload;
   const event = normalizeEvent(payload);
   const supabase = createAdminClient();
-  const receivedSecret = secretOverride ?? getReceivedSecret(request);
+  const receivedSecret = (secretOverride ?? getReceivedSecret(request))?.trim();
   const normalizedIdentifier = workspaceId.trim();
   const workspaceQuery = looksLikeCompanyCode(normalizedIdentifier)
     ? await supabase

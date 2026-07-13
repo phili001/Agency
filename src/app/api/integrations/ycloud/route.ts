@@ -4,6 +4,7 @@ import { requireWorkspaceRole } from "@/lib/authz";
 import { normalizeAppUrl } from "@/lib/app-url";
 import {
   generateWebhookSecret,
+  getIntegrationSecret,
   hashSecret,
   maskSecret,
   saveIntegrationSecret,
@@ -90,6 +91,52 @@ export async function POST(request: Request) {
       integration: data,
       webhookSecret: secret,
       webhookUrl: `${appUrl}/api/webhooks/ycloud/${companyCode}/${encodeURIComponent(secret)}`,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Error desconocido." },
+      { status: 500 },
+    );
+  }
+}
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const workspaceId = searchParams.get("workspaceId")?.trim();
+
+    if (!workspaceId) {
+      return NextResponse.json({ error: "workspaceId requerido." }, { status: 400 });
+    }
+
+    await requireWorkspaceRole(workspaceId);
+
+    const admin = createAdminClient();
+    const [{ data: workspace }, webhookSecret] = await Promise.all([
+      admin.from("workspaces").select("id, company_code").eq("id", workspaceId).single(),
+      getIntegrationSecret({
+        kind: "webhook_secret",
+        provider: "ycloud",
+        workspaceId,
+      }),
+    ]);
+
+    if (!webhookSecret) {
+      return NextResponse.json(
+        { error: "Guarda YCloud para generar un secreto unico." },
+        { status: 404 },
+      );
+    }
+
+    const companyCode =
+      workspace && "company_code" in workspace && typeof workspace.company_code === "string"
+        ? workspace.company_code
+        : workspaceId;
+    const appUrl = normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL);
+
+    return NextResponse.json({
+      webhookSecret,
+      webhookUrl: `${appUrl}/api/webhooks/ycloud/${companyCode}/${encodeURIComponent(webhookSecret)}`,
     });
   } catch (error) {
     return NextResponse.json(
