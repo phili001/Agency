@@ -565,15 +565,6 @@ async function storeYCloudMessage({
     return { conversationId, shouldStartAiBuffer: false };
   }
 
-  const { data: previousMessages } = await supabase
-    .from("messages")
-    .select("direction")
-    .eq("workspace_id", resolvedWorkspaceId)
-    .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: false })
-    .limit(1);
-  const previousMessage = previousMessages?.[0];
-
   const { data: message, error: messageError } = await supabase
     .from("messages")
     .insert({
@@ -615,8 +606,7 @@ async function storeYCloudMessage({
 
   return {
     conversationId,
-    shouldStartAiBuffer:
-      event.direction === "inbound" && previousMessage?.direction !== "inbound",
+    shouldStartAiBuffer: event.direction === "inbound",
   };
 }
 

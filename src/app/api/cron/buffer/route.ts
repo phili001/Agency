@@ -476,6 +476,7 @@ export async function POST(request: Request) {
   const supabase = createAdminClient();
   const params = new URL(request.url).searchParams;
   const conversationId = params.get("conversationId");
+  const force = params.get("force") === "true";
   const workspaceId = params.get("workspaceId");
   const cutoff = new Date(Date.now() - 20_000).toISOString();
   let conversationsQuery = supabase
@@ -505,6 +506,19 @@ export async function POST(request: Request) {
   const results = [];
 
   for (const conversation of conversations ?? []) {
+    if (
+      conversationId &&
+      !force &&
+      conversation.last_message_at &&
+      conversation.last_message_at > cutoff
+    ) {
+      results.push({
+        conversationId: conversation.id,
+        status: "waiting_for_buffer_window",
+      });
+      continue;
+    }
+
     const { data: messages } = await supabase
       .from("messages")
       .select("body, created_at, direction, role")
