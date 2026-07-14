@@ -1,6 +1,6 @@
 import "server-only";
 
-import { after, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 import { hashSecret } from "@/lib/integrations/secrets";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -31,7 +31,7 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function scheduleConversationAiBuffer({
+async function runConversationAiBuffer({
   appBaseUrl,
   conversationId,
   workspaceId,
@@ -46,32 +46,30 @@ function scheduleConversationAiBuffer({
     return;
   }
 
-  after(async () => {
-    try {
-      await sleep(AI_BUFFER_DELAY_MS);
+  try {
+    await sleep(AI_BUFFER_DELAY_MS);
 
-      const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || appBaseUrl).replace(
-        /\/$/,
-        "",
-      );
-      const params = new URLSearchParams({
-        conversationId,
-        secret: cronSecret,
-        workspaceId,
-      });
+    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || appBaseUrl).replace(
+      /\/$/,
+      "",
+    );
+    const params = new URLSearchParams({
+      conversationId,
+      secret: cronSecret,
+      workspaceId,
+    });
 
-      await fetch(`${baseUrl}/api/cron/buffer?${params.toString()}`, {
-        cache: "no-store",
-        method: "POST",
-      });
-      await fetch(`${baseUrl}/api/cron/deliver?${params.toString()}`, {
-        cache: "no-store",
-        method: "POST",
-      });
-    } catch (error) {
-      console.error("No se pudo ejecutar el buffer IA diferido.", error);
-    }
-  });
+    await fetch(`${baseUrl}/api/cron/buffer?${params.toString()}`, {
+      cache: "no-store",
+      method: "POST",
+    });
+    await fetch(`${baseUrl}/api/cron/deliver?${params.toString()}`, {
+      cache: "no-store",
+      method: "POST",
+    });
+  } catch (error) {
+    console.error("No se pudo ejecutar el buffer IA.", error);
+  }
 }
 
 function readPath(value: unknown, paths: string[][]) {
@@ -780,7 +778,7 @@ export async function handleYCloudWebhook(
           supabase,
         });
         if (storedMessage.shouldStartAiBuffer) {
-          scheduleConversationAiBuffer({
+          await runConversationAiBuffer({
             appBaseUrl,
             conversationId: storedMessage.conversationId,
             workspaceId: resolvedWorkspaceId,
@@ -798,7 +796,7 @@ export async function handleYCloudWebhook(
         supabase,
       });
       if (storedMessage.shouldStartAiBuffer) {
-        scheduleConversationAiBuffer({
+        await runConversationAiBuffer({
           appBaseUrl,
           conversationId: storedMessage.conversationId,
           workspaceId: resolvedWorkspaceId,
