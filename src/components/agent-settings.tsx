@@ -769,14 +769,11 @@ export function AgentSettings({
               <div className="mt-3 grid gap-2">
                 {knowledgeAssets.map((asset) => (
                   <div
-                    className="flex items-start justify-between gap-3 rounded-lg border border-[#e2e6df] px-3 py-2 text-sm"
+                    className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-[#e2e6df] px-3 py-2 text-sm"
                     key={asset.id}
                   >
-                    <span className="min-w-0">
-                      <span className="block font-medium">{asset.title}</span>
-                      <span className="mt-0.5 line-clamp-2 block text-xs text-[#647067]">
-                        {asset.content || "Documento disponible para respuestas."}
-                      </span>
+                    <span className="min-w-0 truncate font-medium">
+                      {asset.title}
                     </span>
                     <ToggleSwitch
                       checked={form.knowledge_asset_ids.includes(asset.id)}
