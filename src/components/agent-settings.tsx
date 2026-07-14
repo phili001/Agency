@@ -43,16 +43,38 @@ type AgentSettingsProps = {
 };
 
 type AgentConfig = {
+  agent_name?: string;
   enabled_tools: string[];
+  job_title?: string;
   knowledge_asset_ids: string[];
   onboarding_agent_configured?: boolean;
   router_description: string;
 };
 
+function splitAgentDisplayName(value?: string | null) {
+  const cleanValue = value?.trim() ?? "";
+  const [namePart, ...jobParts] = cleanValue.split(/\s+-\s+/);
+  const cleanJob = jobParts.join(" - ").replace(/\s+IA$/i, "").trim();
+
+  return {
+    agentName: namePart?.trim() || cleanValue || "Mateo",
+    jobTitle: cleanJob || "Soporte",
+  };
+}
+
+function buildAgentDisplayName(agentName: string, jobTitle: string) {
+  const cleanName = agentName.trim() || "Mateo";
+  const cleanJob = jobTitle.trim() || "Soporte";
+
+  return `${cleanName} - ${cleanJob}`;
+}
+
 function getAgentConfig(config: Json): AgentConfig {
   if (!config || typeof config !== "object" || Array.isArray(config)) {
     return {
+      agent_name: "Mateo",
       enabled_tools: [],
+      job_title: "Soporte",
       knowledge_asset_ids: [],
       onboarding_agent_configured: false,
       router_description: "",
@@ -60,9 +82,12 @@ function getAgentConfig(config: Json): AgentConfig {
   }
 
   return {
+    agent_name:
+      typeof config.agent_name === "string" ? config.agent_name : undefined,
     enabled_tools: Array.isArray(config.enabled_tools)
       ? config.enabled_tools.filter((item): item is string => typeof item === "string")
       : [],
+    job_title: typeof config.job_title === "string" ? config.job_title : undefined,
     knowledge_asset_ids: Array.isArray(config.knowledge_asset_ids)
       ? config.knowledge_asset_ids.filter(
           (item): item is string => typeof item === "string",
@@ -83,6 +108,8 @@ function mergeAgentConfig(config: Json, patch: AgentConfig): Json {
   return {
     ...current,
     enabled_tools: patch.enabled_tools,
+    agent_name: patch.agent_name,
+    job_title: patch.job_title,
     knowledge_asset_ids: patch.knowledge_asset_ids,
     onboarding_agent_configured:
       patch.onboarding_agent_configured ?? currentConfigured,
@@ -216,12 +243,14 @@ export function AgentSettings({
     localAgents.find((agent) => agent.id === selectedAgentId) ?? localAgents[0];
   const selectedConfig = getAgentConfig(selectedAgent?.config ?? {});
   const selectedPrompt = parseAgentPrompt(selectedAgent?.system_prompt);
+  const selectedDisplayName = splitAgentDisplayName(selectedAgent?.name);
   const [form, setForm] = useState(() => ({
+    agent_name: selectedConfig.agent_name ?? selectedDisplayName.agentName,
     enabled_tools: selectedConfig.enabled_tools,
     is_active: selectedAgent?.is_active ?? false,
+    job_title: selectedConfig.job_title ?? selectedDisplayName.jobTitle,
     knowledge_asset_ids: selectedConfig.knowledge_asset_ids,
     model: selectedAgent?.model ?? "gpt-5.4-mini",
-    name: selectedAgent?.name ?? "",
     rules: selectedPrompt.rules,
     router_description: selectedConfig.router_description,
     restrictions: selectedPrompt.restrictions,
@@ -242,14 +271,16 @@ export function AgentSettings({
   function selectAgent(agent: AgentItem) {
     const config = getAgentConfig(agent.config);
     const prompt = parseAgentPrompt(agent.system_prompt);
+    const displayName = splitAgentDisplayName(agent.name);
 
     setSelectedAgentId(agent.id);
     setForm({
+      agent_name: config.agent_name ?? displayName.agentName,
       enabled_tools: config.enabled_tools,
       is_active: agent.is_active,
+      job_title: config.job_title ?? displayName.jobTitle,
       knowledge_asset_ids: config.knowledge_asset_ids,
       model: agent.model,
-      name: agent.name,
       rules: prompt.rules,
       router_description: config.router_description,
       restrictions: prompt.restrictions,
@@ -271,14 +302,16 @@ export function AgentSettings({
 
     const payload = {
       config: mergeAgentConfig(selectedAgent.config, {
+        agent_name: form.agent_name,
         enabled_tools: form.enabled_tools,
+        job_title: form.job_title,
         knowledge_asset_ids: form.knowledge_asset_ids,
         onboarding_agent_configured: true,
         router_description: form.router_description,
       }),
       is_active: form.is_active,
       model: form.model.trim(),
-      name: form.name.trim(),
+      name: buildAgentDisplayName(form.agent_name, form.job_title),
       system_prompt: buildAgentPrompt(form),
       temperature: Number(form.temperature),
     };
@@ -318,14 +351,16 @@ export function AgentSettings({
       .insert({
         is_active: localAgents.length === 0,
         model: "gpt-5.4-mini",
-        name: localAgents.length === 0 ? "Sofia - Setter IA" : "Nuevo agente",
+        name: localAgents.length === 0 ? "Mateo - Soporte" : "Mateo - Soporte",
         system_prompt:
           "Eres un agente de WhatsApp claro, breve y orientado a agendar o resolver la necesidad del contacto. Responde en espanol, haz una pregunta a la vez y pide datos solo cuando hagan falta.",
         temperature: 0.4,
         type: "setter",
         workspace_id: workspaceId,
         config: {
+          agent_name: "Mateo",
           enabled_tools: [],
+          job_title: "Soporte",
           knowledge_asset_ids: [],
           onboarding_agent_configured: true,
           router_description:
@@ -346,14 +381,17 @@ export function AgentSettings({
     setLocalAgents((current) => [data, ...current]);
     setSelectedAgentId(data.id);
     const dataPrompt = parseAgentPrompt(data.system_prompt);
+    const dataConfig = getAgentConfig(data.config);
+    const dataDisplayName = splitAgentDisplayName(data.name);
     setForm({
-      enabled_tools: getAgentConfig(data.config).enabled_tools,
+      agent_name: dataConfig.agent_name ?? dataDisplayName.agentName,
+      enabled_tools: dataConfig.enabled_tools,
       is_active: data.is_active,
-      knowledge_asset_ids: getAgentConfig(data.config).knowledge_asset_ids,
+      job_title: dataConfig.job_title ?? dataDisplayName.jobTitle,
+      knowledge_asset_ids: dataConfig.knowledge_asset_ids,
       model: data.model,
-      name: data.name,
       rules: dataPrompt.rules,
-      router_description: getAgentConfig(data.config).router_description,
+      router_description: dataConfig.router_description,
       restrictions: dataPrompt.restrictions,
       system_prompt: dataPrompt.system_prompt,
       temperature: getResponseStyleValue(data.temperature),
@@ -391,12 +429,14 @@ export function AgentSettings({
     if (nextAgent) {
       const config = getAgentConfig(nextAgent.config);
       const prompt = parseAgentPrompt(nextAgent.system_prompt);
+      const displayName = splitAgentDisplayName(nextAgent.name);
       setForm({
+        agent_name: config.agent_name ?? displayName.agentName,
         enabled_tools: config.enabled_tools,
         is_active: nextAgent.is_active,
+        job_title: config.job_title ?? displayName.jobTitle,
         knowledge_asset_ids: config.knowledge_asset_ids,
         model: nextAgent.model,
-        name: nextAgent.name,
         rules: prompt.rules,
         router_description: config.router_description,
         restrictions: prompt.restrictions,
@@ -530,11 +570,26 @@ export function AgentSettings({
               <input
                 className="h-10 rounded-lg border border-[#cbd2c6] px-3 outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, name: event.target.value }))
+                  setForm((current) => ({ ...current, agent_name: event.target.value }))
                 }
-                value={form.name}
+                placeholder="Mateo"
+                value={form.agent_name}
               />
             </label>
+            <label className="grid gap-1.5 text-sm font-medium">
+              Trabajo
+              <input
+                className="h-10 rounded-lg border border-[#cbd2c6] px-3 outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, job_title: event.target.value }))
+                }
+                placeholder="Soporte"
+                value={form.job_title}
+              />
+            </label>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
             <label className="grid gap-1.5 text-sm font-medium">
               Modelo OpenAI
               <select

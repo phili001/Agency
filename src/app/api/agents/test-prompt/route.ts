@@ -43,6 +43,30 @@ type BusinessProfileAsset = {
   title: string;
 };
 
+type AgentLike = {
+  config: Json;
+  name: string;
+};
+
+function getAgentIdentity(agent: AgentLike) {
+  const config =
+    agent.config && typeof agent.config === "object" && !Array.isArray(agent.config)
+      ? (agent.config as Record<string, unknown>)
+      : {};
+  const [fallbackName, ...fallbackJobParts] = agent.name.split(/\s+-\s+/);
+
+  return {
+    agentName:
+      typeof config.agent_name === "string" && config.agent_name.trim()
+        ? config.agent_name.trim()
+        : fallbackName?.trim() || agent.name,
+    jobTitle:
+      typeof config.job_title === "string" && config.job_title.trim()
+        ? config.job_title.trim()
+        : fallbackJobParts.join(" - ").replace(/\s+IA$/i, "").trim(),
+  };
+}
+
 function getKnowledgeAssetIds(config: Json) {
   if (!config || typeof config !== "object" || Array.isArray(config)) {
     return [];
@@ -56,6 +80,7 @@ function getKnowledgeAssetIds(config: Json) {
 }
 
 function buildInstructions(
+  agent: AgentLike,
   systemPrompt: string | null,
   assets: KnowledgeAsset[],
   businessProfile?: BusinessProfileAsset | null,
@@ -63,7 +88,12 @@ function buildInstructions(
   const basePrompt =
     systemPrompt ||
     "Eres un agente de WhatsApp claro, breve y orientado a resolver.";
-  const businessVariables = getBusinessVariables(businessProfile);
+  const identity = getAgentIdentity(agent);
+  const businessVariables = {
+    ...getBusinessVariables(businessProfile),
+    agent_name: identity.agentName,
+    job_title: identity.jobTitle,
+  };
   const promptWithVariables = applyBusinessVariables(basePrompt, businessVariables);
   const businessContext = buildBusinessContext(businessProfile);
 
@@ -186,6 +216,7 @@ export async function POST(request: Request) {
           .in("id", knowledgeAssetIds)
       : { data: [] };
   const instructions = buildInstructions(
+    agent,
     agent.system_prompt,
     (knowledgeAssets ?? []) as KnowledgeAsset[],
     businessProfile as BusinessProfileAsset | null,

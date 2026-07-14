@@ -65,6 +65,25 @@ type OpenAIResponsePayload = {
 
 const DEFAULT_MODEL = "gpt-5.4-mini";
 
+function getAgentIdentity(agent: AgentRow) {
+  const config =
+    agent.config && typeof agent.config === "object" && !Array.isArray(agent.config)
+      ? (agent.config as Record<string, unknown>)
+      : {};
+  const [fallbackName, ...fallbackJobParts] = agent.name.split(/\s+-\s+/);
+
+  return {
+    agentName:
+      typeof config.agent_name === "string" && config.agent_name.trim()
+        ? config.agent_name.trim()
+        : fallbackName?.trim() || agent.name,
+    jobTitle:
+      typeof config.job_title === "string" && config.job_title.trim()
+        ? config.job_title.trim()
+        : fallbackJobParts.join(" - ").replace(/\s+IA$/i, "").trim(),
+  };
+}
+
 function isAuthorized(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = request.headers.get("authorization");
@@ -300,7 +319,12 @@ function buildInstructions(
   const basePrompt =
     agent.system_prompt ||
     "Eres un agente de WhatsApp claro, breve y orientado a resolver. Responde en espanol y evita sonar como robot.";
-  const businessVariables = getBusinessVariables(businessProfile);
+  const identity = getAgentIdentity(agent);
+  const businessVariables = {
+    ...getBusinessVariables(businessProfile),
+    agent_name: identity.agentName,
+    job_title: identity.jobTitle,
+  };
   const promptWithVariables = applyBusinessVariables(basePrompt, businessVariables);
   const businessContext = buildBusinessContext(businessProfile);
 
