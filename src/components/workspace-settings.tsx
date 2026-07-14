@@ -539,7 +539,7 @@ export function WorkspaceSettings({
     setSavingKey("");
   }
 
-  async function saveAsset(kind: WorkspaceAsset["kind"]) {
+  async function saveAsset(kind: WorkspaceAsset["kind"], options?: { forceCreate?: boolean }) {
     if (!workspaceId) {
       setStatus("Primero necesitas un workspace activo.");
       return;
@@ -549,7 +549,14 @@ export function WorkspaceSettings({
     setStatus("");
 
     const draft = assetDrafts[kind];
-    const existing = localAssets.find((asset) => asset.id === draft.id);
+    if (kind === "knowledge" && (!draft.title.trim() || !draft.content.trim())) {
+      setStatus("Escribe titulo y contenido para agregar el documento.");
+      setSavingKey("");
+      return;
+    }
+    const existing = options?.forceCreate
+      ? null
+      : localAssets.find((asset) => asset.id === draft.id);
     const payload = {
       content: draft.content,
       kind,
@@ -590,14 +597,60 @@ export function WorkspaceSettings({
     setAssetDrafts((current) => ({
       ...current,
       [kind]: {
-        content: data.content,
-        id: data.id,
-        metadata: data.metadata,
-        status: data.status,
-        title: data.title,
+        content: options?.forceCreate ? "" : data.content,
+        id: options?.forceCreate ? "" : data.id,
+        metadata: options?.forceCreate ? {} : data.metadata,
+        status: options?.forceCreate ? "draft" : data.status,
+        title: options?.forceCreate ? "" : data.title,
       },
     }));
-    setStatus("Workspace actualizado.");
+    setStatus(options?.forceCreate ? "Documento agregado." : "Workspace actualizado.");
+    setSavingKey("");
+  }
+
+  async function deleteAsset(asset: WorkspaceAsset) {
+    const label = asset.title || "este recurso";
+    const confirmed = window.confirm(`Eliminar ${label}? Esta accion no se puede deshacer.`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setSavingKey(`asset:delete:${asset.id}`);
+    setStatus("");
+
+    const { error } = await supabase
+      .from("workspace_assets")
+      .delete()
+      .eq("id", asset.id)
+      .eq("workspace_id", asset.workspace_id);
+
+    if (error) {
+      setStatus(error.message);
+      setSavingKey("");
+      return;
+    }
+
+    setLocalAssets((current) => current.filter((item) => item.id !== asset.id));
+    setAssetDrafts((current) => {
+      const draft = current[asset.kind];
+
+      if (draft.id !== asset.id) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [asset.kind]: {
+          content: "",
+          id: "",
+          metadata: {},
+          status: "draft",
+          title: "",
+        },
+      };
+    });
+    setStatus("Documento eliminado.");
     setSavingKey("");
   }
 
@@ -1123,9 +1176,24 @@ export function WorkspaceSettings({
               <p className="font-semibold">{asset.title}</p>
               <p className="mt-1 line-clamp-2 text-[#647067]">{asset.content}</p>
             </div>
-            <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
-              {asset.status}
-            </span>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
+                {asset.status}
+              </span>
+              <button
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2 text-xs font-medium text-red-700 disabled:opacity-60"
+                disabled={savingKey === `asset:delete:${asset.id}`}
+                onClick={() => deleteAsset(asset)}
+                type="button"
+              >
+                {savingKey === `asset:delete:${asset.id}` ? (
+                  <Loader2 className="animate-spin" size={13} />
+                ) : (
+                  <Trash2 size={13} />
+                )}
+                Eliminar
+              </button>
+            </div>
           </div>
         ))}
         {currentAssets.length === 0 ? (
@@ -1199,7 +1267,7 @@ export function WorkspaceSettings({
           <button
             className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]"
             disabled={savingKey === kind}
-            onClick={() => saveAsset(kind)}
+            onClick={() => saveAsset(kind, { forceCreate: kind === "knowledge" })}
             type="button"
           >
             {savingKey === kind ? (
@@ -1207,7 +1275,7 @@ export function WorkspaceSettings({
             ) : (
               <Save size={16} />
             )}
-            Guardar
+            {kind === "knowledge" ? "Agregar" : "Guardar"}
           </button>
         </div>
       </div>
