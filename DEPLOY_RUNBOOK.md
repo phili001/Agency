@@ -51,19 +51,27 @@ Use this webhook URL:
 Enable inbound/outbound WhatsApp message events. If a custom domain is added
 later, update the webhook URL in YCloud.
 
-## 5. Cron manual durante pruebas
+## 5. Buffer IA sin cron
 
-During the first Vercel test, cron scheduling is not registered in
-`vercel.json` because the Hobby/Free plan can reject frequent cron jobs.
+La IA no depende de Vercel Cron. Cuando entra el primer mensaje de una racha
+por WhatsApp, el webhook arranca un buffer por conversacion:
 
-Trigger these manually after receiving a WhatsApp message:
+- Espera 20 segundos.
+- Agrupa los mensajes que lleguen en esa ventana para ese usuario.
+- Llama internamente a `/api/cron/buffer` para generar la respuesta.
+- Llama internamente a `/api/cron/deliver` para enviarla por YCloud.
 
-- `{NEXT_PUBLIC_APP_URL}/api/cron/buffer?secret={CRON_SECRET}`
-- `{NEXT_PUBLIC_APP_URL}/api/cron/deliver?secret={CRON_SECRET}`
+These internal routes still require `CRON_SECRET`. Keep `CRON_SECRET`
+configured in Vercel so the delayed webhook task can authorize them.
+
+Manual debug, only if you need to force a pending conversation:
+
+- `{NEXT_PUBLIC_APP_URL}/api/cron/buffer?secret={CRON_SECRET}&conversationId={CONVERSATION_ID}&workspaceId={WORKSPACE_ID}`
+- `{NEXT_PUBLIC_APP_URL}/api/cron/deliver?secret={CRON_SECRET}&conversationId={CONVERSATION_ID}&workspaceId={WORKSPACE_ID}`
 - `{NEXT_PUBLIC_APP_URL}/api/cron/ghl-sync?secret={CRON_SECRET}`
 
-Each route requires `CRON_SECRET`. Later, move these to Vercel Cron,
-GitHub Actions, QStash, or another scheduler according to the production plan.
+If Vercel ever stops allowing the delayed background task, move only the two
+internal calls above to QStash, Supabase Edge Functions, or another scheduler.
 
 ## 6. GoHighLevel
 

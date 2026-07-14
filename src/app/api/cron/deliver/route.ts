@@ -89,13 +89,26 @@ export async function POST(request: Request) {
   }
 
   const supabase = createAdminClient();
-  const { data: messages, error } = await supabase
+  const params = new URL(request.url).searchParams;
+  const conversationId = params.get("conversationId");
+  const workspaceId = params.get("workspaceId");
+  let messagesQuery = supabase
     .from("messages")
     .select("id, workspace_id, conversation_id, contact_id, body, metadata")
     .eq("direction", "outbound")
     .eq("status", "queued")
     .order("created_at", { ascending: true })
     .limit(10);
+
+  if (conversationId) {
+    messagesQuery = messagesQuery.eq("conversation_id", conversationId);
+  }
+
+  if (workspaceId) {
+    messagesQuery = messagesQuery.eq("workspace_id", workspaceId);
+  }
+
+  const { data: messages, error } = await messagesQuery;
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

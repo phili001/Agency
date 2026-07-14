@@ -1,6 +1,6 @@
 import "server-only";
 
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { hashSecret } from "@/lib/integrations/secrets";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -24,6 +24,55 @@ type NormalizedYCloudEvent = {
   phoneId: string | null;
   wabaId: string | null;
 };
+
+const AI_BUFFER_DELAY_MS = 20_000;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function scheduleConversationAiBuffer({
+  appBaseUrl,
+  conversationId,
+  workspaceId,
+}: {
+  appBaseUrl: string;
+  conversationId: string;
+  workspaceId: string;
+}) {
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (!cronSecret) {
+    return;
+  }
+
+  after(async () => {
+    try {
+      await sleep(AI_BUFFER_DELAY_MS);
+
+      const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || appBaseUrl).replace(
+        /\/$/,
+        "",
+      );
+      const params = new URLSearchParams({
+        conversationId,
+        secret: cronSecret,
+        workspaceId,
+      });
+
+      await fetch(`${baseUrl}/api/cron/buffer?${params.toString()}`, {
+        cache: "no-store",
+        method: "POST",
+      });
+      await fetch(`${baseUrl}/api/cron/deliver?${params.toString()}`, {
+        cache: "no-store",
+        method: "POST",
+      });
+    } catch (error) {
+      console.error("No se pudo ejecutar el buffer IA diferido.", error);
+    }
+  });
+}
 
 function readPath(value: unknown, paths: string[][]) {
   for (const path of paths) {
@@ -377,7 +426,7 @@ async function storeYCloudMessage({
   event: NormalizedYCloudEvent;
   resolvedWorkspaceId: string;
   supabase: ReturnType<typeof createAdminClient>;
-}) {
+}): Promise<{ conversationId: string; shouldStartAiBuffer: boolean }> {
   if (!event.contactPhone) {
     throw new Error("El webhook no incluye telefono de contacto.");
   }
@@ -513,8 +562,17 @@ async function storeYCloudMessage({
       .eq("id", conversationId)
       .eq("workspace_id", resolvedWorkspaceId);
 
-    return;
+    return { conversationId, shouldStartAiBuffer: false };
   }
+
+  const { data: previousMessages } = await supabase
+    .from("messages")
+    .select("direction")
+    .eq("workspace_id", resolvedWorkspaceId)
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  const previousMessage = previousMessages?.[0];
 
   const { data: message, error: messageError } = await supabase
     .from("messages")
@@ -554,6 +612,12 @@ async function storeYCloudMessage({
     .update({ last_message_at: message.created_at })
     .eq("id", conversationId)
     .eq("workspace_id", resolvedWorkspaceId);
+
+  return {
+    conversationId,
+    shouldStartAiBuffer:
+      event.direction === "inbound" && previousMessage?.direction !== "inbound",
+  };
 }
 
 export async function handleYCloudWebhook(
@@ -563,6 +627,7 @@ export async function handleYCloudWebhook(
 ) {
   const payload = (await request.json()) as WebhookPayload;
   const event = normalizeEvent(payload);
+  const appBaseUrl = new URL(request.url).origin;
   const supabase = createAdminClient();
   const receivedSecret = (secretOverride ?? getReceivedSecret(request))?.trim();
   const normalizedIdentifier = workspaceId.trim();
@@ -719,14 +784,36 @@ export async function handleYCloudWebhook(
       if (updated) {
         status = "stored";
       } else if (event.messageText && event.contactPhone) {
-        await storeYCloudMessage({ event, resolvedWorkspaceId, supabase });
+        const storedMessage = await storeYCloudMessage({
+          event,
+          resolvedWorkspaceId,
+          supabase,
+        });
+        if (storedMessage.shouldStartAiBuffer) {
+          scheduleConversationAiBuffer({
+            appBaseUrl,
+            conversationId: storedMessage.conversationId,
+            workspaceId: resolvedWorkspaceId,
+          });
+        }
         status = "stored";
       } else {
         status = "ignored";
         errorMessage = "Actualizacion de estado sin mensaje saliente previo en Levi.";
       }
     } else if (event.contactPhone) {
-      await storeYCloudMessage({ event, resolvedWorkspaceId, supabase });
+      const storedMessage = await storeYCloudMessage({
+        event,
+        resolvedWorkspaceId,
+        supabase,
+      });
+      if (storedMessage.shouldStartAiBuffer) {
+        scheduleConversationAiBuffer({
+          appBaseUrl,
+          conversationId: storedMessage.conversationId,
+          workspaceId: resolvedWorkspaceId,
+        });
+      }
       status = "stored";
     } else {
       errorMessage = "El webhook no incluye telefono de contacto.";

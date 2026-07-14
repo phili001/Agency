@@ -474,15 +474,29 @@ export async function POST(request: Request) {
   }
 
   const supabase = createAdminClient();
-  const cutoff = new Date(Date.now() - 45_000).toISOString();
-  const { data: conversations, error: conversationsError } = await supabase
+  const params = new URL(request.url).searchParams;
+  const conversationId = params.get("conversationId");
+  const workspaceId = params.get("workspaceId");
+  const cutoff = new Date(Date.now() - 20_000).toISOString();
+  let conversationsQuery = supabase
     .from("conversations")
     .select("id, workspace_id, contact_id, agent_id, last_message_at")
     .eq("status", "open")
     .eq("ai_enabled", true)
-    .lte("last_message_at", cutoff)
-    .order("last_message_at", { ascending: true })
-    .limit(5);
+    .order("last_message_at", { ascending: true });
+
+  if (conversationId) {
+    conversationsQuery = conversationsQuery.eq("id", conversationId).limit(1);
+
+    if (workspaceId) {
+      conversationsQuery = conversationsQuery.eq("workspace_id", workspaceId);
+    }
+  } else {
+    conversationsQuery = conversationsQuery.lte("last_message_at", cutoff).limit(5);
+  }
+
+  const { data: conversations, error: conversationsError } =
+    await conversationsQuery;
 
   if (conversationsError) {
     return NextResponse.json({ error: conversationsError.message }, { status: 500 });

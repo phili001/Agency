@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 import { handleYCloudWebhook } from "@/lib/ycloud-webhook";
 
+export const maxDuration = 60;
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ workspaceId: string }> },
