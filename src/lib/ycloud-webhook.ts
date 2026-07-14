@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 
+import { normalizeAppUrl } from "@/lib/app-url";
 import { hashSecret } from "@/lib/integrations/secrets";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -49,10 +50,7 @@ async function runConversationAiBuffer({
   try {
     await sleep(AI_BUFFER_DELAY_MS);
 
-    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || appBaseUrl).replace(
-      /\/$/,
-      "",
-    );
+    const baseUrl = normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL || appBaseUrl);
     const params = new URLSearchParams({
       conversationId,
       secret: cronSecret,
