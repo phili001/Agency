@@ -506,6 +506,23 @@ export async function POST(request: Request) {
   const results = [];
 
   for (const conversation of conversations ?? []) {
+    const { data: contactStatus } = await supabase
+      .from("contacts")
+      .select("messaging_status")
+      .eq("id", conversation.contact_id)
+      .eq("workspace_id", conversation.workspace_id)
+      .maybeSingle();
+
+    if (contactStatus?.messaging_status === "blocked") {
+      await supabase
+        .from("conversations")
+        .update({ ai_enabled: false, status: "pending_handoff" })
+        .eq("id", conversation.id)
+        .eq("workspace_id", conversation.workspace_id);
+      results.push({ conversationId: conversation.id, status: "contact_blocked" });
+      continue;
+    }
+
     if (
       conversationId &&
       !force &&
@@ -529,7 +546,12 @@ export async function POST(request: Request) {
     const chronologicalMessages = [...(messages ?? [])].reverse() as MessageRow[];
     const latestMessage = chronologicalMessages.at(-1);
 
-    if (!latestMessage || latestMessage.direction !== "inbound") {
+    if (
+      !latestMessage ||
+      latestMessage.direction !== "inbound" ||
+      latestMessage.role === "system" ||
+      !latestMessage.body?.trim()
+    ) {
       results.push({ conversationId: conversation.id, status: "skipped" });
       continue;
     }

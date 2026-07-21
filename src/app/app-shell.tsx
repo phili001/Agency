@@ -22,6 +22,7 @@ import { redirect } from "next/navigation";
 
 import { signOut } from "./actions";
 import { InboxPanel } from "@/components/inbox-panel";
+import { FlowBuilder } from "@/components/flow-builder";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { WorkspaceSettings } from "@/components/workspace-settings";
 import { normalizeAppUrl } from "@/lib/app-url";
@@ -121,6 +122,7 @@ const sidebarItems = [
   },
   { href: "/negocio", icon: BriefcaseBusiness, label: "Negocio", section: "business" },
   { href: "/tools", icon: Wrench, label: "Tools", section: "tools" },
+  { href: "/flujos", icon: GitBranch, label: "Flujos", section: "flows" },
   { href: "/templates", icon: ClipboardList, label: "Templates", section: "templates" },
   {
     href: "/knowledge-base",
@@ -149,6 +151,7 @@ type AppSection =
   | "business"
   | "clients"
   | "dashboard"
+  | "flows"
   | "integrations"
   | "knowledge"
   | "observability"
@@ -173,6 +176,7 @@ const sectionTitles: Record<AppSection, { eyebrow: string; title: string }> = {
   business: { eyebrow: "Workspace", title: "Negocio" },
   clients: { eyebrow: "CRM", title: "Clientes" },
   dashboard: { eyebrow: "Operaciones", title: "Dashboard de agentes de WhatsApp" },
+  flows: { eyebrow: "Workspace", title: "Flujos" },
   integrations: { eyebrow: "Workspace", title: "Integraciones" },
   knowledge: { eyebrow: "Workspace", title: "Knowledge Base" },
   observability: { eyebrow: "Sistema", title: "Observabilidad" },
@@ -201,7 +205,12 @@ function stableNumber(value: number) {
   return new Intl.NumberFormat("en-US").format(value);
 }
 
-function getContactMetadata(metadata: unknown) {
+function getContactMetadata(
+  metadata: unknown,
+  automationLabels: string[] = [],
+  messagingStatus: string = "active",
+  pendingReview?: Record<string, unknown> | null,
+) {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
     return null;
   }
@@ -211,6 +220,12 @@ function getContactMetadata(metadata: unknown) {
     record.ycloud && typeof record.ycloud === "object" && !Array.isArray(record.ycloud)
       ? (record.ycloud as Record<string, unknown>)
       : {};
+  const flowProgress =
+    record.flow_progress &&
+    typeof record.flow_progress === "object" &&
+    !Array.isArray(record.flow_progress)
+      ? (record.flow_progress as Record<string, unknown>)
+      : undefined;
 
   return {
     ai_summary:
@@ -218,12 +233,61 @@ function getContactMetadata(metadata: unknown) {
     ai_tags: Array.isArray(record.ai_tags)
       ? record.ai_tags.filter((tag: unknown): tag is string => typeof tag === "string")
       : undefined,
+    automation_labels: automationLabels,
+    flow_progress: flowProgress
+      ? {
+          completedStageKeys: Array.isArray(flowProgress.completedStageKeys)
+            ? flowProgress.completedStageKeys.filter(
+                (item): item is string => typeof item === "string",
+              )
+            : undefined,
+          completedStepIds: Array.isArray(flowProgress.completedStepIds)
+            ? flowProgress.completedStepIds.filter(
+                (item): item is string => typeof item === "string",
+              )
+            : undefined,
+          completedSteps:
+            typeof flowProgress.completedSteps === "number"
+              ? flowProgress.completedSteps
+              : undefined,
+          currentStageKey:
+            typeof flowProgress.currentStageKey === "string"
+              ? flowProgress.currentStageKey
+              : undefined,
+          currentStageLabel:
+            typeof flowProgress.currentStageLabel === "string"
+              ? flowProgress.currentStageLabel
+              : undefined,
+          flowId:
+            typeof flowProgress.flowId === "string" ? flowProgress.flowId : undefined,
+          totalSteps:
+            typeof flowProgress.totalSteps === "number"
+              ? flowProgress.totalSteps
+              : undefined,
+          updatedAt:
+            typeof flowProgress.updatedAt === "string"
+              ? flowProgress.updatedAt
+              : undefined,
+        }
+      : undefined,
     ghl_contact_id:
       typeof record.ghl_contact_id === "string" ? record.ghl_contact_id : undefined,
     ghl_last_error:
       typeof record.ghl_last_error === "string" ? record.ghl_last_error : undefined,
     ghl_synced_at:
       typeof record.ghl_synced_at === "string" ? record.ghl_synced_at : undefined,
+    messaging_status:
+      messagingStatus === "blocked" ? ("blocked" as const) : ("active" as const),
+    pending_review: pendingReview
+      ? {
+          attempt_count: Number(pendingReview.attempt_count ?? 0),
+          created_at: String(pendingReview.created_at ?? ""),
+          id: String(pendingReview.id ?? ""),
+          original_answer: String(pendingReview.original_answer ?? ""),
+          question: String(pendingReview.question ?? ""),
+          validation_reason: String(pendingReview.validation_reason ?? ""),
+        }
+      : undefined,
     ycloud_contact_name:
       typeof ycloud.contact_name === "string" ? ycloud.contact_name : undefined,
   };
@@ -364,6 +428,7 @@ export async function AppShell({ section }: { section: AppSection }) {
   }
   const isDashboard = section === "dashboard";
   const isClients = section === "clients";
+  const isFlows = section === "flows";
   const isObservability = section === "observability";
   const isWorkspaceSection = workspaceTabs.includes(
     section as (typeof workspaceTabs)[number],
@@ -371,10 +436,12 @@ export async function AppShell({ section }: { section: AppSection }) {
   const needsContacts = isDashboard || isClients;
   const needsConversations = isDashboard;
   const needsUsage = isDashboard;
-  const needsIntegrations = isWorkspaceSection || isDashboard;
+  const needsIntegrations = isWorkspaceSection || isDashboard || isFlows;
   const needsMembers = section === "team" || isDashboard;
   const needsAssets = isWorkspaceSection;
-  const needsAgents = isWorkspaceSection;
+  const needsAgents = isWorkspaceSection || isFlows;
+  const needsFlows = isFlows;
+  const needsFlowRuns = isFlows || isDashboard;
   const needsWebhooks = isDashboard || isObservability;
   const needsAgency = true;
   const [
@@ -387,6 +454,8 @@ export async function AppShell({ section }: { section: AppSection }) {
     membersResult,
     assetsResult,
     webhookEventsResult,
+    flowsResult,
+    flowRunsResult,
     agencyWorkspacesResult,
     agencyConversationsResult,
     agencyIntegrationsResult,
@@ -401,7 +470,7 @@ export async function AppShell({ section }: { section: AppSection }) {
         needsContacts
           ? supabase
               .from("contacts")
-              .select("id, full_name, phone_e164, email, metadata, created_at")
+              .select("id, full_name, phone_e164, email, metadata, automation_labels, messaging_status, created_at")
               .eq("workspace_id", workspaceId)
               .order("created_at", { ascending: false })
               .limit(isClients ? 200 : 200)
@@ -462,6 +531,24 @@ export async function AppShell({ section }: { section: AppSection }) {
               .order("created_at", { ascending: false })
               .limit(20)
           : Promise.resolve({ data: [], error: null }),
+        needsFlows
+          ? supabase
+              .from("flows")
+              .select("*")
+              .eq("workspace_id", workspaceId)
+              .neq("status", "archived")
+              .order("updated_at", { ascending: false })
+          : Promise.resolve({ data: [], error: null }),
+        needsFlowRuns
+          ? supabase
+              .from("flow_runs")
+              .select(
+                "id, flow_id, contact_id, conversation_id, current_step_id, status, updated_at",
+              )
+              .eq("workspace_id", workspaceId)
+              .order("updated_at", { ascending: false })
+              .limit(500)
+          : Promise.resolve({ data: [], error: null }),
         needsAgency && workspaceIds.length > 0
           ? supabase
               .from("workspaces")
@@ -502,6 +589,8 @@ export async function AppShell({ section }: { section: AppSection }) {
         { data: [], error: null },
         { data: [], error: null },
         { data: [], error: null },
+        { data: [], error: null },
+        { data: [], error: null },
       ];
 
   const workspace = workspaceResult.data;
@@ -509,6 +598,8 @@ export async function AppShell({ section }: { section: AppSection }) {
   const agents = agentsResult.data ?? [];
   const realConversations = conversationsResult.data ?? [];
   const integrations = integrationsResult.data ?? [];
+  const flows = flowsResult.data ?? [];
+  const flowRuns = flowRunsResult.data ?? [];
   const members = membersResult.data ?? [];
   const memberProfiles = await getMemberProfiles(members.map((member) => member.user_id));
   const displayMembers = members.map((member) => {
@@ -531,6 +622,33 @@ export async function AppShell({ section }: { section: AppSection }) {
   );
   const contactById = new Map(contacts.map((contact) => [contact.id, contact]));
   const conversationIds = realConversations.map((conversation) => conversation.id);
+  const { data: pendingReviews } =
+    workspaceId && conversationIds.length > 0
+      ? await supabase
+          .from("flow_answer_reviews")
+          .select(
+            "id, contact_id, conversation_id, question, original_answer, validation_reason, attempt_count, created_at",
+          )
+          .eq("workspace_id", workspaceId)
+          .eq("status", "pending_human")
+          .in("conversation_id", conversationIds)
+          .order("created_at", { ascending: false })
+      : { data: [] };
+  const pendingReviewByConversation = new Map(
+    (pendingReviews ?? []).map((review) => [review.conversation_id, review]),
+  );
+  const latestFlowRunByConversation = new Map<
+    string,
+    (typeof flowRuns)[number]
+  >();
+  flowRuns.forEach((run) => {
+    if (
+      run.conversation_id &&
+      !latestFlowRunByConversation.has(run.conversation_id)
+    ) {
+      latestFlowRunByConversation.set(run.conversation_id, run);
+    }
+  });
   const { data: conversationMessages } =
     workspaceId && conversationIds.length > 0
       ? await supabase
@@ -550,7 +668,13 @@ export async function AppShell({ section }: { section: AppSection }) {
     realConversations.length > 0
       ? realConversations.map((conversation) => {
           const contact = contactById.get(conversation.contact_id);
-          const contactMetadata = getContactMetadata(contact?.metadata);
+          const contactMetadata = getContactMetadata(
+            contact?.metadata,
+            contact?.automation_labels,
+            contact?.messaging_status,
+            pendingReviewByConversation.get(conversation.id),
+          );
+          const latestFlowRun = latestFlowRunByConversation.get(conversation.id);
           return {
             aiEnabled: conversation.ai_enabled,
             business: workspace?.name ?? "Workspace",
@@ -562,6 +686,21 @@ export async function AppShell({ section }: { section: AppSection }) {
               contactMetadata?.ycloud_contact_name ??
               contact?.phone_e164 ??
               "Contacto",
+            onboarding: latestFlowRun
+              ? {
+                  completedSteps:
+                    contactMetadata?.flow_progress?.completedSteps ?? 0,
+                  currentStepId: latestFlowRun.current_step_id,
+                  flowId: latestFlowRun.flow_id,
+                  runId: latestFlowRun.id,
+                  stageLabel:
+                    contactMetadata?.flow_progress?.currentStageLabel ??
+                    contactMetadata?.flow_progress?.currentStageKey ??
+                    "Inicio",
+                  status: latestFlowRun.status,
+                  totalSteps: contactMetadata?.flow_progress?.totalSteps ?? 0,
+                }
+              : undefined,
             id: conversation.id,
             rawStatus: conversation.status,
             status: conversation.ai_enabled ? "IA activa" : "Handoff",
@@ -579,12 +718,20 @@ export async function AppShell({ section }: { section: AppSection }) {
           aiEnabled: false,
           business: workspace?.name ?? "Workspace",
           contactId: contact.id,
-          contactMetadata: getContactMetadata(contact.metadata),
+          contactMetadata: getContactMetadata(
+            contact.metadata,
+            contact.automation_labels,
+            contact.messaging_status,
+          ),
           contactPhone: contact.phone_e164,
           id: contact.id,
           name:
             contact.full_name ??
-            getContactMetadata(contact.metadata)?.ycloud_contact_name ??
+            getContactMetadata(
+              contact.metadata,
+              contact.automation_labels,
+              contact.messaging_status,
+            )?.ycloud_contact_name ??
             contact.phone_e164,
           rawStatus: "open",
           status: "Handoff",
@@ -810,6 +957,7 @@ export async function AppShell({ section }: { section: AppSection }) {
                   </span>
                 </div>
                 <InboxPanel
+                  activeRole={activeRole}
                   conversations={visibleConversations}
                   messages={displayMessages}
                   usageEvents={displayUsageEvents}
@@ -882,6 +1030,21 @@ export async function AppShell({ section }: { section: AppSection }) {
                 workspaceId={workspaceId ?? null}
                 workspaceName={workspace?.name ?? "Workspace"}
               />
+              ) : null}
+
+              {section === "flows" ? (
+                <FlowBuilder
+                  agents={agents}
+                  flows={flows as never}
+                  integrations={integrations as never}
+                  runs={flowRuns as never}
+                  workspaceCode={
+                    workspace && "company_code" in workspace && typeof workspace.company_code === "string"
+                      ? workspace.company_code
+                      : null
+                  }
+                  workspaceId={workspaceId ?? null}
+                />
               ) : null}
 
               {section === "observability" ? (

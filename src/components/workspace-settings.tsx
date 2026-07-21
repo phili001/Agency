@@ -129,10 +129,16 @@ const providers = [
     provider: "openai",
   },
   {
-    description: "CRM para contactos, oportunidades y agenda.",
+    description: "CRM para contactos, oportunidades, acciones de flujo y agenda.",
     fields: [
       ["location_id", "Location ID"],
       ["api_key", "GoHighLevel API key"],
+      ["default_pipeline_id", "Pipeline ID por defecto"],
+      ["default_stage_id", "Stage ID por defecto"],
+      ["ghl_webhook_secret", "Secreto webhook GHL"],
+      ["stage_map", "Mapa de etapas JSON"],
+      ["tag_map", "Mapa de tags JSON"],
+      ["custom_field_map", "Mapa de campos JSON"],
     ],
     label: "GoHighLevel",
     provider: "gohighlevel",
@@ -240,6 +246,34 @@ function fieldHelp(provider: string, key: string) {
     return {
       help: "Se cifra en el backend y se usa solo para sincronizar contactos de esta empresa.",
       placeholder: "GHL API key",
+    };
+  }
+
+  if (provider === "gohighlevel" && key === "default_pipeline_id") {
+    return {
+      help: "Pipeline principal que usaran los nodos de flujo cuando no se indique otro.",
+      placeholder: "pipeline_id",
+    };
+  }
+
+  if (provider === "gohighlevel" && key === "default_stage_id") {
+    return {
+      help: "Etapa fallback para crear oportunidades desde flujos.",
+      placeholder: "stage_id",
+    };
+  }
+
+  if (provider === "gohighlevel" && key === "ghl_webhook_secret") {
+    return {
+      help: "Secreto que GHL debe mandar en Authorization: Bearer para activar flujos en Levi. Si lo dejas vacio, Levi genera uno.",
+      placeholder: "Dejalo vacio para generar uno",
+    };
+  }
+
+  if (provider === "gohighlevel" && key.endsWith("_map")) {
+    return {
+      help: "JSON simple para mostrar nombres humanos y guardar IDs reales. Ej: {\"Video enviado\":\"abc123\"}",
+      placeholder: "{\"Video enviado\":\"stage_id\"}",
     };
   }
 
@@ -428,7 +462,13 @@ export function WorkspaceSettings({
               }
             : {
                 apiKey: draft.config.api_key,
+                customFieldMap: draft.config.custom_field_map,
+                defaultPipelineId: draft.config.default_pipeline_id,
+                defaultStageId: draft.config.default_stage_id,
+                ghlWebhookSecret: draft.config.ghl_webhook_secret,
                 locationId: draft.config.location_id,
+                stageMap: draft.config.stage_map,
+                tagMap: draft.config.tag_map,
                 workspaceId,
               };
       const response = await fetch(endpoint, {
@@ -449,7 +489,7 @@ export function WorkspaceSettings({
         return;
       }
 
-      if (payload.webhookSecret) {
+      if (payload.webhookSecret && provider === "ycloud") {
         setIntegrationDrafts((current) => ({
           ...current,
           ycloud: {
@@ -457,6 +497,19 @@ export function WorkspaceSettings({
             config: {
               ...current.ycloud.config,
               webhook_secret: payload.webhookSecret ?? "",
+            },
+          },
+        }));
+      }
+
+      if (payload.webhookSecret && provider === "gohighlevel") {
+        setIntegrationDrafts((current) => ({
+          ...current,
+          gohighlevel: {
+            ...current.gohighlevel,
+            config: {
+              ...current.gohighlevel.config,
+              ghl_webhook_secret: payload.webhookSecret ?? "",
             },
           },
         }));

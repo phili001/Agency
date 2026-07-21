@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 
 import { normalizeAppUrl } from "@/lib/app-url";
+import { handleInboundFlow } from "@/lib/flow-engine";
 import { hashSecret } from "@/lib/integrations/secrets";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -67,6 +68,38 @@ async function runConversationAiBuffer({
     });
   } catch (error) {
     console.error("No se pudo ejecutar el buffer IA.", error);
+  }
+}
+
+async function runConversationDelivery({
+  appBaseUrl,
+  conversationId,
+  workspaceId,
+}: {
+  appBaseUrl: string;
+  conversationId: string;
+  workspaceId: string;
+}) {
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (!cronSecret) {
+    return;
+  }
+
+  try {
+    const baseUrl = normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL || appBaseUrl);
+    const params = new URLSearchParams({
+      conversationId,
+      secret: cronSecret,
+      workspaceId,
+    });
+
+    await fetch(`${baseUrl}/api/cron/deliver?${params.toString()}`, {
+      cache: "no-store",
+      method: "POST",
+    });
+  } catch (error) {
+    console.error("No se pudo ejecutar entrega de mensajes.", error);
   }
 }
 
@@ -297,6 +330,14 @@ function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
       ]),
     ),
     messageText: readPath(payload, [
+      ["whatsappInboundMessage", "interactive", "list_reply", "id"],
+      ["whatsappInboundMessage", "interactive", "button_reply", "id"],
+      ["message", "interactive", "list_reply", "id"],
+      ["message", "interactive", "button_reply", "id"],
+      ["data", "message", "interactive", "list_reply", "id"],
+      ["data", "message", "interactive", "button_reply", "id"],
+      ["data", "whatsappInboundMessage", "interactive", "list_reply", "id"],
+      ["data", "whatsappInboundMessage", "interactive", "button_reply", "id"],
       ["text"],
       ["text", "body"],
       ["whatsappInboundMessage", "text", "body"],
@@ -422,14 +463,14 @@ async function storeYCloudMessage({
   event: NormalizedYCloudEvent;
   resolvedWorkspaceId: string;
   supabase: ReturnType<typeof createAdminClient>;
-}): Promise<{ conversationId: string; shouldStartAiBuffer: boolean }> {
+}): Promise<{ contactId: string; conversationId: string; shouldStartAiBuffer: boolean }> {
   if (!event.contactPhone) {
     throw new Error("El webhook no incluye telefono de contacto.");
   }
 
   const { data: existingContact } = await supabase
     .from("contacts")
-    .select("id, full_name, email, metadata")
+    .select("id, full_name, email, metadata, automation_labels, messaging_status")
     .eq("workspace_id", resolvedWorkspaceId)
     .eq("phone_e164", event.contactPhone)
     .maybeSingle();
@@ -468,6 +509,9 @@ async function storeYCloudMessage({
             waba_id: event.wabaId ?? ycloudMetadata.waba_id,
           },
         },
+        automation_labels:
+          existingContact?.automation_labels ?? ["onboarding_eligible"],
+        messaging_status: existingContact?.messaging_status ?? "active",
         phone_e164: event.contactPhone,
         workspace_id: resolvedWorkspaceId,
       },
@@ -558,7 +602,7 @@ async function storeYCloudMessage({
       .eq("id", conversationId)
       .eq("workspace_id", resolvedWorkspaceId);
 
-    return { conversationId, shouldStartAiBuffer: false };
+    return { contactId: contact.id, conversationId, shouldStartAiBuffer: false };
   }
 
   const { data: message, error: messageError } = await supabase
@@ -601,8 +645,12 @@ async function storeYCloudMessage({
     .eq("workspace_id", resolvedWorkspaceId);
 
   return {
+    contactId: contact.id,
     conversationId,
-    shouldStartAiBuffer: event.direction === "inbound",
+    shouldStartAiBuffer:
+      event.direction === "inbound" &&
+      Boolean(event.messageText?.trim()) &&
+      (existingContact?.messaging_status ?? "active") !== "blocked",
   };
 }
 
@@ -776,11 +824,29 @@ export async function handleYCloudWebhook(
           supabase,
         });
         if (storedMessage.shouldStartAiBuffer) {
-          await runConversationAiBuffer({
-            appBaseUrl,
-            conversationId: storedMessage.conversationId,
-            workspaceId: resolvedWorkspaceId,
+          const flowResult = await handleInboundFlow({
+            context: {
+              contactId: storedMessage.contactId,
+              conversationId: storedMessage.conversationId,
+              inboundText: event.messageText,
+              workspaceId: resolvedWorkspaceId,
+            },
+            supabase,
           });
+
+          if (flowResult.handled) {
+            await runConversationDelivery({
+              appBaseUrl,
+              conversationId: storedMessage.conversationId,
+              workspaceId: resolvedWorkspaceId,
+            });
+          } else {
+            await runConversationAiBuffer({
+              appBaseUrl,
+              conversationId: storedMessage.conversationId,
+              workspaceId: resolvedWorkspaceId,
+            });
+          }
         }
         status = "stored";
       } else {
@@ -794,11 +860,29 @@ export async function handleYCloudWebhook(
         supabase,
       });
       if (storedMessage.shouldStartAiBuffer) {
-        await runConversationAiBuffer({
-          appBaseUrl,
-          conversationId: storedMessage.conversationId,
-          workspaceId: resolvedWorkspaceId,
+        const flowResult = await handleInboundFlow({
+          context: {
+            contactId: storedMessage.contactId,
+            conversationId: storedMessage.conversationId,
+            inboundText: event.messageText,
+            workspaceId: resolvedWorkspaceId,
+          },
+          supabase,
         });
+
+        if (flowResult.handled) {
+          await runConversationDelivery({
+            appBaseUrl,
+            conversationId: storedMessage.conversationId,
+            workspaceId: resolvedWorkspaceId,
+          });
+        } else {
+          await runConversationAiBuffer({
+            appBaseUrl,
+            conversationId: storedMessage.conversationId,
+            workspaceId: resolvedWorkspaceId,
+          });
+        }
       }
       status = "stored";
     } else {

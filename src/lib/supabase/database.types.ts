@@ -26,14 +26,208 @@ export type Database = {
       };
       contacts: {
         Row: {
+          automation_labels: string[];
           created_at: string;
           email: string | null;
           full_name: string | null;
           id: string;
           metadata: Json;
+          messaging_status: "active" | "blocked";
           phone_e164: string;
           updated_at: string;
           workspace_id: string;
+        };
+      };
+      flow_answer_reviews: {
+        Row: {
+          attempt_count: number;
+          confidence: number | null;
+          contact_id: string;
+          conversation_id: string | null;
+          created_at: string;
+          decided_at: string | null;
+          decided_by: string | null;
+          field_key: string | null;
+          flow_id: string;
+          flow_run_id: string;
+          human_decision_reason: string | null;
+          id: string;
+          model: string | null;
+          normalized_answer: string | null;
+          original_answer: string;
+          post_review_attempts: number;
+          question: string;
+          status:
+            | "accepted"
+            | "approved_by_human"
+            | "blocked"
+            | "pending_human"
+            | "rejected_by_ai"
+            | "rejected_by_human";
+          step_id: string;
+          updated_at: string;
+          validation_reason: string;
+          workspace_id: string;
+        };
+        Insert: {
+          attempt_count?: number;
+          confidence?: number | null;
+          contact_id: string;
+          conversation_id?: string | null;
+          created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          field_key?: string | null;
+          flow_id: string;
+          flow_run_id: string;
+          human_decision_reason?: string | null;
+          id?: string;
+          model?: string | null;
+          normalized_answer?: string | null;
+          original_answer: string;
+          post_review_attempts?: number;
+          question: string;
+          status?:
+            | "accepted"
+            | "approved_by_human"
+            | "blocked"
+            | "pending_human"
+            | "rejected_by_ai"
+            | "rejected_by_human";
+          step_id: string;
+          updated_at?: string;
+          validation_reason: string;
+          workspace_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["flow_answer_reviews"]["Insert"]>;
+      };
+      flow_events: {
+        Row: {
+          contact_id: string | null;
+          conversation_id: string | null;
+          created_at: string;
+          error: string | null;
+          event_type: string;
+          flow_id: string | null;
+          flow_run_id: string | null;
+          id: string;
+          payload: Json;
+          status: "stored" | "error";
+          workspace_id: string;
+        };
+        Insert: {
+          contact_id?: string | null;
+          conversation_id?: string | null;
+          created_at?: string;
+          error?: string | null;
+          event_type: string;
+          flow_id?: string | null;
+          flow_run_id?: string | null;
+          id?: string;
+          payload?: Json;
+          status?: "stored" | "error";
+          workspace_id: string;
+        };
+        Update: {
+          contact_id?: string | null;
+          conversation_id?: string | null;
+          created_at?: string;
+          error?: string | null;
+          event_type?: string;
+          flow_id?: string | null;
+          flow_run_id?: string | null;
+          id?: string;
+          payload?: Json;
+          status?: "stored" | "error";
+          workspace_id?: string;
+        };
+      };
+      flow_runs: {
+        Row: {
+          answers: Json;
+          completed_at: string | null;
+          contact_id: string;
+          conversation_id: string | null;
+          current_step_id: string | null;
+          flow_id: string;
+          history: Json;
+          id: string;
+          last_error: string | null;
+          started_at: string;
+          status: "active" | "waiting" | "completed" | "paused" | "transferred" | "failed" | "review_pending" | "blocked";
+          updated_at: string;
+          workspace_id: string;
+        };
+        Insert: {
+          answers?: Json;
+          completed_at?: string | null;
+          contact_id: string;
+          conversation_id?: string | null;
+          current_step_id?: string | null;
+          flow_id: string;
+          history?: Json;
+          id?: string;
+          last_error?: string | null;
+          started_at?: string;
+          status?: "active" | "waiting" | "completed" | "paused" | "transferred" | "failed" | "review_pending" | "blocked";
+          updated_at?: string;
+          workspace_id: string;
+        };
+        Update: {
+          answers?: Json;
+          completed_at?: string | null;
+          contact_id?: string;
+          conversation_id?: string | null;
+          current_step_id?: string | null;
+          flow_id?: string;
+          history?: Json;
+          id?: string;
+          last_error?: string | null;
+          started_at?: string;
+          status?: "active" | "waiting" | "completed" | "paused" | "transferred" | "failed" | "review_pending" | "blocked";
+          updated_at?: string;
+          workspace_id?: string;
+        };
+      };
+      flows: {
+        Row: {
+          created_at: string;
+          description: string;
+          id: string;
+          metrics: Json;
+          name: string;
+          status: "draft" | "active" | "paused" | "archived";
+          steps: Json;
+          trigger_config: Json;
+          trigger_type: "first_inbound" | "keyword" | "tag" | "webhook" | "manual";
+          updated_at: string;
+          workspace_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          description?: string;
+          id?: string;
+          metrics?: Json;
+          name: string;
+          status?: "draft" | "active" | "paused" | "archived";
+          steps?: Json;
+          trigger_config?: Json;
+          trigger_type?: "first_inbound" | "keyword" | "tag" | "webhook" | "manual";
+          updated_at?: string;
+          workspace_id: string;
+        };
+        Update: {
+          created_at?: string;
+          description?: string;
+          id?: string;
+          metrics?: Json;
+          name?: string;
+          status?: "draft" | "active" | "paused" | "archived";
+          steps?: Json;
+          trigger_config?: Json;
+          trigger_type?: "first_inbound" | "keyword" | "tag" | "webhook" | "manual";
+          updated_at?: string;
+          workspace_id?: string;
         };
       };
       conversations: {

@@ -56,11 +56,11 @@ export async function GET(request: Request) {
     ]);
     const contactIds = [...new Set((conversations ?? []).map((item) => item.contact_id))];
     const conversationIds = (conversations ?? []).map((item) => item.id);
-    const [{ data: contacts }, { data: messages }] = await Promise.all([
+    const [{ data: contacts }, { data: messages }, { data: flowRuns }] = await Promise.all([
       contactIds.length
         ? admin
             .from("contacts")
-            .select("id, full_name, phone_e164, email, metadata, created_at")
+            .select("id, full_name, phone_e164, email, metadata, automation_labels, messaging_status, created_at")
             .eq("workspace_id", workspaceId)
             .in("id", contactIds)
         : Promise.resolve({ data: [] }),
@@ -73,23 +73,81 @@ export async function GET(request: Request) {
             .order("created_at", { ascending: true })
             .limit(2000)
         : Promise.resolve({ data: [] }),
+      conversationIds.length
+        ? admin
+            .from("flow_runs")
+            .select(
+              "id, flow_id, contact_id, conversation_id, current_step_id, status, updated_at",
+            )
+            .eq("workspace_id", workspaceId)
+            .in("conversation_id", conversationIds)
+            .order("updated_at", { ascending: false })
+        : Promise.resolve({ data: [] }),
     ]);
+    const { data: pendingReviews } = conversationIds.length
+      ? await admin
+          .from("flow_answer_reviews")
+          .select(
+            "id, contact_id, conversation_id, question, original_answer, validation_reason, attempt_count, created_at",
+          )
+          .eq("workspace_id", workspaceId)
+          .eq("status", "pending_human")
+          .in("conversation_id", conversationIds)
+          .order("created_at", { ascending: false })
+      : { data: [] };
+    const pendingReviewByConversation = new Map(
+      (pendingReviews ?? []).map((review) => [review.conversation_id, review]),
+    );
     const contactById = new Map((contacts ?? []).map((contact) => [contact.id, contact]));
+    const latestFlowRunByConversation = new Map<
+      string,
+      NonNullable<typeof flowRuns>[number]
+    >();
+    (flowRuns ?? []).forEach((run) => {
+      if (
+        run.conversation_id &&
+        !latestFlowRunByConversation.has(run.conversation_id)
+      ) {
+        latestFlowRunByConversation.set(run.conversation_id, run);
+      }
+    });
 
     return NextResponse.json({
       conversations: (conversations ?? []).map((conversation) => {
         const contact = contactById.get(conversation.contact_id);
         const metadata = getMetadataRecord(contact?.metadata);
+        const flowProgress = getMetadataRecord(metadata.flow_progress);
         const ycloudName = getYCloudContactName(metadata);
+        const latestFlowRun = latestFlowRunByConversation.get(conversation.id);
 
         return {
           aiEnabled: conversation.ai_enabled,
           business: workspace?.name ?? "Workspace",
           contactId: conversation.contact_id,
-          contactMetadata: metadata,
+          contactMetadata: {
+            ...metadata,
+            automation_labels: contact?.automation_labels ?? [],
+            messaging_status: contact?.messaging_status ?? "active",
+            pending_review: pendingReviewByConversation.get(conversation.id),
+          },
           contactPhone: contact?.phone_e164,
           id: conversation.id,
           name: contact?.full_name ?? ycloudName ?? contact?.phone_e164 ?? "Contacto",
+          onboarding: latestFlowRun
+            ? {
+                completedSteps: Number(flowProgress.completedSteps ?? 0),
+                currentStepId: latestFlowRun.current_step_id,
+                flowId: latestFlowRun.flow_id,
+                runId: latestFlowRun.id,
+                stageLabel: String(
+                  flowProgress.currentStageLabel ??
+                    flowProgress.currentStageKey ??
+                    "Inicio",
+                ),
+                status: latestFlowRun.status,
+                totalSteps: Number(flowProgress.totalSteps ?? 0),
+              }
+            : undefined,
           rawStatus: conversation.status,
           status: conversation.ai_enabled ? "IA activa" : "Handoff",
           summary:

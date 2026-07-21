@@ -115,6 +115,20 @@ export async function POST(request: Request) {
     );
   }
 
+  const { data: contactStatus } = await supabase
+    .from("contacts")
+    .select("messaging_status")
+    .eq("id", conversationRow.contact_id)
+    .eq("workspace_id", conversationRow.workspace_id)
+    .single();
+
+  if (contactStatus?.messaging_status === "blocked") {
+    return NextResponse.json(
+      { error: "Toda atencion esta bloqueada para este contacto." },
+      { status: 423 },
+    );
+  }
+
   const { data: message, error: messageError } = await supabase
     .from("messages")
     .insert({

@@ -43,6 +43,8 @@ create table if not exists public.contacts (
   phone_e164 text not null,
   email text,
   metadata jsonb not null default '{}'::jsonb,
+  automation_labels text[] not null default '{}'::text[],
+  messaging_status text not null default 'active' check (messaging_status in ('active', 'blocked')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (workspace_id, phone_e164)
@@ -162,6 +164,7 @@ create table if not exists public.webhook_events (
 
 create index if not exists idx_workspace_members_user_id on public.workspace_members(user_id);
 create index if not exists idx_contacts_workspace_id on public.contacts(workspace_id);
+create index if not exists idx_contacts_automation_labels on public.contacts using gin (automation_labels);
 create index if not exists idx_agents_workspace_id on public.agents(workspace_id);
 create index if not exists idx_conversations_workspace_id on public.conversations(workspace_id);
 create index if not exists idx_conversations_contact_id on public.conversations(contact_id);

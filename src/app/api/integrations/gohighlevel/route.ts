@@ -1,14 +1,35 @@
 import { NextResponse } from "next/server";
 
 import { requireWorkspaceRole } from "@/lib/authz";
-import { maskSecret, saveIntegrationSecret } from "@/lib/integrations/secrets";
+import {
+  generateWebhookSecret,
+  hashSecret,
+  maskSecret,
+  saveIntegrationSecret,
+} from "@/lib/integrations/secrets";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
   try {
-    const { apiKey, locationId, workspaceId } = (await request.json()) as {
+    const {
+      apiKey,
+      customFieldMap,
+      defaultPipelineId,
+      defaultStageId,
+      ghlWebhookSecret,
+      locationId,
+      stageMap,
+      tagMap,
+      workspaceId,
+    } = (await request.json()) as {
       apiKey?: string;
+      customFieldMap?: string;
+      defaultPipelineId?: string;
+      defaultStageId?: string;
+      ghlWebhookSecret?: string;
       locationId?: string;
+      stageMap?: string;
+      tagMap?: string;
       workspaceId?: string;
     };
     const cleanKey = apiKey?.trim();
@@ -30,13 +51,43 @@ export async function POST(request: Request) {
     });
 
     const admin = createAdminClient();
+    const { data: existingIntegration } = await admin
+      .from("integrations")
+      .select("config")
+      .eq("workspace_id", workspaceId)
+      .eq("provider", "gohighlevel")
+      .maybeSingle();
+    const existingConfig =
+      existingIntegration?.config &&
+      typeof existingIntegration.config === "object" &&
+      !Array.isArray(existingIntegration.config)
+        ? (existingIntegration.config as Record<string, unknown>)
+        : {};
+    const incomingSecret = ghlWebhookSecret?.trim();
+    const generatedSecret =
+      incomingSecret || existingConfig.ghl_webhook_secret_hash
+        ? incomingSecret
+        : generateWebhookSecret();
+    const webhookSecretHash = generatedSecret
+      ? hashSecret(generatedSecret)
+      : String(existingConfig.ghl_webhook_secret_hash ?? "");
+    const webhookSecretMask = generatedSecret
+      ? maskSecret(generatedSecret)
+      : String(existingConfig.ghl_webhook_secret_mask ?? "");
     const { data, error } = await admin
       .from("integrations")
       .upsert(
         {
           config: {
             api_key_mask: maskSecret(cleanKey),
+            custom_field_map: customFieldMap?.trim() ?? "",
+            default_pipeline_id: defaultPipelineId?.trim() ?? "",
+            default_stage_id: defaultStageId?.trim() ?? "",
+            ghl_webhook_secret_hash: webhookSecretHash,
+            ghl_webhook_secret_mask: webhookSecretMask,
             location_id: cleanLocationId,
+            stage_map: stageMap?.trim() ?? "",
+            tag_map: tagMap?.trim() ?? "",
           },
           connected_at: new Date().toISOString(),
           provider: "gohighlevel",
@@ -52,7 +103,10 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    return NextResponse.json({ integration: data });
+    return NextResponse.json({
+      integration: data,
+      webhookSecret: generatedSecret || undefined,
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Error desconocido." },
