@@ -824,6 +824,182 @@ export async function startWebhookFlow({
   });
 }
 
+export async function startManualContactFlow({
+  contactId,
+  conversationId,
+  flowId,
+  startedBy,
+  supabase,
+  workspaceId,
+}: {
+  contactId: string;
+  conversationId: string;
+  flowId?: string | null;
+  startedBy: string;
+  supabase: AdminClient;
+  workspaceId: string;
+}) {
+  const [{ data: conversation }, { data: contact }] = await Promise.all([
+    supabase
+      .from("conversations")
+      .select("id, contact_id")
+      .eq("id", conversationId)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle(),
+    supabase
+      .from("contacts")
+      .select("*")
+      .eq("id", contactId)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle(),
+  ]);
+
+  if (!conversation || conversation.contact_id !== contactId || !contact) {
+    throw new Error("El contacto o la conversacion no pertenecen a esta empresa.");
+  }
+
+  let flowQuery = supabase
+    .from("flows")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .neq("status", "archived");
+
+  if (flowId) {
+    flowQuery = flowQuery.eq("id", flowId);
+  }
+
+  const { data: flows, error: flowError } = await flowQuery
+    .order("updated_at", { ascending: false })
+    .limit(1);
+  const flow = (flows?.[0] ?? null) as FlowRow | null;
+
+  if (flowError) {
+    throw flowError;
+  }
+
+  if (!flow || parseFlowSteps(flow.steps).length === 0) {
+    throw new Error("No hay un flujo disponible con pasos para esta empresa.");
+  }
+
+  const now = new Date().toISOString();
+  const metadata = getRecord(contact.metadata);
+  const cleanMetadata = { ...metadata };
+  delete cleanMetadata.flow_answers;
+  delete cleanMetadata.flow_progress;
+  delete cleanMetadata.pending_review;
+  const cleanLabels = [
+    "onboarding_excluded_existing",
+    "onboarding_completed",
+    "onboarding_review_pending",
+    "blocked_invalid_answers",
+  ].reduce((labels, label) => withoutLabel(labels, label), contact.automation_labels ?? []);
+
+  const { data: previousRuns } = await supabase
+    .from("flow_runs")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("contact_id", contactId)
+    .not("status", "in", '("completed","transferred")');
+  const previousRunIds = (previousRuns ?? []).map((run) => run.id);
+
+  await Promise.all([
+    previousRunIds.length
+      ? supabase
+          .from("flow_runs")
+          .update({
+            completed_at: now,
+            last_error: "Ejecucion reemplazada por un inicio manual.",
+            status: "failed",
+          })
+          .in("id", previousRunIds)
+          .eq("workspace_id", workspaceId)
+      : Promise.resolve(),
+    previousRunIds.length
+      ? supabase
+          .from("flow_answer_reviews")
+          .update({
+            decided_at: now,
+            decided_by: startedBy,
+            human_decision_reason: "Ejecucion reiniciada manualmente.",
+            status: "rejected_by_human",
+          })
+          .in("flow_run_id", previousRunIds)
+          .eq("workspace_id", workspaceId)
+          .eq("status", "pending_human")
+      : Promise.resolve(),
+    supabase
+      .from("contacts")
+      .update({
+        automation_labels: withLabel(cleanLabels, "onboarding_eligible"),
+        messaging_status: "active",
+        metadata: cleanMetadata,
+      })
+      .eq("id", contactId)
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("conversations")
+      .update({ ai_enabled: false, status: "open" })
+      .eq("id", conversationId)
+      .eq("workspace_id", workspaceId),
+  ]);
+
+  const { data: run, error: runError } = await supabase
+    .from("flow_runs")
+    .insert({
+      contact_id: contactId,
+      conversation_id: conversationId,
+      current_step_id: null,
+      flow_id: flow.id,
+      status: "active",
+      workspace_id: workspaceId,
+    })
+    .select("*")
+    .single();
+
+  if (runError || !run) {
+    throw runError ?? new Error("No se pudo iniciar el flujo.");
+  }
+
+  await logFlowEvent({
+    contactId,
+    conversationId,
+    eventType: "flow_started_manually",
+    flowId: flow.id,
+    flowRunId: run.id,
+    payload: { startedBy },
+    supabase,
+    workspaceId,
+  });
+
+  const execution = await executeRun({
+    contact: {
+      ...contact,
+      automation_labels: withLabel(cleanLabels, "onboarding_eligible"),
+      messaging_status: "active",
+      metadata: cleanMetadata,
+    },
+    flow,
+    run: run as FlowRunRow,
+    supabase,
+  });
+
+  const { data: updatedRun } = await supabase
+    .from("flow_runs")
+    .select("current_step_id, status")
+    .eq("id", run.id)
+    .eq("workspace_id", workspaceId)
+    .single();
+
+  return {
+    ...execution,
+    currentStepId: updatedRun?.current_step_id ?? null,
+    flowId: flow.id,
+    flowName: flow.name,
+    runId: run.id,
+    runStatus: updatedRun?.status ?? "active",
+  };
+}
+
 export async function handleInboundFlow({
   context,
   supabase,

@@ -7,6 +7,7 @@ import {
   Clock3,
   GitBranch,
   Hand,
+  ListPlus,
   Loader2,
   MessageSquareText,
   NotebookPen,
@@ -163,9 +164,11 @@ export function InboxPanel({
   const [draft, setDraft] = useState("");
   const [noteDraft, setNoteDraft] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isSavingNote, setIsSavingNote] = useState(false);
   const [reviewAction, setReviewAction] = useState("");
+  const [flowAction, setFlowAction] = useState("");
   const [localMessages, setLocalMessages] = useState<MessageItem[]>(messages);
   const onboardingConversations = useMemo(
     () => localConversations.filter(isPendingOnboarding),
@@ -494,6 +497,101 @@ export function InboxPanel({
     setReviewAction("");
   }
 
+  async function handleAddToFlow() {
+    if (
+      !selectedConversation?.workspaceId ||
+      !selectedConversation.contactId ||
+      activeRole === "viewer"
+    ) {
+      return;
+    }
+
+    if (
+      selectedConversation.onboarding &&
+      pendingOnboardingStatuses.has(selectedConversation.onboarding.status) &&
+      !window.confirm("Este contacto ya esta en onboarding. Reiniciar desde el primer paso?")
+    ) {
+      return;
+    }
+
+    setError("");
+    setNotice("");
+    setFlowAction("start");
+    const response = await fetch("/api/flows/start", {
+      body: JSON.stringify({
+        contactId: selectedConversation.contactId,
+        conversationId: selectedConversation.id,
+        workspaceId: selectedConversation.workspaceId,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    const payload = (await response.json()) as {
+      currentStepId?: string | null;
+      delivered?: boolean;
+      error?: string;
+      flowId?: string;
+      flowName?: string;
+      runId?: string;
+      runStatus?: string;
+    };
+
+    if (!response.ok || !payload.flowId || !payload.runId) {
+      setError(payload.error ?? "No se pudo agregar el contacto al flujo.");
+      setFlowAction("");
+      return;
+    }
+
+    setLocalConversations((current) =>
+      current.map((conversation) =>
+        conversation.id === selectedConversation.id
+          ? {
+              ...conversation,
+              aiEnabled: false,
+              contactMetadata: {
+                ...conversation.contactMetadata,
+                automation_labels: Array.from(
+                  new Set([
+                    ...(conversation.contactMetadata?.automation_labels ?? []).filter(
+                      (label) =>
+                        ![
+                          "blocked_invalid_answers",
+                          "onboarding_completed",
+                          "onboarding_excluded_existing",
+                          "onboarding_review_pending",
+                        ].includes(label),
+                    ),
+                    "onboarding_eligible",
+                  ]),
+                ),
+                messaging_status: "active",
+                pending_review: undefined,
+              },
+              onboarding: {
+                completedSteps: 0,
+                currentStepId: payload.currentStepId,
+                flowId: payload.flowId!,
+                runId: payload.runId!,
+                stageLabel: "Inicio",
+                status: payload.runStatus ?? "waiting",
+                totalSteps: 0,
+              },
+              rawStatus: "open",
+              status: "Onboarding",
+            }
+          : conversation,
+      ),
+    );
+    setInboxView("onboarding");
+    setSelectedConversationId(selectedConversation.id);
+    setNotice(
+      payload.delivered
+        ? `${payload.flowName ?? "Flujo"} iniciado. Primer mensaje enviado.`
+        : `${payload.flowName ?? "Flujo"} iniciado. El mensaje quedo en cola.`,
+    );
+    setFlowAction("");
+  }
+
   async function handleInternalNote(formData: FormData) {
     const body = String(formData.get("note") ?? "").trim();
 
@@ -710,6 +808,24 @@ export function InboxPanel({
             </div>
             <div className="flex flex-wrap gap-2">
               <button
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#35735b] bg-white px-3 text-sm font-medium text-[#245943] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={
+                  !canSend ||
+                  !selectedConversation?.contactId ||
+                  activeRole === "viewer" ||
+                  flowAction === "start"
+                }
+                onClick={handleAddToFlow}
+                type="button"
+              >
+                {flowAction === "start" ? (
+                  <Loader2 className="animate-spin" size={16} />
+                ) : (
+                  <ListPlus size={16} />
+                )}
+                Agregar al flujo
+              </button>
+              <button
                 className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium ${
                   selectedConversation?.aiEnabled
                     ? "bg-[#e7f6ce] text-[#31521d]"
@@ -808,6 +924,11 @@ export function InboxPanel({
           {error ? (
             <p className="mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
+            </p>
+          ) : null}
+          {notice ? (
+            <p className="mb-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              {notice}
             </p>
           ) : null}
           <div className="flex gap-2">
