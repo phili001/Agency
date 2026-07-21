@@ -191,7 +191,10 @@ function renderTemplate(template: string, contact: ContactRow, answers: Record<s
     ),
   };
 
-  return template.replace(/\{\{(\w+)\}\}/g, (_match, key: string) => values[key] ?? "");
+  return template
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\{\{(\w+)\}\}/g, (_match, key: string) => values[key] ?? "");
 }
 
 function findStep(steps: FlowStep[], stepId?: string | null) {
