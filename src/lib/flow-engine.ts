@@ -180,7 +180,9 @@ async function syncContactFlowProgress({
 
 function renderTemplate(template: string, contact: ContactRow, answers: Record<string, Json>) {
   const firstName = contact.full_name?.split(/\s+/)[0] ?? "";
+  const impact = calculateProcessImpact(answers);
   const values: Record<string, string> = {
+    ...impact,
     email: contact.email ?? "",
     firstName,
     fullName: contact.full_name ?? "",
@@ -195,6 +197,100 @@ function renderTemplate(template: string, contact: ContactRow, answers: Record<s
     .replace(/\\r\\n/g, "\n")
     .replace(/\\n/g, "\n")
     .replace(/\{\{(\w+)\}\}/g, (_match, key: string) => values[key] ?? "");
+}
+
+function parsePositiveNumber(value: unknown) {
+  const clean = String(value ?? "")
+    .replace(/[^\d.,]/g, "")
+    .trim();
+
+  if (!clean) {
+    return null;
+  }
+
+  const separators = [...clean.matchAll(/[.,]/g)];
+  let normalized = clean;
+
+  if (separators.length > 0) {
+    const lastSeparator = separators[separators.length - 1];
+    const separatorIndex = lastSeparator.index ?? -1;
+    const decimalDigits = clean.length - separatorIndex - 1;
+
+    if (decimalDigits > 0 && decimalDigits <= 2) {
+      const integerPart = clean.slice(0, separatorIndex).replace(/[.,]/g, "");
+      const decimalPart = clean.slice(separatorIndex + 1);
+      normalized = `${integerPart}.${decimalPart}`;
+    } else {
+      normalized = clean.replace(/[.,]/g, "");
+    }
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function formatImpactValue(value: number, currency: string) {
+  return `${new Intl.NumberFormat("es-CO", {
+    maximumFractionDigits: 0,
+  }).format(value)} ${currency}`;
+}
+
+function calculateProcessImpact(answers: Record<string, Json>): Record<string, string> {
+  const weeklyRange = String(answers.horas_perdidas ?? "");
+  const hourlyValue = parsePositiveNumber(answers.valor_hora);
+  const currency =
+    String(answers.valor_hora ?? "").match(/\b(COP|EUR|USD|MXN)\b/i)?.[1]?.toUpperCase() ??
+    "COP";
+  const ranges: Record<string, [number, number | null]> = {
+    "+20": [20, null],
+    "1-5": [1, 5],
+    "10-20": [10, 20],
+    "5-10": [5, 10],
+  };
+  const [weeklyLow, weeklyHigh] = ranges[weeklyRange] ?? [0, 0];
+  const monthlyLow = weeklyLow * 4.33;
+  const monthlyHigh = weeklyHigh === null ? null : weeklyHigh * 4.33;
+
+  if (!hourlyValue || weeklyLow <= 0) {
+    return {
+      costo_anual_estimado: "un costo relevante cada ano",
+      costo_mensual_estimado: "un costo relevante cada mes",
+      horas_mensuales_estimadas: "varias horas",
+      horas_semanales_estimadas: weeklyRange ? `${weeklyRange} horas` : "varias horas",
+    };
+  }
+
+  const monthlyCostLow = monthlyLow * hourlyValue;
+  const yearlyCostLow = monthlyCostLow * 12;
+  const prefix = weeklyHigh === null ? "mas de " : "";
+  const hoursMonthly =
+    monthlyHigh === null
+      ? `mas de ${Math.round(monthlyLow)} horas`
+      : `entre ${Math.round(monthlyLow)} y ${Math.round(monthlyHigh)} horas`;
+  const monthlyCost =
+    monthlyHigh === null
+      ? `${prefix}${formatImpactValue(monthlyCostLow, currency)}`
+      : `entre ${formatImpactValue(monthlyCostLow, currency)} y ${formatImpactValue(
+          monthlyHigh * hourlyValue,
+          currency,
+        )}`;
+  const yearlyCost =
+    monthlyHigh === null
+      ? `${prefix}${formatImpactValue(yearlyCostLow, currency)}`
+      : `entre ${formatImpactValue(yearlyCostLow, currency)} y ${formatImpactValue(
+          monthlyHigh * hourlyValue * 12,
+          currency,
+        )}`;
+
+  return {
+    costo_anual_estimado: yearlyCost,
+    costo_mensual_estimado: monthlyCost,
+    horas_mensuales_estimadas: hoursMonthly,
+    horas_semanales_estimadas:
+      weeklyHigh === null
+        ? `mas de ${weeklyLow} horas`
+        : `entre ${weeklyLow} y ${weeklyHigh} horas`,
+  };
 }
 
 function findStep(steps: FlowStep[], stepId?: string | null) {
@@ -395,7 +491,14 @@ async function executeRun({
     ];
 
     if (currentStep.type === "message") {
+      if (answers.horas_perdidas && answers.valor_hora) {
+        answers = {
+          ...answers,
+          ...calculateProcessImpact(answers),
+        };
+      }
       await runStepActions({
+        answers,
         contact,
         flow,
         run,

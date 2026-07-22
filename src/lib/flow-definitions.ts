@@ -260,7 +260,7 @@ export const defaultLevyFlowSteps: FlowStep[] = [
     id: "objetivo_30_dias",
     message: "Que te gustaria haber mejorado en tu negocio durante los proximos 30 dias?",
     name: "Guardar objetivo a 30 dias",
-    nextStepId: "tag_diagnostico",
+    nextStepId: "valor_hora",
     requiredForStage: true,
     stageKey: "diagnostico",
     type: "question",
@@ -270,6 +270,34 @@ export const defaultLevyFlowSteps: FlowStep[] = [
       "Debe expresar un resultado operativo o personal concreto que espera lograr en 30 dias.",
     validationEnabled: true,
     validationMinLength: 12,
+  },
+  {
+    fieldKey: "valor_hora",
+    id: "valor_hora",
+    message:
+      "Para ponerle un valor a ese tiempo, cuanto cuesta aproximadamente una hora tuya o de la persona que hace esa tarea? Incluye la moneda. Por ejemplo: 50000 COP, 20 EUR o 25 USD.",
+    name: "Calcular valor de la hora",
+    nextStepId: "impacto_operativo",
+    requiredForStage: true,
+    retryMessage:
+      "Escribe un valor numerico y la moneda. Por ejemplo: 50000 COP, 20 EUR o 25 USD.",
+    stageKey: "diagnostico",
+    type: "question",
+    validationCriteria:
+      "Debe contener un valor numerico positivo y una moneda como COP, EUR, USD o MXN.",
+    validationEnabled: true,
+    validationMinLength: 4,
+  },
+  {
+    id: "impacto_operativo",
+    message:
+      "Hay un costo que suele pasar desapercibido.\n\nCon {{horas_semanales_estimadas}} dedicadas cada semana a esa tarea, son aproximadamente {{horas_mensuales_estimadas}} al mes.\n\nEso representa cerca de {{costo_mensual_estimado}} al mes y {{costo_anual_estimado}} al ano, sin contar errores, retrasos ni oportunidades perdidas.\n\nEs una estimacion conservadora de lo que hoy consume el proceso.",
+    name: "Mostrar costo oculto del proceso",
+    nextStepId: "tag_diagnostico",
+    requiredForStage: true,
+    stageKey: "diagnostico",
+    type: "message",
+    waitForInbound: false,
   },
   {
     actions: [
