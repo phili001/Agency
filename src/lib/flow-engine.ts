@@ -239,7 +239,7 @@ function calculateProcessImpact(answers: Record<string, Json>): Record<string, s
   const weeklyRange = String(answers.horas_perdidas ?? "");
   const hourlyValue = parsePositiveNumber(answers.valor_hora);
   const currency =
-    String(answers.valor_hora ?? "").match(/\b(COP|EUR|USD|MXN)\b/i)?.[1]?.toUpperCase() ??
+    String(answers.valor_hora ?? "").match(/\b(USD|EUR|COP|MXN)\b/i)?.[1]?.toUpperCase() ??
     "COP";
   const ranges: Record<string, [number, number | null]> = {
     "+20": [20, null],

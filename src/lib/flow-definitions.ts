@@ -154,7 +154,7 @@ export const defaultLevyFlowSteps: FlowStep[] = [
     fieldKey: "tipo_negocio",
     id: "tipo_negocio",
     message:
-      "Hola {{firstName}}. Para preparar mejor nuestra conversacion, quiero hacerte unas preguntas breves.\n\nQue tipo de negocio tienes?",
+      "Hola {{firstName}}. En menos de 2 minutos vamos a ponerle un numero al tiempo que hoy se esta escapando de tu negocio.\n\nPara empezar, que tipo de negocio tienes?",
     name: "Bienvenida y tipo de negocio",
     nextStepId: "cuello_botella",
     options: [
@@ -186,7 +186,7 @@ export const defaultLevyFlowSteps: FlowStep[] = [
   {
     fieldKey: "cuello_botella",
     id: "cuello_botella",
-    message: "Que tarea te esta quitando mas tiempo ahora mismo?",
+    message: "Ahora vamos al punto importante: que tarea repetitiva te esta quitando mas tiempo cada semana?",
     name: "Preguntar cuello de botella",
     nextStepId: "herramientas",
     options: [
@@ -226,7 +226,7 @@ export const defaultLevyFlowSteps: FlowStep[] = [
   {
     fieldKey: "herramientas_actuales",
     id: "herramientas",
-    message: "Que herramientas usas hoy para gestionarlo? Por ejemplo WhatsApp, agenda, Excel, email, Instagram o CRM.",
+    message: "Con que herramientas intentas gestionarla hoy? Por ejemplo WhatsApp, agenda, Excel, email, Instagram o CRM.",
     name: "Preguntar herramientas actuales",
     nextStepId: "horas_perdidas",
     requiredForStage: true,
@@ -242,7 +242,7 @@ export const defaultLevyFlowSteps: FlowStep[] = [
   {
     fieldKey: "horas_perdidas",
     id: "horas_perdidas",
-    message: "Cuantas horas a la semana te quita aproximadamente?",
+    message: "Hagamos visible esa fuga: cuantas horas a la semana te consume aproximadamente?",
     name: "Preguntar horas perdidas",
     nextStepId: "objetivo_30_dias",
     options: [
@@ -258,7 +258,7 @@ export const defaultLevyFlowSteps: FlowStep[] = [
   {
     fieldKey: "objetivo_30_dias",
     id: "objetivo_30_dias",
-    message: "Que te gustaria haber mejorado en tu negocio durante los proximos 30 dias?",
+    message: "Si recuperaras parte de ese tiempo durante los proximos 30 dias, que cambiaria primero en tu negocio?",
     name: "Guardar objetivo a 30 dias",
     nextStepId: "valor_hora",
     requiredForStage: true,
@@ -275,23 +275,23 @@ export const defaultLevyFlowSteps: FlowStep[] = [
     fieldKey: "valor_hora",
     id: "valor_hora",
     message:
-      "Para ponerle un valor a ese tiempo, cuanto cuesta aproximadamente una hora tuya o de la persona que hace esa tarea? Incluye la moneda. Por ejemplo: 50000 COP, 20 EUR o 25 USD.",
+      "Ultimo dato para calcular el costo oculto: cuanto vale aproximadamente una hora tuya o de la persona que hace esa tarea?\n\nResponde con importe y moneda. Ejemplos: 25 USD, 20 EUR o 50000 COP.",
     name: "Calcular valor de la hora",
     nextStepId: "impacto_operativo",
     requiredForStage: true,
     retryMessage:
-      "Escribe un valor numerico y la moneda. Por ejemplo: 50000 COP, 20 EUR o 25 USD.",
+      "Escribe un valor numerico y la moneda. Por ejemplo: 25 USD, 20 EUR o 50000 COP.",
     stageKey: "diagnostico",
     type: "question",
     validationCriteria:
-      "Debe contener un valor numerico positivo y una moneda como COP, EUR, USD o MXN.",
+      "Debe contener un valor numerico positivo y una moneda como USD, EUR, COP o MXN.",
     validationEnabled: true,
     validationMinLength: 4,
   },
   {
     id: "impacto_operativo",
     message:
-      "Hay un costo que suele pasar desapercibido.\n\nCon {{horas_semanales_estimadas}} dedicadas cada semana a esa tarea, son aproximadamente {{horas_mensuales_estimadas}} al mes.\n\nEso representa cerca de {{costo_mensual_estimado}} al mes y {{costo_anual_estimado}} al ano, sin contar errores, retrasos ni oportunidades perdidas.\n\nEs una estimacion conservadora de lo que hoy consume el proceso.",
+      "*Aqui esta la fuga que hoy no se ve:*\n\nTiempo consumido: {{horas_mensuales_estimadas}} al mes.\nCosto mensual estimado: {{costo_mensual_estimado}}.\nCosto anual estimado: {{costo_anual_estimado}}.\n\nY eso sin contar errores, retrasos ni oportunidades que no puedes atender mientras repites la misma tarea.\n\nYa tienes una primera radiografia del problema. En la reunion revisaremos que conviene automatizar primero y si podemos convertir esta fuga en tiempo util para vender, atender o crecer.\n\nAgenda tu revision aqui:\nhttps://momentiacitas.ruralketing.com/agenda-tu-cita#row-g6WOTuqARq",
     name: "Mostrar costo oculto del proceso",
     nextStepId: "tag_diagnostico",
     requiredForStage: true,
@@ -309,21 +309,10 @@ export const defaultLevyFlowSteps: FlowStep[] = [
     ],
     id: "tag_diagnostico",
     name: "GHL: diagnostico completado",
-    nextStepId: "enlace_agenda",
-    requiredForStage: true,
-    stageKey: "conversion",
-    type: "ghl_action",
-  },
-  {
-    id: "enlace_agenda",
-    message:
-      "Gracias, {{firstName}}. Ya tengo la informacion necesaria para la llamada.\n\nPuedes elegir el horario que mejor te funcione aqui:\nhttps://momentiacitas.ruralketing.com/agenda-tu-cita#row-g6WOTuqARq",
-    name: "Enviar enlace de agenda",
     nextStepId: "transferir_citas",
     requiredForStage: true,
     stageKey: "conversion",
-    type: "message",
-    waitForInbound: false,
+    type: "ghl_action",
   },
   {
     id: "transferir_citas",
