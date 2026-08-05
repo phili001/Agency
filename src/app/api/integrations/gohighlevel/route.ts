@@ -1,54 +1,62 @@
 import { NextResponse } from "next/server";
 
+import { normalizeAppUrl } from "@/lib/app-url";
 import { requireWorkspaceRole } from "@/lib/authz";
 import {
   generateWebhookSecret,
+  getIntegrationSecret,
   hashSecret,
   maskSecret,
   saveIntegrationSecret,
 } from "@/lib/integrations/secrets";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+function webhookUrl() {
+  return `${normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL)}/api/webhooks/ghl/send-message`;
+}
+
 export async function POST(request: Request) {
   try {
-    const {
-      apiKey,
-      customFieldMap,
-      defaultPipelineId,
-      defaultStageId,
-      ghlWebhookSecret,
-      locationId,
-      stageMap,
-      tagMap,
-      workspaceId,
-    } = (await request.json()) as {
-      apiKey?: string;
-      customFieldMap?: string;
-      defaultPipelineId?: string;
-      defaultStageId?: string;
-      ghlWebhookSecret?: string;
-      locationId?: string;
-      stageMap?: string;
-      tagMap?: string;
-      workspaceId?: string;
-    };
+    const { apiKey, locationId, regenerateWebhookSecret, workspaceId } =
+      (await request.json()) as {
+        apiKey?: string;
+        locationId?: string;
+        regenerateWebhookSecret?: boolean;
+        workspaceId?: string;
+      };
     const cleanKey = apiKey?.trim();
     const cleanLocationId = locationId?.trim();
 
-    if (!workspaceId || !cleanKey || !cleanLocationId) {
+    if (!workspaceId || !cleanLocationId) {
       return NextResponse.json(
-        { error: "workspaceId, apiKey y locationId son requeridos." },
+        { error: "workspaceId y locationId son requeridos." },
         { status: 400 },
       );
     }
 
     await requireWorkspaceRole(workspaceId);
-    await saveIntegrationSecret({
+
+    const storedKey = await getIntegrationSecret({
       kind: "api_key",
       provider: "gohighlevel",
-      value: cleanKey,
       workspaceId,
     });
+
+    if (!cleanKey && !storedKey) {
+      return NextResponse.json(
+        { error: "Pega la API key de GoHighLevel para conectar la integracion." },
+        { status: 400 },
+      );
+    }
+
+    if (cleanKey) {
+      await saveIntegrationSecret({
+        kind: "api_key",
+        provider: "gohighlevel",
+        value: cleanKey,
+        workspaceId,
+      });
+    }
 
     const admin = createAdminClient();
     const { data: existingIntegration } = await admin
@@ -63,31 +71,33 @@ export async function POST(request: Request) {
       !Array.isArray(existingIntegration.config)
         ? (existingIntegration.config as Record<string, unknown>)
         : {};
-    const incomingSecret = ghlWebhookSecret?.trim();
+    const existingHash =
+      typeof existingConfig.ghl_webhook_secret_hash === "string"
+        ? existingConfig.ghl_webhook_secret_hash
+        : "";
+    // El secreto solo se guarda hasheado, asi que solo puede mostrarse en el
+    // momento en que se genera: al conectar por primera vez o al regenerar.
     const generatedSecret =
-      incomingSecret || existingConfig.ghl_webhook_secret_hash
-        ? incomingSecret
-        : generateWebhookSecret();
-    const webhookSecretHash = generatedSecret
-      ? hashSecret(generatedSecret)
-      : String(existingConfig.ghl_webhook_secret_hash ?? "");
-    const webhookSecretMask = generatedSecret
-      ? maskSecret(generatedSecret)
-      : String(existingConfig.ghl_webhook_secret_mask ?? "");
+      regenerateWebhookSecret || !existingHash ? generateWebhookSecret() : null;
     const { data, error } = await admin
       .from("integrations")
       .upsert(
         {
+          // Config completa y explicita: los mapas JSON (stage_map, tag_map,
+          // custom_field_map) no tenian consumidor y se descartan al reescribir.
           config: {
-            api_key_mask: maskSecret(cleanKey),
-            custom_field_map: customFieldMap?.trim() ?? "",
-            default_pipeline_id: defaultPipelineId?.trim() ?? "",
-            default_stage_id: defaultStageId?.trim() ?? "",
-            ghl_webhook_secret_hash: webhookSecretHash,
-            ghl_webhook_secret_mask: webhookSecretMask,
+            api_key_mask: cleanKey
+              ? maskSecret(cleanKey)
+              : (existingConfig.api_key_mask ?? maskSecret(storedKey)),
+            default_pipeline_id: existingConfig.default_pipeline_id ?? "",
+            default_stage_id: existingConfig.default_stage_id ?? "",
+            ghl_webhook_secret_hash: generatedSecret
+              ? hashSecret(generatedSecret)
+              : existingHash,
+            ghl_webhook_secret_mask: generatedSecret
+              ? maskSecret(generatedSecret)
+              : (existingConfig.ghl_webhook_secret_mask ?? null),
             location_id: cleanLocationId,
-            stage_map: stageMap?.trim() ?? "",
-            tag_map: tagMap?.trim() ?? "",
           },
           connected_at: new Date().toISOString(),
           provider: "gohighlevel",
@@ -105,7 +115,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       integration: data,
-      webhookSecret: generatedSecret || undefined,
+      webhookSecret: generatedSecret ?? undefined,
+      webhookUrl: webhookUrl(),
     });
   } catch (error) {
     return NextResponse.json(

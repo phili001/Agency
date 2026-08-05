@@ -129,16 +129,10 @@ const providers = [
     provider: "openai",
   },
   {
-    description: "CRM para contactos, oportunidades, acciones de flujo y agenda.",
+    description: "Conecta tu CRM para que los contactos de WhatsApp entren solos.",
     fields: [
       ["location_id", "Location ID"],
       ["api_key", "GoHighLevel API key"],
-      ["default_pipeline_id", "Pipeline ID por defecto"],
-      ["default_stage_id", "Stage ID por defecto"],
-      ["ghl_webhook_secret", "Secreto webhook GHL"],
-      ["stage_map", "Mapa de etapas JSON"],
-      ["tag_map", "Mapa de tags JSON"],
-      ["custom_field_map", "Mapa de campos JSON"],
     ],
     label: "GoHighLevel",
     provider: "gohighlevel",
@@ -207,6 +201,13 @@ function stableDate(value: string) {
   )}-${String(date.getUTCDate()).padStart(2, "0")}`;
 }
 
+const statusLabels: Record<IntegrationItem["status"], string> = {
+  active: "Conectado",
+  disabled: "Desactivado",
+  error: "Con error",
+  pending: "Sin conectar",
+};
+
 function fieldHelp(provider: string, key: string) {
   if (provider === "ycloud") {
     const helpers: Record<string, { help: string; placeholder: string }> = {
@@ -237,43 +238,15 @@ function fieldHelp(provider: string, key: string) {
 
   if (provider === "gohighlevel" && key === "location_id") {
     return {
-      help: "Location ID del subaccount en GoHighLevel.",
+      help: "En GoHighLevel: Settings > Business Profile. Es el ID de la subcuenta de tu negocio.",
       placeholder: "location_id",
     };
   }
 
   if (provider === "gohighlevel" && key === "api_key") {
     return {
-      help: "Se cifra en el backend y se usa solo para sincronizar contactos de esta empresa.",
+      help: "En GoHighLevel: Settings > API Keys > Create new key. Se cifra en el backend y solo se usa para esta empresa.",
       placeholder: "GHL API key",
-    };
-  }
-
-  if (provider === "gohighlevel" && key === "default_pipeline_id") {
-    return {
-      help: "Pipeline principal que usaran los nodos de flujo cuando no se indique otro.",
-      placeholder: "pipeline_id",
-    };
-  }
-
-  if (provider === "gohighlevel" && key === "default_stage_id") {
-    return {
-      help: "Etapa fallback para crear oportunidades desde flujos.",
-      placeholder: "stage_id",
-    };
-  }
-
-  if (provider === "gohighlevel" && key === "ghl_webhook_secret") {
-    return {
-      help: "Secreto que GHL debe mandar en Authorization: Bearer para activar flujos en Levi. Si lo dejas vacio, Levi genera uno.",
-      placeholder: "Dejalo vacio para generar uno",
-    };
-  }
-
-  if (provider === "gohighlevel" && key.endsWith("_map")) {
-    return {
-      help: "JSON simple para mostrar nombres humanos y guardar IDs reales. Ej: {\"Video enviado\":\"abc123\"}",
-      placeholder: "{\"Video enviado\":\"stage_id\"}",
     };
   }
 
@@ -351,6 +324,14 @@ export function WorkspaceSettings({
   const webhookUrl = workspaceId
     ? `${appUrl}/api/webhooks/ycloud/${workspaceCode ?? workspaceId}/${webhookSecretParam}`
     : "";
+  // El secreto de GHL viaja en la cabecera Authorization, no en la URL, y solo
+  // esta disponible en claro justo despues de generarlo.
+  const ghlWebhookUrl = `${appUrl}/api/webhooks/ghl/send-message`;
+  const ghlSecretValue = integrationDrafts.gohighlevel.config.ghl_webhook_secret?.trim();
+  const ghlSecretMask = asRecord(
+    localIntegrations.find((integration) => integration.provider === "gohighlevel")
+      ?.config ?? {},
+  ).ghl_webhook_secret_mask;
   const assetsByKind = useMemo(
     () =>
       localAssets.reduce<Record<string, WorkspaceAsset[]>>((grouped, asset) => {
@@ -426,13 +407,16 @@ export function WorkspaceSettings({
     };
   }, [localIntegrations, workspaceId, ycloudSecretValue]);
 
-  async function saveIntegration(provider: IntegrationItem["provider"]) {
+  async function saveIntegration(
+    provider: IntegrationItem["provider"],
+    { regenerateWebhookSecret = false } = {},
+  ) {
     if (!workspaceId) {
       setStatus("Primero necesitas un workspace activo.");
       return;
     }
 
-    setSavingKey(provider);
+    setSavingKey(regenerateWebhookSecret ? `${provider}:secret` : provider);
     setStatus("");
 
     const draft = integrationDrafts[provider];
@@ -462,13 +446,8 @@ export function WorkspaceSettings({
               }
             : {
                 apiKey: draft.config.api_key,
-                customFieldMap: draft.config.custom_field_map,
-                defaultPipelineId: draft.config.default_pipeline_id,
-                defaultStageId: draft.config.default_stage_id,
-                ghlWebhookSecret: draft.config.ghl_webhook_secret,
                 locationId: draft.config.location_id,
-                stageMap: draft.config.stage_map,
-                tagMap: draft.config.tag_map,
+                regenerateWebhookSecret,
                 workspaceId,
               };
       const response = await fetch(endpoint, {
@@ -521,7 +500,11 @@ export function WorkspaceSettings({
         );
         return [...withoutProvider, payload.integration!];
       });
-      setStatus("Integracion conectada.");
+      setStatus(
+        regenerateWebhookSecret
+          ? "Secreto nuevo generado. Copialo ahora: no se vuelve a mostrar."
+          : "Integracion conectada.",
+      );
       setSavingKey("");
       return;
     }
@@ -566,7 +549,7 @@ export function WorkspaceSettings({
     setSavingKey("");
   }
 
-  async function testIntegration(provider: Extract<IntegrationItem["provider"], "openai" | "ycloud">) {
+  async function testIntegration(provider: IntegrationItem["provider"]) {
     if (!workspaceId) {
       setStatus("Primero necesitas un workspace activo.");
       return;
@@ -588,7 +571,13 @@ export function WorkspaceSettings({
       return;
     }
 
-    setStatus(provider === "ycloud" ? "YCloud respondio correctamente." : "OpenAI respondio correctamente.");
+    const successMessages: Record<IntegrationItem["provider"], string> = {
+      gohighlevel: "GoHighLevel respondio correctamente. La conexion esta lista.",
+      openai: "OpenAI respondio correctamente.",
+      ycloud: "YCloud respondio correctamente.",
+    };
+
+    setStatus(successMessages[provider]);
     setSavingKey("");
   }
 
@@ -1404,13 +1393,15 @@ export function WorkspaceSettings({
                       </p>
                     </div>
                     <span
-                      className={`rounded-lg px-2 py-1 text-xs ${
+                      className={`shrink-0 rounded-lg px-2 py-1 text-xs ${
                         connected?.status === "active"
                           ? "bg-[#e7f6ce] text-[#31521d]"
-                          : "bg-[#eef2eb] text-[#4d5a51]"
+                          : connected?.status === "error"
+                            ? "bg-[#f8dcd6] text-[#7a2f1d]"
+                            : "bg-[#eef2eb] text-[#4d5a51]"
                       }`}
                     >
-                      {connected?.status ?? "pending"}
+                      {statusLabels[connected?.status ?? "pending"]}
                     </span>
                   </div>
                   {provider.provider === "ycloud" ? (
@@ -1454,25 +1445,43 @@ export function WorkspaceSettings({
                       </label>
                     );
                   })}
+                  {provider.provider === "gohighlevel" && connected ? (
+                    <div className="rounded-lg border border-dashed border-[#cbd2c6] bg-[#fafbf8] p-2 text-xs text-[#4d5a51]">
+                      <p className="font-semibold">Webhook para pegar en GoHighLevel</p>
+                      <p className="mt-1 break-all">{ghlWebhookUrl}</p>
+                      <p className="mt-2">
+                        En GoHighLevel: Settings &gt; Webhooks. Agrega la cabecera{" "}
+                        <span className="font-semibold">Authorization: Bearer</span> con
+                        este secreto:
+                      </p>
+                      <p className="mt-1 break-all font-semibold">
+                        {ghlSecretValue || ghlSecretMask || "Sin secreto"}
+                      </p>
+                      <p className="mt-2">
+                        {ghlSecretValue
+                          ? "Copialo ahora: por seguridad no se vuelve a mostrar completo."
+                          : "Solo se guarda cifrado. Si lo perdiste, genera uno nuevo (el anterior deja de servir)."}
+                      </p>
+                      <button
+                        className="mt-2 inline-flex h-8 items-center gap-2 rounded-lg border border-[#cbd2c6] px-2 text-xs font-medium text-[#10231c] disabled:text-[#9aa59e]"
+                        disabled={savingKey === "gohighlevel:secret"}
+                        onClick={() =>
+                          saveIntegration("gohighlevel", {
+                            regenerateWebhookSecret: true,
+                          })
+                        }
+                        type="button"
+                      >
+                        {savingKey === "gohighlevel:secret" ? (
+                          <Loader2 className="animate-spin" size={13} />
+                        ) : (
+                          <KeyRound size={13} />
+                        )}
+                        Generar secreto nuevo
+                      </button>
+                    </div>
+                  ) : null}
                   <div className="flex flex-wrap gap-2">
-                    <select
-                      className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
-                      onChange={(event) =>
-                        setIntegrationDrafts((current) => ({
-                          ...current,
-                          [provider.provider]: {
-                            ...current[provider.provider],
-                            status: event.target.value as IntegrationItem["status"],
-                          },
-                        }))
-                      }
-                      value={draft.status}
-                    >
-                      <option value="pending">Pendiente</option>
-                      <option value="active">Activa</option>
-                      <option value="error">Error</option>
-                      <option value="disabled">Desactivada</option>
-                    </select>
                     <button
                       className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]"
                       disabled={savingKey === provider.provider}
@@ -1486,21 +1495,19 @@ export function WorkspaceSettings({
                       )}
                       Guardar
                     </button>
-                    {provider.provider === "ycloud" || provider.provider === "openai" ? (
-                      <button
-                        className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#10231c] px-3 text-sm font-medium text-[#10231c] disabled:border-[#9aa59e] disabled:text-[#9aa59e]"
-                        disabled={savingKey === `${provider.provider}:test`}
-                        onClick={() => testIntegration(provider.provider)}
-                        type="button"
-                      >
-                        {savingKey === `${provider.provider}:test` ? (
-                          <Loader2 className="animate-spin" size={16} />
-                        ) : (
-                          <PlugZap size={16} />
-                        )}
-                        Probar
-                      </button>
-                    ) : null}
+                    <button
+                      className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#10231c] px-3 text-sm font-medium text-[#10231c] disabled:border-[#9aa59e] disabled:text-[#9aa59e]"
+                      disabled={savingKey === `${provider.provider}:test` || !connected}
+                      onClick={() => testIntegration(provider.provider)}
+                      type="button"
+                    >
+                      {savingKey === `${provider.provider}:test` ? (
+                        <Loader2 className="animate-spin" size={16} />
+                      ) : (
+                        <PlugZap size={16} />
+                      )}
+                      Probar conexion
+                    </button>
                   </div>
                 </div>
               );

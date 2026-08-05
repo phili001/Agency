@@ -400,19 +400,25 @@ function GhlActionsEditor({
               </div>
             ) : null}
             {action.type === "upsert_opportunity" ? (
-              <div className="grid gap-2 md:grid-cols-2">
-                <input
-                  className="h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
-                  onChange={(event) => patchAction(index, { pipelineId: event.target.value })}
-                  placeholder="Pipeline ID o default"
-                  value={"pipelineId" in action ? action.pipelineId ?? "" : ""}
-                />
-                <input
-                  className="h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
-                  onChange={(event) => patchAction(index, { stageId: event.target.value })}
-                  placeholder="Stage ID o nombre mapeado"
-                  value={"stageId" in action ? action.stageId ?? "" : ""}
-                />
+              <div className="grid gap-2">
+                <div className="grid gap-2 md:grid-cols-2">
+                  <input
+                    className="h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+                    onChange={(event) => patchAction(index, { pipelineId: event.target.value })}
+                    placeholder="Pipeline ID de GoHighLevel"
+                    value={"pipelineId" in action ? action.pipelineId ?? "" : ""}
+                  />
+                  <input
+                    className="h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+                    onChange={(event) => patchAction(index, { stageId: event.target.value })}
+                    placeholder="Stage ID de GoHighLevel"
+                    value={"stageId" in action ? action.stageId ?? "" : ""}
+                  />
+                </div>
+                <p className="text-xs text-[#647067]">
+                  Los IDs salen de GoHighLevel: Opportunities &gt; Pipelines. Cada
+                  pipeline y cada etapa tienen su propio ID.
+                </p>
               </div>
             ) : null}
             {action.type === "create_task" ? (
