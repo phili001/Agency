@@ -18,6 +18,11 @@ import {
 
 import { AgentSettings } from "@/components/agent-settings";
 import {
+  buildCalendarToolMetadata,
+  isCalendarTool,
+  parseCalendarTools,
+} from "@/lib/calendar-tools";
+import {
   buildBusinessProfileContent,
   businessProfileFields,
   getBusinessProfileMetadata,
@@ -361,7 +366,8 @@ export function WorkspaceSettings({
       }, {}),
     [localAssets],
   );
-  const tools = assetsByKind.tool ?? [];
+  const tools = useMemo(() => assetsByKind.tool ?? [], [assetsByKind]);
+  const calendarTools = useMemo(() => parseCalendarTools(tools), [tools]);
   const knowledgeAssets = assetsByKind.knowledge ?? [];
 
   useEffect(() => {
@@ -757,6 +763,111 @@ export function WorkspaceSettings({
       };
     });
     setStatus("Documento eliminado.");
+    setSavingKey("");
+  }
+
+  /**
+   * Crea o actualiza una tool de calendario. Solo una puede ser la de por
+   * defecto, asi que al marcar una se desmarcan las demas: el agente de citas
+   * usa exactamente un calendario y no debe haber ambiguedad.
+   */
+  async function saveCalendarTool({
+    assetId,
+    calendarId,
+    description,
+    makeDefault,
+  }: {
+    assetId?: string;
+    calendarId: string;
+    description?: string;
+    makeDefault: boolean;
+  }) {
+    if (!workspaceId) {
+      setStatus("Primero necesitas un workspace activo.");
+      return;
+    }
+
+    const calendar = ghlCalendars.find((item) => item.id === calendarId);
+
+    if (!calendar) {
+      setStatus("Elige un calendario de la lista.");
+      return;
+    }
+
+    setSavingKey(`calendar:${calendarId}`);
+    setStatus("");
+
+    const metadata = buildCalendarToolMetadata({
+      calendarId: calendar.id,
+      calendarName: calendar.name,
+      isDefault: makeDefault,
+    });
+    const payload = {
+      content:
+        description ??
+        `Citas de ${calendar.name}. Describe aqui cuando usar esta agenda.`,
+      kind: "tool" as const,
+      metadata,
+      status: "active" as const,
+      title: calendar.name,
+      workspace_id: workspaceId,
+    };
+    const { data, error } = assetId
+      ? await supabase
+          .from("workspace_assets")
+          .update(payload)
+          .eq("id", assetId)
+          .select("id, workspace_id, kind, title, content, status, metadata")
+          .single()
+      : await supabase
+          .from("workspace_assets")
+          .insert(payload)
+          .select("id, workspace_id, kind, title, content, status, metadata")
+          .single();
+
+    if (error) {
+      setStatus(error.message);
+      setSavingKey("");
+      return;
+    }
+
+    const saved = data as WorkspaceAsset;
+
+    if (makeDefault) {
+      const toUnset = calendarTools.filter(
+        (tool) => tool.isDefault && tool.id !== saved.id,
+      );
+
+      for (const tool of toUnset) {
+        const asset = localAssets.find((item) => item.id === tool.id);
+        await supabase
+          .from("workspace_assets")
+          .update({
+            metadata: { ...asRecord(asset?.metadata ?? {}), is_default: false },
+          })
+          .eq("id", tool.id);
+      }
+    }
+
+    setLocalAssets((current) => {
+      const withoutSaved = current.filter((asset) => asset.id !== saved.id);
+      const reset = makeDefault
+        ? withoutSaved.map((asset) =>
+            isCalendarTool(asset.metadata)
+              ? {
+                  ...asset,
+                  metadata: { ...asRecord(asset.metadata), is_default: false },
+                }
+              : asset,
+          )
+        : withoutSaved;
+      return [saved, ...reset];
+    });
+    setStatus(
+      makeDefault
+        ? `"${calendar.name}" es ahora el calendario del agente de citas.`
+        : "Calendario guardado.",
+    );
     setSavingKey("");
   }
 
@@ -1668,6 +1779,111 @@ export function WorkspaceSettings({
               <p className="mt-1 text-sm text-[#647067]">
                 Crea capacidades reutilizables y luego asignalas a cada agente.
               </p>
+            </div>
+
+            <div className="grid gap-3 rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3">
+              <div>
+                <h3 className="text-sm font-semibold">Calendarios de agendamiento</h3>
+                <p className="mt-1 text-sm text-[#647067]">
+                  Habilita los calendarios y describe cuando usar cada uno. El
+                  agente elige segun lo que pida el cliente. Asignaselos en la
+                  pestana Agentes.
+                </p>
+              </div>
+
+              {ghlCalendars.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-[#d9ded3] bg-white p-3 text-sm text-[#647067]">
+                  {ghlCalendarsError ||
+                    "Conecta GoHighLevel en Integraciones para ver tus calendarios."}
+                </p>
+              ) : (
+                <div className="grid gap-2">
+                  {ghlCalendars.map((calendar) => {
+                    const tool = calendarTools.find(
+                      (item) => item.calendarId === calendar.id,
+                    );
+
+                    return (
+                      <div
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#e2e6df] bg-white p-3"
+                        key={calendar.id}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold">
+                            {calendar.name}
+                          </p>
+                          {tool ? (
+                            <textarea
+                              className="mt-1.5 w-full rounded-lg border border-[#cbd2c6] px-2 py-1.5 text-xs outline-none focus:border-[#35735b]"
+                              defaultValue={tool.description}
+                              onBlur={(event) => {
+                                if (event.target.value.trim() === tool.description) {
+                                  return;
+                                }
+
+                                void saveCalendarTool({
+                                  assetId: tool.id,
+                                  calendarId: calendar.id,
+                                  description: event.target.value,
+                                  makeDefault: tool.isDefault,
+                                });
+                              }}
+                              placeholder="Cuando usar esta agenda. Ej: limpiezas y revisiones generales, 30 minutos."
+                              rows={2}
+                            />
+                          ) : (
+                            <p className="mt-0.5 text-xs text-[#647067]">
+                              Todavia no esta habilitado.
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 items-start gap-2">
+                          {tool?.isDefault ? (
+                            <span className="rounded-lg bg-[#e7f6ce] px-2 py-1 text-xs text-[#31521d]">
+                              Preferida
+                            </span>
+                          ) : tool ? (
+                            <button
+                              className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#10231c] px-3 text-sm font-medium text-[#10231c] disabled:border-[#9aa59e] disabled:text-[#9aa59e]"
+                              disabled={savingKey === `calendar:${calendar.id}`}
+                              onClick={() =>
+                                saveCalendarTool({
+                                  assetId: tool.id,
+                                  calendarId: calendar.id,
+                                  description: tool.description,
+                                  makeDefault: true,
+                                })
+                              }
+                              type="button"
+                            >
+                              {savingKey === `calendar:${calendar.id}` ? (
+                                <Loader2 className="animate-spin" size={15} />
+                              ) : null}
+                              Marcar preferida
+                            </button>
+                          ) : null}
+                          {!tool ? (
+                            <button
+                              className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]"
+                              disabled={savingKey === `calendar:${calendar.id}`}
+                              onClick={() =>
+                                saveCalendarTool({
+                                  calendarId: calendar.id,
+                                  makeDefault: calendarTools.length === 0,
+                                })
+                              }
+                              type="button"
+                            >
+                              <Plus size={15} />
+                              Habilitar
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             <div className="grid gap-3 xl:grid-cols-2">
               {toolPresets.map((tool) => (

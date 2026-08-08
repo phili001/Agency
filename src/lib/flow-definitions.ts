@@ -15,6 +15,8 @@ export type FlowStepType =
   | "webhook";
 
 export type FlowGhlAction = {
+  /** Calendario que usara el agente de citas para este contacto. */
+  calendarId?: string;
   customFieldKey?: string;
   customFieldValue?: string;
   label: string;
@@ -26,6 +28,7 @@ export type FlowGhlAction = {
     | "add_tag"
     | "create_task"
     | "remove_tag"
+    | "set_booking_calendar"
     | "upsert_opportunity"
     | "update_contact_field";
 };

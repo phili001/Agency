@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 
 import type { Json } from "@/lib/supabase/database.types";
+import {
+  parseCalendarTools,
+  resolveCalendarsForAgent,
+  type CalendarTool,
+} from "@/lib/calendar-tools";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   applyBusinessVariables,
@@ -152,59 +157,93 @@ function buildTranscript(messages: MessageRow[]) {
     .join("\n");
 }
 
-const calendarToolDefinitions = [
-  {
-    description:
-      "Consulta los horarios realmente disponibles en el calendario del negocio. Usala SIEMPRE antes de proponer u ofrecer cualquier horario al cliente.",
-    name: "consultar_disponibilidad",
-    parameters: {
-      additionalProperties: false,
-      properties: {
-        dias: {
-          description:
-            "Cuantos dias hacia adelante buscar desde la fecha de inicio. Entre 1 y 14.",
-          type: "integer",
-        },
-        fecha_inicio: {
-          description:
-            "Fecha desde la que buscar, en formato YYYY-MM-DD. Usa la fecha de hoy si el cliente no indica otra.",
+/**
+ * Las definiciones se arman segun los calendarios que tenga el agente. Con uno
+ * solo no se expone el parametro: pedirle al modelo que elija entre una sola
+ * opcion solo agrega ruido y posibilidad de error.
+ */
+function buildCalendarToolDefinitions(calendars: CalendarTool[]) {
+  const multiple = calendars.length > 1;
+  const options = calendars
+    .map(
+      (calendar) =>
+        `- "${calendar.calendarName}": ${calendar.description || "sin descripcion"}`,
+    )
+    .join("\n");
+  const calendarProperty = multiple
+    ? {
+        calendario: {
+          description: `Cual agenda usar, segun lo que pida el cliente:\n${options}`,
+          enum: calendars.map((calendar) => calendar.calendarName),
           type: "string",
         },
+      }
+    : {};
+  const calendarRequired = multiple ? ["calendario"] : [];
+
+  return [
+    {
+      description:
+        "Consulta los horarios realmente disponibles. Usala SIEMPRE antes de proponer u ofrecer cualquier horario al cliente.",
+      name: "consultar_disponibilidad",
+      parameters: {
+        additionalProperties: false,
+        properties: {
+          ...calendarProperty,
+          dias: {
+            description:
+              "Cuantos dias hacia adelante buscar desde la fecha de inicio. Entre 1 y 14.",
+            type: "integer",
+          },
+          fecha_inicio: {
+            description:
+              "Fecha desde la que buscar, en formato YYYY-MM-DD. Usa la fecha de hoy si el cliente no indica otra.",
+            type: "string",
+          },
+        },
+        required: [...calendarRequired, "fecha_inicio", "dias"],
+        type: "object",
       },
-      required: ["fecha_inicio", "dias"],
-      type: "object",
+      strict: true,
+      type: "function",
     },
-    strict: true,
-    type: "function",
-  },
-  {
-    description:
-      "Crea la cita en el calendario del negocio. Usala solo despues de consultar disponibilidad y de que el cliente haya elegido un horario concreto de los ofrecidos.",
-    name: "agendar_cita",
-    parameters: {
-      additionalProperties: false,
-      properties: {
-        horario_iso: {
-          description:
-            "El horario exacto elegido, copiado tal cual del campo 'inicio' que devolvio consultar_disponibilidad.",
-          type: "string",
+    {
+      description:
+        "Crea la cita. Usala solo despues de consultar disponibilidad y de que el cliente haya elegido un horario concreto de los ofrecidos.",
+      name: "agendar_cita",
+      parameters: {
+        additionalProperties: false,
+        properties: {
+          ...calendarProperty,
+          horario_iso: {
+            description:
+              "El horario exacto elegido, copiado tal cual del campo 'inicio' que devolvio consultar_disponibilidad.",
+            type: "string",
+          },
+          motivo: {
+            description: "Motivo o servicio de la cita, en pocas palabras.",
+            type: "string",
+          },
+          nombre: {
+            description: "Nombre completo del cliente.",
+            type: "string",
+          },
         },
-        motivo: {
-          description: "Motivo o servicio de la cita, en pocas palabras.",
-          type: "string",
-        },
-        nombre: {
-          description: "Nombre completo del cliente.",
-          type: "string",
-        },
+        required: [...calendarRequired, "horario_iso", "nombre", "motivo"],
+        type: "object",
       },
-      required: ["horario_iso", "nombre", "motivo"],
-      type: "object",
+      strict: true,
+      type: "function",
     },
-    strict: true,
-    type: "function",
-  },
-] as const;
+  ];
+}
+
+function getEnabledToolIds(config: Json) {
+  const record = getConfigRecord(config);
+  return Array.isArray(record.enabled_tools)
+    ? record.enabled_tools.filter((item): item is string => typeof item === "string")
+    : [];
+}
 
 function getKnowledgeAssetIds(config: Json) {
   if (!config || typeof config !== "object" || Array.isArray(config)) {
@@ -390,9 +429,23 @@ function buildCalendarContext(calendarRuntime: CalendarRuntime | null) {
     timeZone: calendarRuntime.timezone,
   }).format(new Date());
 
+  const calendarList =
+    calendarRuntime.calendars.length > 1
+      ? `\n- Tienes varias agendas. Elige la que corresponda a lo que pida el cliente:\n${calendarRuntime.calendars
+          .map(
+            (calendar) =>
+              `  - "${calendar.calendarName}": ${
+                calendar.description || "sin descripcion"
+              }`,
+          )
+          .join(
+            "\n",
+          )}\n- Si no queda claro cual corresponde, preguntale al cliente antes de consultar horarios.`
+      : "";
+
   return `Agenda conectada:
 - Hoy es ${today} (formato YYYY-MM-DD) en la zona horaria ${calendarRuntime.timezone}.
-- Tienes acceso real al calendario mediante tools. Los horarios que devuelven son reales.
+- Tienes acceso real al calendario mediante tools. Los horarios que devuelven son reales.${calendarList}
 - Antes de mencionar cualquier horario, llama a consultar_disponibilidad. Nunca inventes huecos.
 - Ofrece como maximo 3 opciones por mensaje, en lenguaje natural, sin mostrar fechas ISO ni IDs.
 - Solo llama a agendar_cita cuando el cliente haya elegido explicitamente uno de los horarios que le ofreciste, y ya tengas su nombre.
@@ -451,7 +504,7 @@ ${calendarContext}`;
 
 type CalendarRuntime = {
   apiKey: string;
-  calendarId: string;
+  calendars: CalendarTool[];
   contact: {
     email: string | null;
     fullName: string | null;
@@ -483,24 +536,7 @@ async function buildCalendarRuntime({
 
   const context = await getWorkspaceCalendarContext(workspaceId);
 
-  if (!context?.calendarId) {
-    return null;
-  }
-
-  // Cada empresa tiene su propia zona horaria. Se toma la del perfil de negocio
-  // y, si no esta configurada, la que tenga el calendario en GHL. Nunca se
-  // adivina una por defecto: una zona equivocada agenda a la hora equivocada.
-  const profileTimezone = getBusinessVariables(businessProfile).timezone;
-  const timezone =
-    profileTimezone && isValidTimeZone(profileTimezone)
-      ? profileTimezone
-      : await getCalendarTimezone({
-          apiKey: context.apiKey,
-          calendarId: context.calendarId,
-          locationId: context.locationId,
-        });
-
-  if (!timezone) {
+  if (!context) {
     return null;
   }
 
@@ -516,6 +552,58 @@ async function buildCalendarRuntime({
     return null;
   }
 
+  // El agente elige entre los calendarios que tenga asignados, salvo que un
+  // flujo le haya fijado uno a este contacto.
+  const { data: toolAssets } = await admin
+    .from("workspace_assets")
+    .select("id, title, content, metadata")
+    .eq("workspace_id", workspaceId)
+    .eq("kind", "tool")
+    .neq("status", "archived");
+  const calendars = resolveCalendarsForAgent({
+    contactMetadata: contact.metadata,
+    enabledToolIds: getEnabledToolIds(agent.config),
+    tools: parseCalendarTools(toolAssets ?? []),
+  });
+  // Compatibilidad: si aun no se crearon tools de calendario, se usa el que
+  // quedo configurado en la tarjeta de Integraciones.
+  const fallbackCalendars: CalendarTool[] =
+    calendars.length > 0
+      ? calendars
+      : context.calendarId
+        ? [
+            {
+              calendarId: context.calendarId,
+              calendarName: "Agenda del negocio",
+              description: "Calendario configurado en Integraciones.",
+              id: "",
+              isDefault: true,
+              title: "Agenda del negocio",
+            },
+          ]
+        : [];
+
+  if (fallbackCalendars.length === 0) {
+    return null;
+  }
+
+  // Cada empresa tiene su propia zona horaria. Se toma la del perfil de negocio
+  // y, si no esta configurada, la que tenga el calendario en GHL. Nunca se
+  // adivina una por defecto: una zona equivocada agenda a la hora equivocada.
+  const profileTimezone = getBusinessVariables(businessProfile).timezone;
+  const timezone =
+    profileTimezone && isValidTimeZone(profileTimezone)
+      ? profileTimezone
+      : await getCalendarTimezone({
+          apiKey: context.apiKey,
+          calendarId: fallbackCalendars[0].calendarId,
+          locationId: context.locationId,
+        });
+
+  if (!timezone) {
+    return null;
+  }
+
   const metadata =
     contact.metadata && typeof contact.metadata === "object" && !Array.isArray(contact.metadata)
       ? (contact.metadata as Record<string, unknown>)
@@ -523,7 +611,7 @@ async function buildCalendarRuntime({
 
   return {
     apiKey: context.apiKey,
-    calendarId: context.calendarId,
+    calendars: fallbackCalendars,
     contact: {
       email: contact.email,
       fullName: contact.full_name,
@@ -550,6 +638,22 @@ async function runCalendarTool(
     return { error: "No se pudieron leer los argumentos de la tool." };
   }
 
+  // Con un solo calendario el modelo no manda el parametro; con varios elige
+  // por nombre. Si manda uno que no existe, se corta: agendar en el calendario
+  // equivocado es peor que pedirle que lo reintente.
+  const requested = typeof args.calendario === "string" ? args.calendario.trim() : "";
+  const calendar = requested
+    ? runtime.calendars.find((item) => item.calendarName === requested)
+    : runtime.calendars[0];
+
+  if (!calendar) {
+    return {
+      error: `No existe la agenda "${requested}". Opciones validas: ${runtime.calendars
+        .map((item) => item.calendarName)
+        .join(", ")}.`,
+    };
+  }
+
   try {
     if (call.name === "consultar_disponibilidad") {
       // La medianoche se resuelve en la zona horaria de esta empresa, no en la
@@ -564,7 +668,7 @@ async function runCalendarTool(
       const endDate = new Date(startDate.getTime() + days * 24 * 60 * 60 * 1000);
       const slots = await getFreeSlots({
         apiKey: runtime.apiKey,
-        calendarId: runtime.calendarId,
+        calendarId: calendar.calendarId,
         endDate,
         startDate,
         timezone: runtime.timezone,
@@ -613,7 +717,7 @@ async function runCalendarTool(
 
       const appointmentId = await createAppointment({
         apiKey: runtime.apiKey,
-        calendarId: runtime.calendarId,
+        calendarId: calendar.calendarId,
         contactId: ghlContactId,
         locationId: runtime.locationId,
         startTime,
@@ -719,7 +823,9 @@ async function generateReply(
     calendarRuntime,
   );
   const transcript = buildTranscript(messages);
-  const tools = calendarRuntime ? [...calendarToolDefinitions] : undefined;
+  const tools = calendarRuntime
+    ? buildCalendarToolDefinitions(calendarRuntime.calendars)
+    : undefined;
   const input: unknown[] = [
     {
       content: `Conversacion reciente:\n${transcript}\n\nResponde el ultimo mensaje del cliente.`,

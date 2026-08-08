@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bot,
   Check,
@@ -79,6 +79,7 @@ const ghlActionTypes: Array<{ label: string; value: FlowGhlAction["type"] }> = [
   { label: "Actualizar campo", value: "update_contact_field" },
   { label: "Mover oportunidad", value: "upsert_opportunity" },
   { label: "Crear tarea", value: "create_task" },
+  { label: "Cambiar calendario de citas", value: "set_booking_calendar" },
 ];
 
 function asConfigRecord(value: Json): Record<string, string> {
@@ -307,9 +308,11 @@ function TriggerConfigEditor({
 
 function GhlActionsEditor({
   actions,
+  calendars,
   onChange,
 }: {
   actions: FlowGhlAction[];
+  calendars: Array<{ id: string; name: string }>;
   onChange: (actions: FlowGhlAction[]) => void;
 }) {
   function patchAction(index: number, patch: Partial<FlowGhlAction>) {
@@ -429,6 +432,33 @@ function GhlActionsEditor({
                 value={"taskTitle" in action ? action.taskTitle ?? "" : ""}
               />
             ) : null}
+            {action.type === "set_booking_calendar" ? (
+              <div className="grid gap-2">
+                <select
+                  className="h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none disabled:bg-[#f2f4f0] disabled:text-[#9aa59e]"
+                  disabled={calendars.length === 0}
+                  onChange={(event) =>
+                    patchAction(index, { calendarId: event.target.value })
+                  }
+                  value={"calendarId" in action ? action.calendarId ?? "" : ""}
+                >
+                  <option value="">
+                    {calendars.length === 0
+                      ? "Conecta GoHighLevel para ver calendarios"
+                      : "Elige un calendario"}
+                  </option>
+                  {calendars.map((calendar) => (
+                    <option key={calendar.id} value={calendar.id}>
+                      {calendar.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-[#647067]">
+                  A partir de aqui, el agente de citas agenda a este contacto en
+                  este calendario en vez del de por defecto de Tools.
+                </p>
+              </div>
+            ) : null}
           </div>
         ))}
         {actions.length === 0 ? (
@@ -443,6 +473,7 @@ function GhlActionsEditor({
 
 function StepEditor({
   agents,
+  calendars,
   flowStages,
   onChange,
   onDelete,
@@ -454,6 +485,7 @@ function StepEditor({
   canMoveUp,
 }: {
   agents: AgentItem[];
+  calendars: Array<{ id: string; name: string }>;
   flowStages: FlowStage[];
   onChange: (step: FlowStep) => void;
   onDelete: () => void;
@@ -859,6 +891,7 @@ function StepEditor({
       <div className="mt-3">
         <GhlActionsEditor
           actions={step.actions ?? []}
+          calendars={calendars}
           onChange={(actions) => onChange({ ...step, actions })}
         />
       </div>
@@ -886,7 +919,46 @@ export function FlowBuilder({
   const ghlConfig = asConfigRecord(
     integrations.find((integration) => integration.provider === "gohighlevel")?.config ?? {},
   );
+  const [calendars, setCalendars] = useState<Array<{ id: string; name: string }>>([]);
   const activeFlows = localFlows.filter((flow) => flow.status === "active").length;
+  const ghlActive = integrations.some(
+    (integration) =>
+      integration.provider === "gohighlevel" && integration.status === "active",
+  );
+
+  useEffect(() => {
+    if (!workspaceId || !ghlActive) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadCalendars() {
+      const response = await fetch(
+        `/api/integrations/gohighlevel/calendars?workspaceId=${encodeURIComponent(
+          workspaceId!,
+        )}`,
+      );
+
+      if (!response.ok || cancelled) {
+        return;
+      }
+
+      const payload = (await response.json()) as {
+        calendars?: Array<{ id: string; name: string }>;
+      };
+
+      if (!cancelled) {
+        setCalendars(payload.calendars ?? []);
+      }
+    }
+
+    void loadCalendars();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ghlActive, workspaceId]);
 
   function updateDraft(patch: Partial<FlowRecord>) {
     setDraft((current) => (current ? { ...current, ...patch } : current));
@@ -1420,6 +1492,7 @@ export function FlowBuilder({
               {selectedStep && selectedStepIndex >= 0 ? (
                 <StepEditor
                   agents={agents.filter((agent) => agent.is_active)}
+                  calendars={calendars}
                   canMoveDown={selectedStepIndex < draft.steps.length - 1}
                   canMoveUp={selectedStepIndex > 0}
                   flowStages={flowStages}

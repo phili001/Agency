@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getIntegrationSecret } from "./secrets";
+import { CONTACT_CALENDAR_KEY } from "@/lib/calendar-tools";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { FlowGhlAction } from "@/lib/flow-definitions";
 import type { Json } from "@/lib/supabase/database.types";
@@ -142,6 +143,7 @@ export async function runGoHighLevelFlowActions({
   }
 
   const results: Array<Record<string, unknown>> = [];
+  let bookingCalendarId: string | null = null;
   let opportunityId =
     typeof currentMetadata.ghl_opportunity_id === "string"
       ? currentMetadata.ghl_opportunity_id
@@ -239,6 +241,17 @@ export async function runGoHighLevelFlowActions({
       });
       results.push({ action: action.type, title: action.taskTitle });
     }
+
+    if (action.type === "set_booking_calendar") {
+      // No llama a GHL: solo deja anotado que calendario debe usar el agente de
+      // citas para este contacto. Se persiste junto al resto del metadata abajo.
+      if (action.calendarId?.trim()) {
+        bookingCalendarId = action.calendarId.trim();
+        results.push({ action: action.type, calendarId: bookingCalendarId });
+      } else {
+        results.push({ action: action.type, error: "Falta calendarId." });
+      }
+    }
   }
 
   await admin
@@ -249,6 +262,9 @@ export async function runGoHighLevelFlowActions({
         ghl_contact_id: ghlContactId,
         ghl_flow_synced_at: new Date().toISOString(),
         ...(opportunityId ? { ghl_opportunity_id: opportunityId } : {}),
+        ...(bookingCalendarId
+          ? { [CONTACT_CALENDAR_KEY]: bookingCalendarId }
+          : {}),
       },
     })
     .eq("id", contact.id)
