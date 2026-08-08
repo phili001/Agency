@@ -1544,11 +1544,14 @@ export function WorkspaceSettings({
                       </label>
                     );
                   })}
-                  {provider.provider === "gohighlevel" && connected ? (
+                  {provider.provider === "gohighlevel" ? (
+                    // Siempre visible: si solo apareciera al conectar, el paso
+                    // del calendario seria invisible justo cuando se configura.
                     <label className="grid gap-1.5 text-sm font-medium">
                       Calendario para citas
                       <select
-                        className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                        className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50 disabled:bg-[#f2f4f0] disabled:text-[#9aa59e]"
+                        disabled={!connected || ghlCalendars.length === 0}
                         onChange={(event) =>
                           setIntegrationDrafts((current) => ({
                             ...current,
@@ -1563,16 +1566,26 @@ export function WorkspaceSettings({
                         }
                         value={draft.config.calendar_id ?? ""}
                       >
-                        <option value="">Sin calendario</option>
+                        <option value="">
+                          {connected ? "Sin calendario" : "Guarda primero las credenciales"}
+                        </option>
                         {ghlCalendars.map((calendar) => (
                           <option key={calendar.id} value={calendar.id}>
                             {calendar.name}
                           </option>
                         ))}
                       </select>
-                      <span className="text-xs font-normal text-[#647067]">
+                      <span
+                        className={`text-xs font-normal ${
+                          ghlCalendarsError ? "text-[#a8442c]" : "text-[#647067]"
+                        }`}
+                      >
                         {ghlCalendarsError ||
-                          "El agente de citas consultara y reservara aqui. Sin calendario no puede agendar."}
+                          (!connected
+                            ? "Paso 2: pega el Location ID y el token, dale Guardar y aqui apareceran tus calendarios de GHL."
+                            : ghlCalendars.length === 0
+                              ? "No se encontraron calendarios en esta subcuenta de GHL. Crea uno en GHL y recarga esta pagina."
+                              : "El agente de citas consultara y reservara aqui. Sin calendario no puede agendar.")}
                       </span>
                     </label>
                   ) : null}
