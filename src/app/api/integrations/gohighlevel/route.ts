@@ -17,9 +17,10 @@ function webhookUrl() {
 
 export async function POST(request: Request) {
   try {
-    const { apiKey, locationId, regenerateWebhookSecret, workspaceId } =
+    const { apiKey, calendarId, locationId, regenerateWebhookSecret, workspaceId } =
       (await request.json()) as {
         apiKey?: string;
+        calendarId?: string;
         locationId?: string;
         regenerateWebhookSecret?: boolean;
         workspaceId?: string;
@@ -89,6 +90,7 @@ export async function POST(request: Request) {
             api_key_mask: cleanKey
               ? maskSecret(cleanKey)
               : (existingConfig.api_key_mask ?? maskSecret(storedKey)),
+            calendar_id: calendarId?.trim() ?? existingConfig.calendar_id ?? "",
             default_pipeline_id: existingConfig.default_pipeline_id ?? "",
             default_stage_id: existingConfig.default_stage_id ?? "",
             ghl_webhook_secret_hash: generatedSecret

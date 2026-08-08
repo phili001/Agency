@@ -201,6 +201,19 @@ function stableDate(value: string) {
   )}-${String(date.getUTCDate()).padStart(2, "0")}`;
 }
 
+/**
+ * Zonas horarias IANA reales del navegador. La zona del negocio decide a que
+ * hora se agenda, asi que no puede ser texto libre: "Colombia" o "GMT-5" no son
+ * zonas validas y se descartarian en silencio al consultar el calendario.
+ */
+function getTimeZoneOptions() {
+  try {
+    return Intl.supportedValuesOf("timeZone");
+  } catch {
+    return [];
+  }
+}
+
 const statusLabels: Record<IntegrationItem["status"], string> = {
   active: "Conectado",
   disabled: "Desactivado",
@@ -245,8 +258,10 @@ function fieldHelp(provider: string, key: string) {
 
   if (provider === "gohighlevel" && key === "api_key") {
     return {
-      help: "En GoHighLevel: Settings > API Keys > Create new key. Se cifra en el backend y solo se usa para esta empresa.",
-      placeholder: "GHL API key",
+      // Debe ser Private Integration Token (API v2). La "API Key" de Settings >
+      // API Keys es la v1, descontinuada, y no sirve para calendarios ni citas.
+      help: "En GoHighLevel: Settings > Private Integrations > Create new Integration. NO uses la API Key vieja. Marca los permisos de contacts y calendars.",
+      placeholder: "Private Integration Token",
     };
   }
 
@@ -332,6 +347,11 @@ export function WorkspaceSettings({
     localIntegrations.find((integration) => integration.provider === "gohighlevel")
       ?.config ?? {},
   ).ghl_webhook_secret_mask;
+  const [ghlCalendars, setGhlCalendars] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [ghlCalendarsError, setGhlCalendarsError] = useState("");
+  const timeZoneOptions = useMemo(() => getTimeZoneOptions(), []);
   const assetsByKind = useMemo(
     () =>
       localAssets.reduce<Record<string, WorkspaceAsset[]>>((grouped, asset) => {
@@ -407,6 +427,49 @@ export function WorkspaceSettings({
     };
   }, [localIntegrations, workspaceId, ycloudSecretValue]);
 
+  useEffect(() => {
+    const ghlActive = localIntegrations.some(
+      (integration) =>
+        integration.provider === "gohighlevel" && integration.status === "active",
+    );
+
+    if (!workspaceId || !ghlActive) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadCalendars() {
+      const response = await fetch(
+        `/api/integrations/gohighlevel/calendars?workspaceId=${encodeURIComponent(
+          workspaceId!,
+        )}`,
+      );
+      const payload = (await response.json()) as {
+        calendars?: Array<{ id: string; name: string }>;
+        error?: string;
+      };
+
+      if (cancelled) {
+        return;
+      }
+
+      if (!response.ok) {
+        setGhlCalendarsError(payload.error ?? "No se pudieron cargar los calendarios.");
+        return;
+      }
+
+      setGhlCalendarsError("");
+      setGhlCalendars(payload.calendars ?? []);
+    }
+
+    void loadCalendars();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [localIntegrations, workspaceId]);
+
   async function saveIntegration(
     provider: IntegrationItem["provider"],
     { regenerateWebhookSecret = false } = {},
@@ -446,6 +509,7 @@ export function WorkspaceSettings({
               }
             : {
                 apiKey: draft.config.api_key,
+                calendarId: draft.config.calendar_id,
                 locationId: draft.config.location_id,
                 regenerateWebhookSecret,
                 workspaceId,
@@ -1055,25 +1119,60 @@ export function WorkspaceSettings({
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
-          {businessProfileFields.map((field) => (
-            <label className="grid gap-1.5 text-sm font-medium" key={field.key}>
-              <span className="flex items-center justify-between gap-2">
-                {field.label}
-                <code className="rounded-md bg-[#eef2eb] px-1.5 py-0.5 text-[11px] font-normal text-[#4d5a51]">
-                  {field.variable}
-                </code>
-              </span>
-              <input
-                className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
-                onChange={(event) => updateBusinessField(field.key, event.target.value)}
-                placeholder={field.placeholder}
-                value={metadata.fields?.[field.key] ?? ""}
-              />
-              <span className="text-xs font-normal text-[#647067]">
-                {field.help}
-              </span>
-            </label>
-          ))}
+          {businessProfileFields.map((field) => {
+            const fieldValue = metadata.fields?.[field.key] ?? "";
+            const isTimeZone = field.key === "timezone" && timeZoneOptions.length > 0;
+            const unknownTimeZone =
+              isTimeZone && fieldValue && !timeZoneOptions.includes(fieldValue);
+
+            return (
+              <label className="grid gap-1.5 text-sm font-medium" key={field.key}>
+                <span className="flex items-center justify-between gap-2">
+                  {field.label}
+                  <code className="rounded-md bg-[#eef2eb] px-1.5 py-0.5 text-[11px] font-normal text-[#4d5a51]">
+                    {field.variable}
+                  </code>
+                </span>
+                {isTimeZone ? (
+                  <select
+                    className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                    onChange={(event) =>
+                      updateBusinessField(field.key, event.target.value)
+                    }
+                    value={fieldValue}
+                  >
+                    <option value="">Sin zona horaria</option>
+                    {unknownTimeZone ? (
+                      <option value={fieldValue}>{fieldValue} (no reconocida)</option>
+                    ) : null}
+                    {timeZoneOptions.map((zone) => (
+                      <option key={zone} value={zone}>
+                        {zone}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                    onChange={(event) =>
+                      updateBusinessField(field.key, event.target.value)
+                    }
+                    placeholder={field.placeholder}
+                    value={fieldValue}
+                  />
+                )}
+                <span
+                  className={`text-xs font-normal ${
+                    unknownTimeZone ? "text-[#a8442c]" : "text-[#647067]"
+                  }`}
+                >
+                  {unknownTimeZone
+                    ? `"${fieldValue}" no es una zona horaria valida y se ignora al agendar. Elige una de la lista.`
+                    : field.help}
+                </span>
+              </label>
+            );
+          })}
         </div>
 
         <div className="grid gap-3 rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3">
@@ -1445,6 +1544,38 @@ export function WorkspaceSettings({
                       </label>
                     );
                   })}
+                  {provider.provider === "gohighlevel" && connected ? (
+                    <label className="grid gap-1.5 text-sm font-medium">
+                      Calendario para citas
+                      <select
+                        className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                        onChange={(event) =>
+                          setIntegrationDrafts((current) => ({
+                            ...current,
+                            gohighlevel: {
+                              ...current.gohighlevel,
+                              config: {
+                                ...current.gohighlevel.config,
+                                calendar_id: event.target.value,
+                              },
+                            },
+                          }))
+                        }
+                        value={draft.config.calendar_id ?? ""}
+                      >
+                        <option value="">Sin calendario</option>
+                        {ghlCalendars.map((calendar) => (
+                          <option key={calendar.id} value={calendar.id}>
+                            {calendar.name}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-xs font-normal text-[#647067]">
+                        {ghlCalendarsError ||
+                          "El agente de citas consultara y reservara aqui. Sin calendario no puede agendar."}
+                      </span>
+                    </label>
+                  ) : null}
                   {provider.provider === "gohighlevel" && connected ? (
                     <div className="rounded-lg border border-dashed border-[#cbd2c6] bg-[#fafbf8] p-2 text-xs text-[#4d5a51]">
                       <p className="font-semibold">Webhook para pegar en GoHighLevel</p>

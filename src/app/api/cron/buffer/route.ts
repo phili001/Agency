@@ -8,6 +8,15 @@ import {
   getBusinessVariables,
 } from "@/lib/business-profile";
 import { getWorkspaceOpenAIKey } from "@/lib/integrations/openai";
+import {
+  createAppointment,
+  ensureGhlContact,
+  getCalendarTimezone,
+  getFreeSlots,
+  getWorkspaceCalendarContext,
+  isValidTimeZone,
+  zonedStartOfDay,
+} from "@/lib/integrations/ghl-calendar";
 
 type AgentRow = {
   config: Json;
@@ -45,17 +54,23 @@ type ContactMetadata = {
   [key: string]: unknown;
 };
 
+type OpenAIOutputItem = {
+  arguments?: string;
+  call_id?: string;
+  content?: Array<{
+    text?: string;
+  }>;
+  name?: string;
+  type?: string;
+};
+
 type OpenAIResponsePayload = {
   error?: {
     message?: string;
   };
   id?: string;
   model?: string;
-  output?: Array<{
-    content?: Array<{
-      text?: string;
-    }>;
-  }>;
+  output?: OpenAIOutputItem[];
   output_text?: string;
   usage?: {
     input_tokens?: number;
@@ -136,6 +151,60 @@ function buildTranscript(messages: MessageRow[]) {
     })
     .join("\n");
 }
+
+const calendarToolDefinitions = [
+  {
+    description:
+      "Consulta los horarios realmente disponibles en el calendario del negocio. Usala SIEMPRE antes de proponer u ofrecer cualquier horario al cliente.",
+    name: "consultar_disponibilidad",
+    parameters: {
+      additionalProperties: false,
+      properties: {
+        dias: {
+          description:
+            "Cuantos dias hacia adelante buscar desde la fecha de inicio. Entre 1 y 14.",
+          type: "integer",
+        },
+        fecha_inicio: {
+          description:
+            "Fecha desde la que buscar, en formato YYYY-MM-DD. Usa la fecha de hoy si el cliente no indica otra.",
+          type: "string",
+        },
+      },
+      required: ["fecha_inicio", "dias"],
+      type: "object",
+    },
+    strict: true,
+    type: "function",
+  },
+  {
+    description:
+      "Crea la cita en el calendario del negocio. Usala solo despues de consultar disponibilidad y de que el cliente haya elegido un horario concreto de los ofrecidos.",
+    name: "agendar_cita",
+    parameters: {
+      additionalProperties: false,
+      properties: {
+        horario_iso: {
+          description:
+            "El horario exacto elegido, copiado tal cual del campo 'inicio' que devolvio consultar_disponibilidad.",
+          type: "string",
+        },
+        motivo: {
+          description: "Motivo o servicio de la cita, en pocas palabras.",
+          type: "string",
+        },
+        nombre: {
+          description: "Nombre completo del cliente.",
+          type: "string",
+        },
+      },
+      required: ["horario_iso", "nombre", "motivo"],
+      type: "object",
+    },
+    strict: true,
+    type: "function",
+  },
+] as const;
 
 function getKnowledgeAssetIds(config: Json) {
   if (!config || typeof config !== "object" || Array.isArray(config)) {
@@ -311,10 +380,30 @@ function routeAgent(agents: AgentRow[], messages: MessageRow[]) {
   };
 }
 
+function buildCalendarContext(calendarRuntime: CalendarRuntime | null) {
+  if (!calendarRuntime) {
+    return "";
+  }
+
+  // Sin la fecha de hoy el modelo no puede resolver "manana" ni "el jueves".
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: calendarRuntime.timezone,
+  }).format(new Date());
+
+  return `Agenda conectada:
+- Hoy es ${today} (formato YYYY-MM-DD) en la zona horaria ${calendarRuntime.timezone}.
+- Tienes acceso real al calendario mediante tools. Los horarios que devuelven son reales.
+- Antes de mencionar cualquier horario, llama a consultar_disponibilidad. Nunca inventes huecos.
+- Ofrece como maximo 3 opciones por mensaje, en lenguaje natural, sin mostrar fechas ISO ni IDs.
+- Solo llama a agendar_cita cuando el cliente haya elegido explicitamente uno de los horarios que le ofreciste, y ya tengas su nombre.
+- Si una tool devuelve un error, no lo repitas literal: explica el problema en palabras simples y ofrece otra opcion.`;
+}
+
 function buildInstructions(
   agent: AgentRow,
   assets: KnowledgeAsset[],
-  businessProfile?: BusinessProfileAsset | null,
+  businessProfile: BusinessProfileAsset | null | undefined,
+  calendarRuntime: CalendarRuntime | null,
 ) {
   const basePrompt =
     agent.system_prompt ||
@@ -327,9 +416,12 @@ function buildInstructions(
   };
   const promptWithVariables = applyBusinessVariables(basePrompt, businessVariables);
   const businessContext = buildBusinessContext(businessProfile);
+  const calendarContext = buildCalendarContext(calendarRuntime);
 
   if (assets.length === 0) {
-    return [businessContext, promptWithVariables].filter(Boolean).join("\n\n");
+    return [businessContext, promptWithVariables, calendarContext]
+      .filter(Boolean)
+      .join("\n\n");
   }
 
   const ragContext = assets
@@ -352,31 +444,243 @@ Reglas obligatorias sobre la base de conocimiento:
 Prompt del agente:
 ${promptWithVariables}
 
-${businessContext}`;
+${businessContext}
+
+${calendarContext}`;
 }
 
-async function generateReply(
-  agent: AgentRow,
-  messages: MessageRow[],
-  knowledgeAssets: KnowledgeAsset[],
-  businessProfile?: BusinessProfileAsset | null,
-) {
-  const apiKey = await getWorkspaceOpenAIKey(agent.workspace_id);
+type CalendarRuntime = {
+  apiKey: string;
+  calendarId: string;
+  contact: {
+    email: string | null;
+    fullName: string | null;
+    ghlContactId: string | null;
+    id: string;
+    phone: string;
+  };
+  locationId: string;
+  timezone: string;
+  workspaceId: string;
+};
 
-  if (!apiKey) {
-    throw new Error("OpenAI no esta conectado para este workspace.");
+async function buildCalendarRuntime({
+  agent,
+  businessProfile,
+  contactId,
+  workspaceId,
+}: {
+  agent: AgentRow;
+  businessProfile: BusinessProfileAsset | null;
+  contactId: string;
+  workspaceId: string;
+}): Promise<CalendarRuntime | null> {
+  // Solo el agente de citas agenda. El setter y el de soporte no deben tocar
+  // el calendario aunque el workspace lo tenga conectado.
+  if (agent.type !== "booking") {
+    return null;
   }
 
-  const model = normalizeModel(agent.model);
-  const instructions = buildInstructions(agent, knowledgeAssets, businessProfile);
-  const transcript = buildTranscript(messages);
+  const context = await getWorkspaceCalendarContext(workspaceId);
+
+  if (!context?.calendarId) {
+    return null;
+  }
+
+  // Cada empresa tiene su propia zona horaria. Se toma la del perfil de negocio
+  // y, si no esta configurada, la que tenga el calendario en GHL. Nunca se
+  // adivina una por defecto: una zona equivocada agenda a la hora equivocada.
+  const profileTimezone = getBusinessVariables(businessProfile).timezone;
+  const timezone =
+    profileTimezone && isValidTimeZone(profileTimezone)
+      ? profileTimezone
+      : await getCalendarTimezone({
+          apiKey: context.apiKey,
+          calendarId: context.calendarId,
+          locationId: context.locationId,
+        });
+
+  if (!timezone) {
+    return null;
+  }
+
+  const admin = createAdminClient();
+  const { data: contact } = await admin
+    .from("contacts")
+    .select("id, email, full_name, phone_e164, metadata")
+    .eq("id", contactId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+
+  if (!contact?.phone_e164) {
+    return null;
+  }
+
+  const metadata =
+    contact.metadata && typeof contact.metadata === "object" && !Array.isArray(contact.metadata)
+      ? (contact.metadata as Record<string, unknown>)
+      : {};
+
+  return {
+    apiKey: context.apiKey,
+    calendarId: context.calendarId,
+    contact: {
+      email: contact.email,
+      fullName: contact.full_name,
+      ghlContactId:
+        typeof metadata.ghl_contact_id === "string" ? metadata.ghl_contact_id : null,
+      id: contact.id,
+      phone: contact.phone_e164,
+    },
+    locationId: context.locationId,
+    timezone,
+    workspaceId,
+  };
+}
+
+async function runCalendarTool(
+  runtime: CalendarRuntime,
+  call: OpenAIOutputItem,
+): Promise<Record<string, unknown>> {
+  let args: Record<string, unknown> = {};
+
+  try {
+    args = JSON.parse(call.arguments ?? "{}") as Record<string, unknown>;
+  } catch {
+    return { error: "No se pudieron leer los argumentos de la tool." };
+  }
+
+  try {
+    if (call.name === "consultar_disponibilidad") {
+      // La medianoche se resuelve en la zona horaria de esta empresa, no en la
+      // del servidor: si no, el rango se corre y cada empresa recibe otro dia.
+      const startDate = zonedStartOfDay(String(args.fecha_inicio), runtime.timezone);
+
+      if (!startDate) {
+        return { error: "fecha_inicio invalida. Usa formato YYYY-MM-DD." };
+      }
+
+      const days = Math.min(Math.max(Number(args.dias) || 1, 1), 14);
+      const endDate = new Date(startDate.getTime() + days * 24 * 60 * 60 * 1000);
+      const slots = await getFreeSlots({
+        apiKey: runtime.apiKey,
+        calendarId: runtime.calendarId,
+        endDate,
+        startDate,
+        timezone: runtime.timezone,
+      });
+
+      if (slots.length === 0) {
+        return {
+          horarios: [],
+          mensaje:
+            "No hay horarios libres en ese rango. Ofrece buscar en fechas posteriores.",
+        };
+      }
+
+      return {
+        horarios: slots.slice(0, 12).map((slot) => ({
+          cuando: slot.label,
+          inicio: slot.iso,
+        })),
+        zona_horaria: runtime.timezone,
+      };
+    }
+
+    if (call.name === "agendar_cita") {
+      const startTime = String(args.horario_iso ?? "");
+
+      if (Number.isNaN(new Date(startTime).getTime())) {
+        return {
+          error:
+            "horario_iso invalido. Copia exactamente el campo 'inicio' de consultar_disponibilidad.",
+        };
+      }
+
+      const ghlContactId =
+        runtime.contact.ghlContactId ??
+        (await ensureGhlContact({
+          apiKey: runtime.apiKey,
+          email: runtime.contact.email,
+          fullName: String(args.nombre ?? "") || runtime.contact.fullName,
+          locationId: runtime.locationId,
+          phone: runtime.contact.phone,
+        }));
+
+      if (!ghlContactId) {
+        return { error: "No se pudo crear el contacto en GoHighLevel." };
+      }
+
+      const appointmentId = await createAppointment({
+        apiKey: runtime.apiKey,
+        calendarId: runtime.calendarId,
+        contactId: ghlContactId,
+        locationId: runtime.locationId,
+        startTime,
+        title: `${String(args.motivo ?? "Cita")} - ${String(args.nombre ?? "")}`.trim(),
+      });
+
+      const admin = createAdminClient();
+      const { data: contactRow } = await admin
+        .from("contacts")
+        .select("metadata")
+        .eq("id", runtime.contact.id)
+        .eq("workspace_id", runtime.workspaceId)
+        .maybeSingle();
+      const currentMetadata =
+        contactRow?.metadata &&
+        typeof contactRow.metadata === "object" &&
+        !Array.isArray(contactRow.metadata)
+          ? (contactRow.metadata as Record<string, unknown>)
+          : {};
+
+      await admin
+        .from("contacts")
+        .update({
+          metadata: {
+            ...currentMetadata,
+            ghl_appointment_id: appointmentId,
+            ghl_appointment_start: startTime,
+            ghl_contact_id: ghlContactId,
+          },
+        })
+        .eq("id", runtime.contact.id)
+        .eq("workspace_id", runtime.workspaceId);
+
+      return { cita_id: appointmentId, confirmada: true, inicio: startTime };
+    }
+
+    return { error: `Tool desconocida: ${call.name}` };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Error al llamar GoHighLevel.",
+    };
+  }
+}
+
+async function callResponsesApi({
+  apiKey,
+  input,
+  instructions,
+  model,
+  temperature,
+  tools,
+}: {
+  apiKey: string;
+  input: unknown;
+  instructions: string;
+  model: string;
+  temperature: number;
+  tools?: unknown[];
+}) {
   const response = await fetch("https://api.openai.com/v1/responses", {
     body: JSON.stringify({
-      input: `Conversacion reciente:\n${transcript}\n\nResponde el ultimo mensaje del cliente.`,
+      input,
       instructions,
-      max_output_tokens: 450,
+      max_output_tokens: 900,
       model,
-      temperature: Number(agent.temperature ?? 0.4),
+      temperature,
+      ...(tools?.length ? { tools } : {}),
     }),
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -390,11 +694,96 @@ async function generateReply(
     throw new Error(payload.error?.message ?? "OpenAI rechazo el buffer.");
   }
 
+  return payload;
+}
+
+async function generateReply(
+  agent: AgentRow,
+  messages: MessageRow[],
+  knowledgeAssets: KnowledgeAsset[],
+  businessProfile: BusinessProfileAsset | null | undefined,
+  calendarRuntime: CalendarRuntime | null,
+) {
+  const apiKey = await getWorkspaceOpenAIKey(agent.workspace_id);
+
+  if (!apiKey) {
+    throw new Error("OpenAI no esta conectado para este workspace.");
+  }
+
+  const model = normalizeModel(agent.model);
+  const temperature = Number(agent.temperature ?? 0.4);
+  const instructions = buildInstructions(
+    agent,
+    knowledgeAssets,
+    businessProfile,
+    calendarRuntime,
+  );
+  const transcript = buildTranscript(messages);
+  const tools = calendarRuntime ? [...calendarToolDefinitions] : undefined;
+  const input: unknown[] = [
+    {
+      content: `Conversacion reciente:\n${transcript}\n\nResponde el ultimo mensaje del cliente.`,
+      role: "user",
+    },
+  ];
+  const toolCalls: Array<Record<string, unknown>> = [];
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let payload = await callResponsesApi({
+    apiKey,
+    input,
+    instructions,
+    model,
+    temperature,
+    tools,
+  });
+
+  inputTokens += Number(payload.usage?.input_tokens ?? 0);
+  outputTokens += Number(payload.usage?.output_tokens ?? 0);
+
+  // El modelo puede encadenar consultar_disponibilidad -> agendar_cita, asi que
+  // se itera hasta que deje de pedir tools. El tope evita un bucle infinito.
+  for (let round = 0; round < 4; round += 1) {
+    const functionCalls = (payload.output ?? []).filter(
+      (item) => item.type === "function_call" && item.call_id && item.name,
+    );
+
+    if (!calendarRuntime || functionCalls.length === 0) {
+      break;
+    }
+
+    for (const item of payload.output ?? []) {
+      input.push(item);
+    }
+
+    for (const call of functionCalls) {
+      const result = await runCalendarTool(calendarRuntime, call);
+      toolCalls.push({ name: call.name, result });
+      input.push({
+        call_id: call.call_id,
+        output: JSON.stringify(result),
+        type: "function_call_output",
+      });
+    }
+
+    payload = await callResponsesApi({
+      apiKey,
+      input,
+      instructions,
+      model,
+      temperature,
+      tools,
+    });
+    inputTokens += Number(payload.usage?.input_tokens ?? 0);
+    outputTokens += Number(payload.usage?.output_tokens ?? 0);
+  }
+
   return {
     answer: getResponseText(payload),
     model: payload.model ?? model,
     responseId: payload.id ?? null,
-    usage: payload.usage ?? {},
+    toolCalls,
+    usage: { input_tokens: inputTokens, output_tokens: outputTokens },
   };
 }
 
@@ -595,11 +984,18 @@ export async function POST(request: Request) {
         .order("updated_at", { ascending: false })
         .limit(1)
         .maybeSingle();
+      const calendarRuntime = await buildCalendarRuntime({
+        agent: typedAgent,
+        businessProfile: businessProfile as BusinessProfileAsset | null,
+        contactId: conversation.contact_id,
+        workspaceId: conversation.workspace_id,
+      });
       const reply = await generateReply(
         typedAgent,
         chronologicalMessages,
         (knowledgeAssets ?? []) as KnowledgeAsset[],
         businessProfile as BusinessProfileAsset | null,
+        calendarRuntime,
       );
       const insights = await generateContactInsights(
         typedAgent,
@@ -621,6 +1017,7 @@ export async function POST(request: Request) {
           input_tokens: Number(reply.usage.input_tokens ?? 0),
           message_type: "text",
           metadata: {
+            calendar_tool_calls: reply.toolCalls,
             delivery: "queued_only",
             kind: "buffer_ai_reply",
             openai_response_id: reply.responseId,
