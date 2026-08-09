@@ -6,6 +6,12 @@ import {
   resolveCalendarsForAgent,
   type CalendarTool,
 } from "@/lib/calendar-tools";
+import {
+  addDaysToDateKey,
+  resolveCalendarRequestContext,
+  slotMatchesRequestedTime,
+  type CalendarRequestContext,
+} from "@/lib/calendar-request";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   applyBusinessVariables,
@@ -415,6 +421,28 @@ function getAgentIntentBoost(agent: AgentRow, messageText: string) {
   );
 }
 
+function isContextualBookingFollowUp(messages: MessageRow[]) {
+  const latest = normalizeRoutingText(messages.at(-1)?.body ?? "").trim();
+  const previous = normalizeRoutingText(
+    messages
+      .slice(0, -1)
+      .slice(-4)
+      .map((message) => message.body ?? "")
+      .join(" "),
+  );
+  const shortTimeFollowUp =
+    latest.length <= 80 &&
+    (/(?:^|\b)(?:y\s+)?(?:a|para)\s+las?\s+\d{1,2}\b/.test(latest) ||
+      /\b\d{1,2}\s*(?:am|pm)\b/.test(latest) ||
+      /\b(?:otra hora|ese horario|y a que hora)\b/.test(latest));
+  const previousBookingContext =
+    /\b(?:cita|agenda|agendar|reservar|disponibilidad|horario|lunes|martes|miercoles|jueves|viernes|sabado|domingo)\b/.test(
+      previous,
+    );
+
+  return shortTimeFollowUp && previousBookingContext;
+}
+
 function routeAgent(
   agents: AgentRow[],
   messages: MessageRow[],
@@ -435,6 +463,7 @@ function routeAgent(
   // siempre y el setter se quedaba pegado aunque el cliente ya pidiera cita.
   const latestTokens = new Set(getRoutingTokens(latest));
   const normalizedLatest = normalizeRoutingText(latest);
+  const contextualBookingFollowUp = isContextualBookingFollowUp(messages);
   const ranked = agents
     .map((agent) => {
       const description = getRouterDescription(agent);
@@ -460,10 +489,12 @@ function routeAgent(
       // Sin esto, respuestas de puro dato ("Felipe, restaurante") devolvian la
       // conversacion al setter en mitad del agendamiento.
       const stickiness = currentAgentId && agent.id === currentAgentId ? 8 : 0;
+      const contextBoost =
+        contextualBookingFollowUp && isBookingAgent(agent) ? 24 : 0;
 
       return {
         agent,
-        score: overlap + keywordBoost + intentBoost + stickiness,
+        score: overlap + keywordBoost + intentBoost + stickiness + contextBoost,
       };
     })
     .sort((left, right) => right.score - left.score);
@@ -569,6 +600,9 @@ function buildCalendarContext(calendarRuntime: CalendarRuntime | null) {
 - Hoy es ${today} (formato YYYY-MM-DD) en la zona horaria ${calendarRuntime.timezone}.
 - Tienes acceso real al calendario mediante tools. Los horarios que devuelven son reales.${calendarList}
 - Antes de mencionar cualquier horario, llama a consultar_disponibilidad. Nunca inventes huecos.
+- En el resultado de consultar_disponibilidad, fecha_consultada y horario_solicitado_disponible son autoritativos.
+- Si horario_solicitado_disponible es true, confirma esa hora. Si es false, indica que no esta libre y ofrece solamente horarios devueltos para fecha_consultada.
+- No cambies a otro dia ni ofrezcas fechas distintas de fecha_consultada salvo que el cliente lo pida expresamente.
 - Ofrece como maximo 3 opciones por mensaje, en lenguaje natural, sin mostrar fechas ISO ni IDs.
 - Solo llama a agendar_cita cuando el cliente haya elegido explicitamente uno de los horarios que le ofreciste, y ya tengas su nombre.
 - SOLO puedes decir que la cita quedo agendada si agendar_cita respondio con
@@ -815,6 +849,7 @@ async function buildCalendarRuntime({
 async function runCalendarTool(
   runtime: CalendarRuntime,
   call: OpenAIOutputItem,
+  requestContext: CalendarRequestContext,
 ): Promise<Record<string, unknown>> {
   let args: Record<string, unknown> = {};
 
@@ -844,14 +879,21 @@ async function runCalendarTool(
     if (call.name === "consultar_disponibilidad") {
       // La medianoche se resuelve en la zona horaria de esta empresa, no en la
       // del servidor: si no, el rango se corre y cada empresa recibe otro dia.
-      const startDate = zonedStartOfDay(String(args.fecha_inicio), runtime.timezone);
+      // La fecha resuelta desde la conversacion manda sobre la que proponga el
+      // modelo. Asi "y a las 4?" conserva el viernes del turno anterior.
+      const dateKey = requestContext.dateKey ?? String(args.fecha_inicio);
+      const startDate = zonedStartOfDay(dateKey, runtime.timezone);
 
       if (!startDate) {
         return { error: "fecha_inicio invalida. Usa formato YYYY-MM-DD." };
       }
 
-      const days = Math.min(Math.max(Number(args.dias) || 1, 1), 14);
-      const endDate = new Date(startDate.getTime() + days * 24 * 60 * 60 * 1000);
+      const days = requestContext.dateKey
+        ? 1
+        : Math.min(Math.max(Number(args.dias) || 1, 1), 14);
+      const endDate =
+        zonedStartOfDay(addDaysToDateKey(dateKey, days), runtime.timezone) ??
+        new Date(startDate.getTime() + days * 24 * 60 * 60 * 1000);
       const { debug, slots } = await getFreeSlots({
         apiKey: runtime.apiKey,
         calendarId: calendar.calendarId,
@@ -859,23 +901,41 @@ async function runCalendarTool(
         startDate,
         timezone: runtime.timezone,
       });
+      const requestedSlots = requestContext.time
+        ? slots.filter((slot) =>
+            slotMatchesRequestedTime(slot.iso, runtime.timezone, requestContext.time!),
+          )
+        : [];
+      const formatSlot = (slot: (typeof slots)[number]) => ({
+        cuando: slot.label,
+        inicio: slot.iso,
+      });
 
       if (slots.length === 0) {
         return {
           // Las claves crudas quedan en el metadata del mensaje: si GHL empieza
           // a responder con otra forma, es lo unico que permite verlo.
           diagnostico: `GHL respondio sin huecos. Claves: ${debug.responseKeys.join(", ") || "(ninguna)"}. Calendario: ${calendar.calendarId}. Zona: ${runtime.timezone}.`,
+          fecha_consultada: dateKey,
+          hora_solicitada: requestContext.time?.label ?? null,
           horarios: [],
+          horario_solicitado: null,
+          horario_solicitado_disponible: requestContext.time ? false : null,
           mensaje:
-            "No hay horarios libres en ese rango. Ofrece buscar en fechas posteriores.",
+            "No hay horarios libres en la fecha consultada. Pregunta si desea buscar otro dia.",
         };
       }
 
       return {
-        horarios: slots.slice(0, 12).map((slot) => ({
-          cuando: slot.label,
-          inicio: slot.iso,
-        })),
+        fecha_consultada: dateKey,
+        hora_solicitada: requestContext.time?.label ?? null,
+        horarios: slots.slice(0, 12).map(formatSlot),
+        horario_solicitado: requestedSlots[0]
+          ? formatSlot(requestedSlots[0])
+          : null,
+        horario_solicitado_disponible: requestContext.time
+          ? requestedSlots.length > 0
+          : null,
         zona_horaria: runtime.timezone,
       };
     }
@@ -1041,6 +1101,9 @@ function textLooksLikeAvailabilityClaim(text: string) {
     /\b(tengo|tenemos|hay)\b.*\b(disponibilidad|disponible|libre|hueco|espacio)\b/,
     /\b(disponible|libre)\b.*\b(a las|para las|el lunes|el martes|el miercoles|el jueves|el viernes|el sabado|el domingo)\b/,
     /\b(puedo|podemos)\b.*\b(agendar|reservar|programar)\b.*\b(a las|para las)\b/,
+    /\b(?:he|hemos)?\s*(?:consultado|revisado|verificado)\b.*\b(?:disponibilidad|agenda|horarios?)\b/,
+    /\b(?:no hay|no tengo|no tenemos)\b.*\b(?:horarios?|disponibilidad|huecos?|espacios?)\b/,
+    /\b(?:tengo|tenemos|hay|te dejo|estas son)\b.*\b(?:opciones?|horarios?)\b/,
   ].some((pattern) => pattern.test(normalized));
 }
 
@@ -1061,7 +1124,18 @@ function hasConfirmedAppointment(toolCalls: Array<Record<string, unknown>>) {
 }
 
 function hasAvailabilityLookup(toolCalls: Array<Record<string, unknown>>) {
-  return toolCalls.some((call) => call.name === "consultar_disponibilidad");
+  return toolCalls.some((call) => {
+    const result =
+      call.result && typeof call.result === "object" && !Array.isArray(call.result)
+        ? (call.result as Record<string, unknown>)
+        : {};
+
+    return (
+      call.name === "consultar_disponibilidad" &&
+      !result.error &&
+      Array.isArray(result.horarios)
+    );
+  });
 }
 
 function sanitizeCalendarAnswer({
@@ -1100,9 +1174,9 @@ function sanitizeCalendarAnswer({
   ) {
     return {
       answer:
-        "Para confirmarte disponibilidad necesito revisar la agenda real primero. Dame un momento y verifico los horarios disponibles antes de proponerte una opcion.",
+        "No pude consultar la agenda real en este momento, asi que no voy a inventarte un horario. Intenta de nuevo en un momento y lo reviso directamente en el calendario.",
       blockedReason:
-        "Respuesta bloqueada: mencionaba disponibilidad sin consultar_disponibilidad.",
+        "Respuesta bloqueada: mencionaba disponibilidad sin una consulta valida a GHL.",
     };
   }
 
@@ -1151,9 +1225,19 @@ async function generateReply(
     timezone === "UTC" && !calendarRuntime
       ? "Falta la zona horaria en Negocio: el agente esta usando UTC y las horas que diga estaran corridas."
       : null;
+  const calendarRequest = calendarRuntime
+    ? resolveCalendarRequestContext(messages, calendarRuntime.timezone)
+    : null;
+  const resolvedRequestLine = calendarRequest?.dateKey
+    ? `[SOLICITUD DE AGENDA RESUELTA POR EL SISTEMA: fecha ${calendarRequest.dateKey}${
+        calendarRequest.time ? `, hora ${calendarRequest.time.label}` : ""
+      }${calendarRequest.inheritedDate ? ". La fecha viene del contexto anterior" : ""}. Usa esta fecha al consultar; no la reemplaces por otra.]`
+    : "";
   const input: unknown[] = [
     {
-      content: `${buildTodayLine(timezone)}\n\nConversacion reciente:\n${transcript}\n\nResponde el ultimo mensaje del cliente.`,
+      content: `${buildTodayLine(timezone)}${
+        resolvedRequestLine ? `\n\n${resolvedRequestLine}` : ""
+      }\n\nConversacion reciente:\n${transcript}\n\nResponde el ultimo mensaje del cliente.`,
       role: "user",
     },
   ];
@@ -1188,7 +1272,11 @@ async function generateReply(
     }
 
     for (const call of functionCalls) {
-      const result = await runCalendarTool(calendarRuntime, call);
+      const result = await runCalendarTool(
+        calendarRuntime,
+        call,
+        calendarRequest ?? { dateKey: null, inheritedDate: false, time: null },
+      );
       toolCalls.push({ name: call.name, result });
       input.push({
         call_id: call.call_id,
