@@ -52,7 +52,7 @@ export async function createDefaultAgentsForWorkspace(
     defaultAgentPresets.map((preset) => ({
       config: buildDefaultAgentConfig(preset),
       is_active: true,
-      model: "gpt-5.5",
+      model: "gpt-4o-mini",
       name: preset.name,
       system_prompt: buildDefaultAgentPrompt(preset),
       temperature: 0.3,

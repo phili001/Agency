@@ -349,12 +349,10 @@ async function syncDefaultAgentPrompts(
   supabase: Awaited<ReturnType<typeof createClient>>,
   workspaceId: string,
 ) {
-  const presetNames = defaultAgentPresets.map((preset) => preset.name);
   const { data: agents } = await supabase
     .from("agents")
-    .select("id, name, config, system_prompt")
-    .eq("workspace_id", workspaceId)
-    .in("name", presetNames);
+    .select("id, name, type, model, config, system_prompt")
+    .eq("workspace_id", workspaceId);
 
   if (!agents?.length) {
     return;
@@ -362,27 +360,51 @@ async function syncDefaultAgentPrompts(
 
   await Promise.all(
     agents.map((agent) => {
-      const preset = defaultAgentPresets.find((item) => item.name === agent.name);
       const config = getConfigRecord(agent.config);
+      const preset = defaultAgentPresets.find(
+        (item) => item.key === config.default_agent_key,
+      );
       const currentVersion = Number(config.default_agent_prompt_version ?? 0);
+      const isCustomized = config.onboarding_agent_configured === true;
       const alreadyUsesBusinessVariables =
         typeof agent.system_prompt === "string" &&
         agent.system_prompt.includes("{company_name}") &&
         agent.system_prompt.includes("{business_hours}") &&
         agent.system_prompt.includes("{location}");
+      const alreadyMatchesPreset =
+        agent.name === preset?.name &&
+        agent.type === preset?.type &&
+        agent.model === "gpt-4o-mini";
 
-      if (!preset || (currentVersion >= DEFAULT_AGENT_PROMPT_VERSION && alreadyUsesBusinessVariables)) {
+      if (
+        !preset ||
+        isCustomized ||
+        (currentVersion >= DEFAULT_AGENT_PROMPT_VERSION &&
+          alreadyUsesBusinessVariables &&
+          alreadyMatchesPreset)
+      ) {
         return Promise.resolve();
       }
+
+      const defaults = buildDefaultAgentConfig(preset);
 
       return supabase
         .from("agents")
         .update({
           config: {
+            ...defaults,
             ...config,
-            ...buildDefaultAgentConfig(preset),
+            agent_name: preset.agentName,
+            default_agent_key: preset.key,
+            default_agent_prompt_version: DEFAULT_AGENT_PROMPT_VERSION,
+            job_title: preset.jobTitle,
+            router_description: preset.routerDescription,
           },
+          model: "gpt-4o-mini",
+          name: preset.name,
           system_prompt: buildDefaultAgentPrompt(preset),
+          temperature: 0.3,
+          type: preset.type,
         })
         .eq("id", agent.id)
         .eq("workspace_id", workspaceId);
