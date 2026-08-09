@@ -14,6 +14,8 @@ import {
 import type { Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/client";
 
+type AgentType = "setter" | "booking" | "support";
+
 type AgentItem = {
   config: Json;
   id: string;
@@ -44,12 +46,31 @@ type AgentSettingsProps = {
 
 type AgentConfig = {
   agent_name?: string;
+  default_agent_key?: AgentType;
   enabled_tools: string[];
   job_title?: string;
   knowledge_asset_ids: string[];
   onboarding_agent_configured?: boolean;
   router_description: string;
 };
+
+const agentTypeOptions: Array<{ label: string; value: AgentType }> = [
+  { label: "Informacion y ventas", value: "setter" },
+  { label: "Citas", value: "booking" },
+  { label: "Soporte", value: "support" },
+];
+
+function isAgentType(value: unknown): value is AgentType {
+  return value === "setter" || value === "booking" || value === "support";
+}
+
+function normalizeAgentType(value: unknown): AgentType {
+  return isAgentType(value) ? value : "support";
+}
+
+function getAgentTypeLabel(value: AgentType) {
+  return agentTypeOptions.find((option) => option.value === value)?.label ?? value;
+}
 
 function splitAgentDisplayName(value?: string | null) {
   const cleanValue = value?.trim() ?? "";
@@ -73,6 +94,7 @@ function getAgentConfig(config: Json): AgentConfig {
   if (!config || typeof config !== "object" || Array.isArray(config)) {
     return {
       agent_name: "Mateo",
+      default_agent_key: undefined,
       enabled_tools: [],
       job_title: "Soporte",
       knowledge_asset_ids: [],
@@ -84,6 +106,9 @@ function getAgentConfig(config: Json): AgentConfig {
   return {
     agent_name:
       typeof config.agent_name === "string" ? config.agent_name : undefined,
+    default_agent_key: isAgentType(config.default_agent_key)
+      ? config.default_agent_key
+      : undefined,
     enabled_tools: Array.isArray(config.enabled_tools)
       ? config.enabled_tools.filter((item): item is string => typeof item === "string")
       : [],
@@ -107,6 +132,11 @@ function mergeAgentConfig(config: Json, patch: AgentConfig): Json {
 
   return {
     ...current,
+    default_agent_key:
+      patch.default_agent_key ??
+      (isAgentType((current as Record<string, unknown>).default_agent_key)
+        ? (current as Record<string, AgentType>).default_agent_key
+        : undefined),
     enabled_tools: patch.enabled_tools,
     agent_name: patch.agent_name,
     job_title: patch.job_title,
@@ -256,6 +286,7 @@ export function AgentSettings({
     restrictions: selectedPrompt.restrictions,
     system_prompt: selectedPrompt.system_prompt,
     temperature: getResponseStyleValue(selectedAgent?.temperature),
+    type: normalizeAgentType(selectedAgent?.type),
   }));
   const [testMessage, setTestMessage] = useState(
     "Hola, quiero agendar una cita esta semana.",
@@ -286,6 +317,7 @@ export function AgentSettings({
       restrictions: prompt.restrictions,
       system_prompt: prompt.system_prompt,
       temperature: getResponseStyleValue(agent.temperature),
+      type: normalizeAgentType(agent.type),
     });
     setStatus("");
     setTestAnswer("");
@@ -303,6 +335,7 @@ export function AgentSettings({
     const payload = {
       config: mergeAgentConfig(selectedAgent.config, {
         agent_name: form.agent_name,
+        default_agent_key: form.type,
         enabled_tools: form.enabled_tools,
         job_title: form.job_title,
         knowledge_asset_ids: form.knowledge_asset_ids,
@@ -314,6 +347,7 @@ export function AgentSettings({
       name: buildAgentDisplayName(form.agent_name, form.job_title),
       system_prompt: buildAgentPrompt(form),
       temperature: Number(form.temperature),
+      type: form.type,
     };
 
     const { error } = await supabase
@@ -355,10 +389,11 @@ export function AgentSettings({
         system_prompt:
           "Eres un agente de WhatsApp claro, breve y orientado a agendar o resolver la necesidad del contacto. Responde en espanol, haz una pregunta a la vez y pide datos solo cuando hagan falta.",
         temperature: 0.4,
-        type: "setter",
+        type: "support",
         workspace_id: workspaceId,
         config: {
           agent_name: "Mateo",
+          default_agent_key: "support",
           enabled_tools: [],
           job_title: "Soporte",
           knowledge_asset_ids: [],
@@ -395,6 +430,7 @@ export function AgentSettings({
       restrictions: dataPrompt.restrictions,
       system_prompt: dataPrompt.system_prompt,
       temperature: getResponseStyleValue(data.temperature),
+      type: normalizeAgentType(data.type),
     });
     setStatus("Agente creado.");
     setIsCreating(false);
@@ -442,6 +478,7 @@ export function AgentSettings({
         restrictions: prompt.restrictions,
         system_prompt: prompt.system_prompt,
         temperature: getResponseStyleValue(nextAgent.temperature),
+        type: normalizeAgentType(nextAgent.type),
       });
     }
 
@@ -484,7 +521,7 @@ export function AgentSettings({
 
   if (!selectedAgent) {
     return (
-      <section className="rounded-lg border border-[#d9ded3] bg-white p-4">
+      <section className="min-w-0 rounded-lg border border-[#d9ded3] bg-white p-4">
         <div className="flex items-center gap-2">
           <Bot className="text-[#35735b]" size={19} />
           <h2 className="text-base font-semibold">Configuracion de agentes</h2>
@@ -508,14 +545,14 @@ export function AgentSettings({
 
   return (
     <>
-    <section className="rounded-lg border border-[#d9ded3] bg-white p-4">
+    <section className="min-w-0 rounded-lg border border-[#d9ded3] bg-white p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Bot className="text-[#35735b]" size={19} />
           <h2 className="text-base font-semibold">Configuracion de agentes</h2>
         </div>
         <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
-          {selectedAgent.type}
+          {getAgentTypeLabel(form.type)}
         </span>
       </div>
 
@@ -563,8 +600,8 @@ export function AgentSettings({
           </button>
         </div>
 
-        <div className="grid gap-4">
-          <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid min-w-0 gap-4 [&>*]:min-w-0 [&_input]:min-w-0 [&_label]:min-w-0 [&_select]:min-w-0 [&_select]:w-full [&_textarea]:min-w-0 [&_textarea]:w-full">
+          <div className="grid gap-3 md:grid-cols-3">
             <label className="grid gap-1.5 text-sm font-medium">
               Nombre
               <input
@@ -586,6 +623,25 @@ export function AgentSettings({
                 placeholder="Soporte"
                 value={form.job_title}
               />
+            </label>
+            <label className="grid gap-1.5 text-sm font-medium">
+              Tipo de agente
+              <select
+                className="h-10 rounded-lg border border-[#cbd2c6] px-3 outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    type: event.target.value as AgentType,
+                  }))
+                }
+                value={form.type}
+              >
+                {agentTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
 
@@ -719,16 +775,16 @@ export function AgentSettings({
             </label>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-lg border border-[#e2e6df] p-3">
+          <div className="grid min-w-0 gap-3 md:grid-cols-2 [&>*]:min-w-0">
+            <div className="min-w-0 rounded-lg border border-[#e2e6df] p-3">
               <div className="flex items-center gap-2">
                 <Wrench className="text-[#35735b]" size={17} />
                 <h3 className="text-sm font-semibold">Tools asignadas</h3>
               </div>
-              <div className="mt-3 grid gap-2">
+              <div className="mt-3 grid min-w-0 gap-2">
                 {tools.map((tool) => (
                   <label
-                    className="flex items-start gap-2 rounded-lg border border-[#e2e6df] px-3 py-2 text-sm"
+                    className="flex min-w-0 items-start gap-2 rounded-lg border border-[#e2e6df] px-3 py-2 text-sm"
                     key={tool.id}
                   >
                     <input
@@ -742,7 +798,7 @@ export function AgentSettings({
                       }
                       type="checkbox"
                     />
-                    <span>
+                    <span className="min-w-0">
                       <span className="block font-medium">{tool.title}</span>
                       <span className="mt-0.5 line-clamp-2 block text-xs text-[#647067]">
                         {tool.content || "Tool disponible para este agente."}
@@ -758,7 +814,7 @@ export function AgentSettings({
               </div>
             </div>
 
-            <div className="rounded-lg border border-[#e2e6df] p-3">
+            <div className="min-w-0 rounded-lg border border-[#e2e6df] p-3">
               <div className="flex items-center gap-2">
                 <BookOpenText className="text-[#35735b]" size={17} />
                 <h3 className="text-sm font-semibold">Documentos RAG asignados</h3>
@@ -766,10 +822,10 @@ export function AgentSettings({
               <p className="mt-1 text-xs text-[#647067]">
                 Selecciona los documentos que este agente puede usar como contexto.
               </p>
-              <div className="mt-3 grid gap-2">
+              <div className="mt-3 grid min-w-0 gap-2">
                 {knowledgeAssets.map((asset) => (
                   <div
-                    className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-[#e2e6df] px-3 py-2 text-sm"
+                    className="flex min-h-12 min-w-0 items-center justify-between gap-3 rounded-lg border border-[#e2e6df] px-3 py-2 text-sm"
                     key={asset.id}
                   >
                     <span className="min-w-0 truncate font-medium">

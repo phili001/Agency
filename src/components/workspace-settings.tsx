@@ -1628,7 +1628,7 @@ export function WorkspaceSettings({
   }
 
   return (
-    <section className="rounded-lg border border-[#d9ded3] bg-white">
+    <section className="min-w-0 rounded-lg border border-[#d9ded3] bg-white">
       {showNavigation ? (
       <div className="border-b border-[#e2e6df] px-4 py-3">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -1665,7 +1665,7 @@ export function WorkspaceSettings({
       </div>
       ) : null}
 
-      <div className="p-4">
+      <div className="min-w-0 p-4">
         {activeTab === "agents" ? (
           <AgentSettings
             agents={agents}

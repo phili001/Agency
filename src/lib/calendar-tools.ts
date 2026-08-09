@@ -110,10 +110,12 @@ export function parseCalendarTools(
  *
  * - Si un flujo fijo un calendario para el contacto, ese es el unico: la
  *   eleccion explicita de un flujo gana sobre la del modelo.
- * - Si no, el agente elige entre los que tenga asignados, leyendo la
- *   descripcion de cada uno para decidir segun lo que pida el paciente.
- * - Si no tiene ninguno asignado, se usan todos los habilitados del workspace,
- *   para que conectar un calendario funcione sin configurar nada mas.
+ * - Si no, el agente elige solo entre los calendarios que tenga asignados,
+ *   leyendo la descripcion de cada uno para decidir segun lo que pida el
+ *   paciente.
+ * - Si el workspace ya tiene tools de calendario pero el agente no tiene
+ *   ninguna asignada, no se usa ningun calendario. Caer a "todos" mezcla
+ *   agendas y permite que un agente confirme citas sin estar configurado.
  */
 export function resolveCalendarsForAgent({
   contactMetadata,
@@ -143,7 +145,7 @@ export function resolveCalendarsForAgent({
   }
 
   const assigned = tools.filter((tool) => enabledToolIds.includes(tool.id));
-  const available = assigned.length > 0 ? assigned : tools;
+  const available = assigned.length > 0 ? assigned : [];
 
   // El marcado por defecto primero: si el modelo duda, es el que vera antes.
   return [...available].sort(

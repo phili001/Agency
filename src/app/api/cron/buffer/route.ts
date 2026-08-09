@@ -245,6 +245,20 @@ function getEnabledToolIds(config: Json) {
     : [];
 }
 
+function isBookingAgent(agent: AgentRow) {
+  const config = getConfigRecord(agent.config);
+  const key = String(config.default_agent_key ?? "").toLowerCase();
+  const searchable = normalizeRoutingText(
+    `${agent.name} ${agent.type} ${getRouterDescription(agent)}`,
+  );
+
+  return (
+    agent.type === "booking" ||
+    key === "booking" ||
+    /\b(citas?|agenda|agendar|reservar|disponibilidad|calendario)\b/.test(searchable)
+  );
+}
+
 function getKnowledgeAssetIds(config: Json) {
   if (!config || typeof config !== "object" || Array.isArray(config)) {
     return [];
@@ -319,7 +333,12 @@ function getRoutingTokens(value: string) {
 
 function getAgentIntentBoost(agent: AgentRow, messageText: string) {
   const config = getConfigRecord(agent.config);
-  const key = String(config.default_agent_key ?? agent.type ?? "");
+  // Instalaciones antiguas pueden conservar type/default_agent_key = "setter"
+  // aunque el agente haya sido convertido en el agente de citas. Usa la misma
+  // clasificacion que habilita el calendario para que el router no lo penalice.
+  const key = isBookingAgent(agent)
+    ? "booking"
+    : String(config.default_agent_key ?? agent.type ?? "");
   const text = normalizeRoutingText(messageText);
   const groups: Record<string, string[]> = {
     booking: [
@@ -671,9 +690,9 @@ async function buildCalendarRuntime({
 }): Promise<CalendarRuntimeResult> {
   // Solo el agente de citas agenda. El setter y el de soporte no deben tocar
   // el calendario aunque el workspace lo tenga conectado.
-  if (agent.type !== "booking") {
+  if (!isBookingAgent(agent)) {
     return {
-      reason: `El agente "${agent.name}" es de tipo "${agent.type}", no "booking". Solo el agente de citas usa el calendario.`,
+      reason: `El agente "${agent.name}" no esta identificado como agente de citas. Solo un agente de citas usa el calendario.`,
       runtime: null,
     };
   }
@@ -711,17 +730,19 @@ async function buildCalendarRuntime({
     .eq("workspace_id", workspaceId)
     .eq("kind", "tool")
     .neq("status", "archived");
+  const calendarTools = parseCalendarTools(toolAssets ?? []);
+  const enabledToolIds = getEnabledToolIds(agent.config);
   const calendars = resolveCalendarsForAgent({
     contactMetadata: contact.metadata,
-    enabledToolIds: getEnabledToolIds(agent.config),
-    tools: parseCalendarTools(toolAssets ?? []),
+    enabledToolIds,
+    tools: calendarTools,
   });
   // Compatibilidad: si aun no se crearon tools de calendario, se usa el que
   // quedo configurado en la tarjeta de Integraciones.
   const fallbackCalendars: CalendarTool[] =
     calendars.length > 0
       ? calendars
-      : context.calendarId
+      : calendarTools.length === 0 && context.calendarId
         ? [
             {
               calendarId: context.calendarId,
@@ -735,9 +756,12 @@ async function buildCalendarRuntime({
         : [];
 
   if (fallbackCalendars.length === 0) {
+    const hasCalendarTools = calendarTools.length > 0;
     return {
       reason:
-        "No hay ningun calendario elegido: habilita uno en Tools o seleccionalo en la tarjeta de GoHighLevel en Integraciones.",
+        hasCalendarTools && enabledToolIds.length === 0
+          ? `El agente "${agent.name}" no tiene ninguna tool de calendario asignada. Asignale el calendario correcto en Agentes > Tools asignadas.`
+          : "No hay ningun calendario elegido: habilita uno en Tools o seleccionalo en la tarjeta de GoHighLevel en Integraciones.",
       runtime: null,
     };
   }
@@ -999,6 +1023,101 @@ async function callResponsesApi({
   return payload;
 }
 
+function textLooksLikeBookingClaim(text: string) {
+  const normalized = normalizeRoutingText(text);
+
+  return [
+    /\b(cita|llamada|sesion|reunion|consulta)\b.*\b(programad[ao]s?|agendad[ao]s?|reservad[ao]s?|confirmad[ao]s?|registrad[ao]s?)\b/,
+    /\b(programad[ao]s?|agendad[ao]s?|reservad[ao]s?|confirmad[ao]s?|registrad[ao]s?)\b.*\b(cita|llamada|sesion|reunion|consulta)\b/,
+    /\bqued[ao]\b.*\b(cita|llamada|sesion|reunion|consulta)\b/,
+    /\bte espero\b.*\b(agenda|cita|llamada|sesion|reunion|consulta)\b/,
+  ].some((pattern) => pattern.test(normalized));
+}
+
+function textLooksLikeAvailabilityClaim(text: string) {
+  const normalized = normalizeRoutingText(text);
+
+  return [
+    /\b(tengo|tenemos|hay)\b.*\b(disponibilidad|disponible|libre|hueco|espacio)\b/,
+    /\b(disponible|libre)\b.*\b(a las|para las|el lunes|el martes|el miercoles|el jueves|el viernes|el sabado|el domingo)\b/,
+    /\b(puedo|podemos)\b.*\b(agendar|reservar|programar)\b.*\b(a las|para las)\b/,
+  ].some((pattern) => pattern.test(normalized));
+}
+
+function hasConfirmedAppointment(toolCalls: Array<Record<string, unknown>>) {
+  return toolCalls.some((call) => {
+    const result =
+      call.result && typeof call.result === "object" && !Array.isArray(call.result)
+        ? (call.result as Record<string, unknown>)
+        : {};
+
+    return (
+      call.name === "agendar_cita" &&
+      result.confirmada === true &&
+      typeof result.cita_id === "string" &&
+      result.cita_id.trim().length > 0
+    );
+  });
+}
+
+function hasAvailabilityLookup(toolCalls: Array<Record<string, unknown>>) {
+  return toolCalls.some((call) => call.name === "consultar_disponibilidad");
+}
+
+function sanitizeCalendarAnswer({
+  answer,
+  calendarRuntime,
+  toolCalls,
+}: {
+  answer: string;
+  calendarRuntime: CalendarRuntime | null;
+  toolCalls: Array<Record<string, unknown>>;
+}) {
+  const confirmedAppointment = hasConfirmedAppointment(toolCalls);
+
+  if (textLooksLikeBookingClaim(answer) && !confirmedAppointment) {
+    if (!calendarRuntime) {
+      return {
+        answer:
+          "No tengo acceso a la agenda en este momento, asi que no puedo confirmar ni registrar esa cita desde aqui. Te ayudo dejando la solicitud lista para que el equipo revise la agenda.",
+        blockedReason:
+          "Respuesta bloqueada: intentaba confirmar una cita sin calendario conectado para el agente.",
+      };
+    }
+
+    return {
+      answer:
+        "No puedo confirmar esa cita todavia porque no tengo una confirmacion real del calendario. Para ayudarte bien, voy a revisar disponibilidad y te confirmo solo cuando quede registrada.",
+      blockedReason:
+        "Respuesta bloqueada: intentaba confirmar una cita sin agendar_cita confirmada con cita_id.",
+    };
+  }
+
+  if (
+    calendarRuntime &&
+    textLooksLikeAvailabilityClaim(answer) &&
+    !hasAvailabilityLookup(toolCalls)
+  ) {
+    return {
+      answer:
+        "Para confirmarte disponibilidad necesito revisar la agenda real primero. Dame un momento y verifico los horarios disponibles antes de proponerte una opcion.",
+      blockedReason:
+        "Respuesta bloqueada: mencionaba disponibilidad sin consultar_disponibilidad.",
+    };
+  }
+
+  if (!calendarRuntime && textLooksLikeAvailabilityClaim(answer)) {
+    return {
+      answer:
+        "No tengo acceso a la agenda en este momento, asi que no puedo confirmar disponibilidad ni reservar un horario desde aqui. Te ayudo dejando la solicitud lista para que el equipo revise la agenda.",
+      blockedReason:
+        "Respuesta bloqueada: mencionaba disponibilidad sin calendario conectado para el agente.",
+    };
+  }
+
+  return { answer, blockedReason: null };
+}
+
 async function generateReply(
   agent: AgentRow,
   messages: MessageRow[],
@@ -1089,9 +1208,15 @@ async function generateReply(
     inputTokens += Number(payload.usage?.input_tokens ?? 0);
     outputTokens += Number(payload.usage?.output_tokens ?? 0);
   }
+  const sanitized = sanitizeCalendarAnswer({
+    answer: getResponseText(payload),
+    calendarRuntime,
+    toolCalls,
+  });
 
   return {
-    answer: getResponseText(payload),
+    answer: sanitized.answer,
+    calendarGuard: sanitized.blockedReason,
     timezoneWarning,
     model: payload.model ?? model,
     responseId: payload.id ?? null,
@@ -1332,6 +1457,7 @@ export async function POST(request: Request) {
           input_tokens: Number(reply.usage.input_tokens ?? 0),
           message_type: "text",
           metadata: {
+            calendar_guard: reply.calendarGuard,
             calendar_tool_calls: reply.toolCalls,
             calendar_unavailable_reason:
               calendarResult.reason ?? reply.timezoneWarning ?? null,

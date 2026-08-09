@@ -926,11 +926,11 @@ export async function AppShell({ section }: { section: AppSection }) {
           </header>
 
           <div
-            className={`grid gap-5 p-5 ${
+            className={`grid min-w-0 gap-5 p-5 ${
               section === "dashboard" ? "xl:grid-cols-[1fr_360px]" : ""
             }`}
           >
-            <div className="grid content-start gap-5">
+            <div className="grid min-w-0 content-start gap-5">
               {!workspace || membershipError ? (
                 <section className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                   <AlertCircle className="mt-0.5 shrink-0" size={18} />
