@@ -34,6 +34,21 @@ function readString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function readAppointmentStart(value: unknown) {
+  const payload = asRecord(value);
+  const event = asRecord(payload.event);
+  const appointment = asRecord(payload.appointment);
+
+  return (
+    readString(event.startTime) ??
+    readString(event.start_time) ??
+    readString(appointment.startTime) ??
+    readString(appointment.start_time) ??
+    readString(payload.startTime) ??
+    readString(payload.start_time)
+  );
+}
+
 function errorText(error: unknown) {
   return error instanceof Error ? error.message : "Error desconocido.";
 }
@@ -231,8 +246,26 @@ export async function POST(request: Request) {
       await runStep(
         steps,
         `read:${calendar.id}`,
-        `Verificar cita: ${calendar.name}`,
-        () => getAppointment({ apiKey: apiKey!, eventId }),
+        `Verificar fecha y hora exactas: ${calendar.name}`,
+        async () => {
+          const appointment = await getAppointment({ apiKey: apiKey!, eventId });
+          const actualStart = readAppointmentStart(appointment);
+
+          if (!actualStart) {
+            throw new Error(
+              "GHL devolvio la cita, pero no incluyo la fecha/hora para verificarla.",
+            );
+          }
+
+          if (new Date(actualStart).getTime() !== new Date(slot.iso).getTime()) {
+            throw new Error(
+              "GHL creo la cita en una hora distinta al horario solicitado.",
+            );
+          }
+
+          return actualStart;
+        },
+        () => `Hora verificada: ${slot.label}.`,
       );
       await runStep(
         steps,
