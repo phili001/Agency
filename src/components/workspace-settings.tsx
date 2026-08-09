@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import {
   BookOpenText,
   BriefcaseBusiness,
+  CalendarCheck,
   Check,
+  CircleX,
   ClipboardList,
   KeyRound,
   Loader2,
@@ -40,6 +42,18 @@ type IntegrationItem = {
   secret_ref: string | null;
   status: "pending" | "active" | "error" | "disabled";
   workspace_id: string;
+};
+
+type IntegrationTestResult = {
+  error?: string;
+  message?: string;
+  ok: boolean;
+  steps?: Array<{
+    detail?: string;
+    key: string;
+    label: string;
+    status: "failed" | "passed";
+  }>;
 };
 
 type WorkspaceAsset = {
@@ -344,6 +358,9 @@ export function WorkspaceSettings({
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState("");
   const [savingKey, setSavingKey] = useState("");
+  const [integrationTestResults, setIntegrationTestResults] = useState<
+    Partial<Record<IntegrationItem["provider"], IntegrationTestResult>>
+  >({});
   const canChangeMemberRoles = activeRole === "owner";
 
   const ycloudSecretValue = integrationDrafts.ycloud.config.webhook_secret?.trim();
@@ -636,13 +653,18 @@ export function WorkspaceSettings({
 
     setSavingKey(`${provider}:test`);
     setStatus("");
+    setIntegrationTestResults((current) => ({
+      ...current,
+      [provider]: undefined,
+    }));
 
     const response = await fetch(`/api/integrations/${provider}/test`, {
       body: JSON.stringify({ workspaceId }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
-    const payload = (await response.json()) as { error?: string; ok?: boolean };
+    const payload = (await response.json()) as IntegrationTestResult;
+    setIntegrationTestResults((current) => ({ ...current, [provider]: payload }));
 
     if (!response.ok || !payload.ok) {
       setStatus(payload.error ?? `No se pudo probar ${provider}.`);
@@ -656,7 +678,7 @@ export function WorkspaceSettings({
       ycloud: "YCloud respondio correctamente.",
     };
 
-    setStatus(successMessages[provider]);
+    setStatus(payload.message ?? successMessages[provider]);
     setSavingKey("");
   }
 
@@ -1815,12 +1837,45 @@ export function WorkspaceSettings({
                     >
                       {savingKey === `${provider.provider}:test` ? (
                         <Loader2 className="animate-spin" size={16} />
+                      ) : provider.provider === "gohighlevel" ? (
+                        <CalendarCheck size={16} />
                       ) : (
                         <PlugZap size={16} />
                       )}
-                      Probar conexion
+                      {provider.provider === "gohighlevel"
+                        ? "Probar citas"
+                        : "Probar conexion"}
                     </button>
                   </div>
+                  {provider.provider === "gohighlevel" &&
+                  integrationTestResults.gohighlevel ? (
+                    <div className="grid gap-1 border-t border-[#e2e6df] pt-3">
+                      <p className="text-xs font-semibold text-[#4d5a51]">
+                        Resultado de la prueba
+                      </p>
+                      {(integrationTestResults.gohighlevel.steps ?? []).map((step) => (
+                        <div
+                          className="grid min-h-7 grid-cols-[18px_minmax(0,1fr)] items-start gap-2 text-xs"
+                          key={step.key}
+                        >
+                          {step.status === "passed" ? (
+                            <Check className="mt-0.5 text-[#35735b]" size={15} />
+                          ) : (
+                            <CircleX className="mt-0.5 text-[#b42318]" size={15} />
+                          )}
+                          <p className="min-w-0 text-[#334139]">
+                            <span className="font-medium">{step.label}</span>
+                            {step.detail ? `: ${step.detail}` : ""}
+                          </p>
+                        </div>
+                      ))}
+                      {integrationTestResults.gohighlevel.error ? (
+                        <p className="text-xs text-[#b42318]">
+                          {integrationTestResults.gohighlevel.error}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               );
             })}

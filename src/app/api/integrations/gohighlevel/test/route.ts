@@ -1,42 +1,71 @@
 import { NextResponse } from "next/server";
 
 import { requireWorkspaceRole } from "@/lib/authz";
-import { getWorkspaceGoHighLevelKey } from "@/lib/integrations/gohighlevel";
+import { parseCalendarTools } from "@/lib/calendar-tools";
+import {
+  createAppointment,
+  deleteCalendarEvent,
+  ensureGhlContact,
+  getAppointment,
+  getFreeSlots,
+  isValidTimeZone,
+  listCalendars,
+} from "@/lib/integrations/ghl-calendar";
+import {
+  deleteGoHighLevelContact,
+  getWorkspaceGoHighLevelKey,
+} from "@/lib/integrations/gohighlevel";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-type GhlErrorPayload = {
-  contacts?: unknown[];
-  message?: string | string[];
+type TestStep = {
+  detail?: string;
+  key: string;
+  label: string;
+  status: "failed" | "passed";
 };
 
-async function readResponsePayload(response: Response) {
-  const contentType = response.headers.get("content-type") ?? "";
-
-  if (contentType.includes("application/json")) {
-    return (await response.json().catch(() => ({}))) as GhlErrorPayload;
-  }
-
-  const text = await response.text();
-  return { message: text.slice(0, 300) };
+function asRecord(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
-function errorMessage(payload: GhlErrorPayload, status: number) {
-  const message = Array.isArray(payload.message)
-    ? payload.message.join(" ")
-    : payload.message;
+function readString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
 
-  if (status === 401) {
-    return message ?? "GoHighLevel rechazo la API key. Revisala en Settings > API Keys.";
+function errorText(error: unknown) {
+  return error instanceof Error ? error.message : "Error desconocido.";
+}
+
+async function runStep<T>(
+  steps: TestStep[],
+  key: string,
+  label: string,
+  action: () => Promise<T>,
+  detail?: (result: T) => string,
+) {
+  try {
+    const result = await action();
+    steps.push({
+      detail: detail?.(result),
+      key,
+      label,
+      status: "passed",
+    });
+    return result;
+  } catch (error) {
+    steps.push({ key, label, status: "failed", detail: errorText(error) });
+    throw error;
   }
-
-  if (status === 404) {
-    return message ?? "GoHighLevel no encontro ese Location ID.";
-  }
-
-  return message ?? `GoHighLevel rechazo la prueba. HTTP ${status}.`;
 }
 
 export async function POST(request: Request) {
+  const steps: TestStep[] = [];
+  let apiKey: string | null = null;
+  let contactId: string | null = null;
+  const eventIds = new Set<string>();
+
   try {
     const { workspaceId } = (await request.json()) as { workspaceId?: string };
 
@@ -45,27 +74,40 @@ export async function POST(request: Request) {
     }
 
     await requireWorkspaceRole(workspaceId, ["owner", "admin", "agent"]);
-    const apiKey = await getWorkspaceGoHighLevelKey(workspaceId);
+    apiKey = await getWorkspaceGoHighLevelKey(workspaceId);
 
     if (!apiKey) {
       return NextResponse.json({ error: "Conecta GoHighLevel primero." }, { status: 400 });
     }
 
     const admin = createAdminClient();
-    const { data: integration } = await admin
-      .from("integrations")
-      .select("config")
-      .eq("workspace_id", workspaceId)
-      .eq("provider", "gohighlevel")
-      .maybeSingle();
-    const config =
-      integration?.config &&
-      typeof integration.config === "object" &&
-      !Array.isArray(integration.config)
-        ? (integration.config as Record<string, unknown>)
-        : {};
-    const locationId =
-      typeof config.location_id === "string" ? config.location_id.trim() : "";
+    const [{ data: integration }, { data: toolAssets }, { data: businessProfile }] =
+      await Promise.all([
+        admin
+          .from("integrations")
+          .select("config")
+          .eq("workspace_id", workspaceId)
+          .eq("provider", "gohighlevel")
+          .eq("status", "active")
+          .maybeSingle(),
+        admin
+          .from("workspace_assets")
+          .select("id, title, content, metadata")
+          .eq("workspace_id", workspaceId)
+          .eq("kind", "tool")
+          .neq("status", "archived"),
+        admin
+          .from("workspace_assets")
+          .select("metadata")
+          .eq("workspace_id", workspaceId)
+          .eq("kind", "business_profile")
+          .eq("status", "active")
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+    const config = asRecord(integration?.config);
+    const locationId = readString(config.location_id);
 
     if (!locationId) {
       return NextResponse.json(
@@ -74,30 +116,172 @@ export async function POST(request: Request) {
       );
     }
 
-    // Lectura pura: valida API key y Location ID juntos sin crear nada en el CRM.
-    const apiBase = process.env.GHL_API_BASE ?? "https://services.leadconnectorhq.com";
-    const query = new URLSearchParams({ limit: "1", locationId });
-    const response = await fetch(`${apiBase.replace(/\/$/, "")}/contacts/?${query}`, {
-      cache: "no-store",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        Version: "2021-07-28",
-      },
-    });
-    const payload = await readResponsePayload(response);
+    const calendars = await runStep(
+      steps,
+      "connection",
+      "Conexion y permisos",
+      () => listCalendars({ apiKey: apiKey!, locationId }),
+      (items) => `${items.length} calendario(s) accesible(s).`,
+    );
+    const tools = parseCalendarTools(toolAssets ?? []);
+    const configuredIds = [
+      ...new Set([
+        ...tools.map((tool) => tool.calendarId),
+        ...(readString(config.calendar_id) ? [readString(config.calendar_id)!] : []),
+      ]),
+    ];
 
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: errorMessage(payload, response.status) },
-        { status: response.status },
-      );
+    if (configuredIds.length === 0) {
+      throw new Error("No hay un calendario configurado en Tools para probar.");
     }
 
-    return NextResponse.json({ locationId, ok: true });
+    const configuredCalendars = configuredIds.map((calendarId) => {
+      const calendar = calendars.find((item) => item.id === calendarId);
+
+      if (!calendar) {
+        throw new Error(`GHL no devolvio el calendario configurado ${calendarId}.`);
+      }
+
+      return calendar;
+    });
+    steps.push({
+      detail: `${configuredCalendars.length} calendario(s) configurado(s).`,
+      key: "calendar_config",
+      label: "Calendarios configurados",
+      status: "passed",
+    });
+
+    const profileFields = asRecord(asRecord(businessProfile?.metadata).fields);
+    const businessTimezone = readString(profileFields.timezone);
+    const testNumber = String(Math.floor(Math.random() * 100)).padStart(2, "0");
+    contactId = await runStep(
+      steps,
+      "test_contact",
+      "Contacto temporal",
+      () =>
+        ensureGhlContact({
+          apiKey: apiKey!,
+          email: `calendar-test-${Date.now()}@example.com`,
+          fullName: "Prueba Tecnica LEVY",
+          locationId,
+          phone: `+120255501${testNumber}`,
+        }).then((id) => {
+          if (!id) {
+            throw new Error("GHL no devolvio el ID del contacto temporal.");
+          }
+
+          return id;
+        }),
+    );
+
+    for (const calendar of configuredCalendars) {
+      const timezone = calendar.timezone ?? businessTimezone;
+
+      if (!timezone || !isValidTimeZone(timezone)) {
+        throw new Error(
+          `No hay zona horaria valida para el calendario ${calendar.name}.`,
+        );
+      }
+
+      steps.push({
+        detail: timezone,
+        key: `timezone:${calendar.id}`,
+        label: `Zona horaria: ${calendar.name}`,
+        status: "passed",
+      });
+      const startDate = new Date(Date.now() + 5 * 60 * 1000);
+      const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const slots = await runStep(
+        steps,
+        `availability:${calendar.id}`,
+        `Disponibilidad: ${calendar.name}`,
+        () =>
+          getFreeSlots({
+            apiKey: apiKey!,
+            calendarId: calendar.id,
+            endDate,
+            startDate,
+            timezone,
+          }).then((result) => {
+            if (result.slots.length === 0) {
+              throw new Error("GHL no devolvio horarios libres en los proximos 30 dias.");
+            }
+
+            return result.slots;
+          }),
+        (items) => `${items.length} horario(s) encontrado(s).`,
+      );
+      const slot = slots[0];
+      const eventId = await runStep(
+        steps,
+        `create:${calendar.id}`,
+        `Crear cita: ${calendar.name}`,
+        () =>
+          createAppointment({
+            apiKey: apiKey!,
+            calendarId: calendar.id,
+            contactId: contactId!,
+            locationId,
+            startTime: slot.iso,
+            title: "[PRUEBA AUTOMATICA] LEVY",
+          }),
+        () => slot.label,
+      );
+      eventIds.add(eventId);
+      await runStep(
+        steps,
+        `read:${calendar.id}`,
+        `Verificar cita: ${calendar.name}`,
+        () => getAppointment({ apiKey: apiKey!, eventId }),
+      );
+      await runStep(
+        steps,
+        `delete:${calendar.id}`,
+        `Eliminar cita de prueba: ${calendar.name}`,
+        () => deleteCalendarEvent({ apiKey: apiKey!, eventId }),
+      );
+      eventIds.delete(eventId);
+    }
+
+    await runStep(steps, "delete_contact", "Eliminar contacto temporal", () =>
+      deleteGoHighLevelContact({ apiKey: apiKey!, contactId: contactId! }),
+    );
+    contactId = null;
+
+    return NextResponse.json({
+      message: "Prueba completa superada: GHL creo, verifico y elimino la cita correctamente.",
+      ok: true,
+      steps,
+    });
   } catch (error) {
+    const cleanupErrors: string[] = [];
+
+    if (apiKey) {
+      for (const eventId of eventIds) {
+        try {
+          await deleteCalendarEvent({ apiKey, eventId });
+        } catch (cleanupError) {
+          cleanupErrors.push(`Cita ${eventId}: ${errorText(cleanupError)}`);
+        }
+      }
+
+      if (contactId) {
+        try {
+          await deleteGoHighLevelContact({ apiKey, contactId });
+        } catch (cleanupError) {
+          cleanupErrors.push(`Contacto temporal: ${errorText(cleanupError)}`);
+        }
+      }
+    }
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Error desconocido." },
-      { status: 500 },
+      {
+        cleanupErrors,
+        error: errorText(error),
+        ok: false,
+        steps,
+      },
+      { status: 502 },
     );
   }
 }

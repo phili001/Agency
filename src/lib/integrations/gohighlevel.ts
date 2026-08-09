@@ -7,11 +7,27 @@ import type { FlowGhlAction } from "@/lib/flow-definitions";
 import type { Json } from "@/lib/supabase/database.types";
 
 export async function getWorkspaceGoHighLevelKey(workspaceId: string) {
-  return getIntegrationSecret({
-    kind: "api_key",
-    provider: "gohighlevel",
-    workspaceId,
-  });
+  try {
+    return await getIntegrationSecret({
+      kind: "api_key",
+      provider: "gohighlevel",
+      workspaceId,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+
+    if (
+      message.includes("Unsupported state") ||
+      message.includes("authenticate data") ||
+      message.includes("Secret cifrado invalido")
+    ) {
+      throw new Error(
+        "El token guardado de GoHighLevel fue cifrado con otra clave. Vuelve a pegar el Private Integration Token en Integraciones y pulsa Guardar.",
+      );
+    }
+
+    throw error;
+  }
 }
 
 type ContactRow = {
@@ -181,6 +197,20 @@ async function ghlFetch<T>({
   }
 
   return payload;
+}
+
+export async function deleteGoHighLevelContact({
+  apiKey,
+  contactId,
+}: {
+  apiKey: string;
+  contactId: string;
+}) {
+  await ghlFetch({
+    apiKey,
+    method: "DELETE",
+    path: `/contacts/${encodeURIComponent(contactId)}`,
+  });
 }
 
 export async function runGoHighLevelFlowActions({

@@ -98,7 +98,7 @@ async function calendarFetch<T>({
 }: {
   apiKey: string;
   body?: Record<string, unknown>;
-  method: "GET" | "POST";
+  method: "DELETE" | "GET" | "POST";
   path: string;
   query?: Record<string, string>;
   version?: string;
@@ -340,6 +340,34 @@ export async function createAppointment({
   }
 
   return appointmentId;
+}
+
+export async function getAppointment({
+  apiKey,
+  eventId,
+}: {
+  apiKey: string;
+  eventId: string;
+}) {
+  return calendarFetch<Record<string, unknown>>({
+    apiKey,
+    method: "GET",
+    path: `/calendars/events/appointments/${encodeURIComponent(eventId)}`,
+  });
+}
+
+export async function deleteCalendarEvent({
+  apiKey,
+  eventId,
+}: {
+  apiKey: string;
+  eventId: string;
+}) {
+  await calendarFetch<Record<string, unknown>>({
+    apiKey,
+    method: "DELETE",
+    path: `/calendars/events/${encodeURIComponent(eventId)}`,
+  });
 }
 
 export async function ensureGhlContact({
