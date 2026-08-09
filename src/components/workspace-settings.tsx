@@ -288,7 +288,7 @@ function fieldHelp(provider: string, key: string) {
     return {
       // Debe ser Private Integration Token (API v2). La "API Key" de Settings >
       // API Keys es la v1, descontinuada, y no sirve para calendarios ni citas.
-      help: "En GoHighLevel: Settings > Private Integrations > Create new Integration. NO uses la API Key vieja. Marca los permisos de contacts y calendars.",
+      help: "En GoHighLevel: Settings > Private Integrations > Create new Integration. NO uses la API Key vieja. Habilita View/Edit Contacts, View Calendars, View/Edit Calendar Events y View Locations.",
       placeholder: "Private Integration Token",
     };
   }

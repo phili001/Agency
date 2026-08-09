@@ -21,7 +21,8 @@ import { getWorkspaceOpenAIKey } from "@/lib/integrations/openai";
 import {
   createAppointment,
   ensureGhlContact,
-  getFreeSlots,
+  getLocationTimezone,
+  getVerifiedFreeSlots,
   getWorkspaceCalendarContext,
   isValidTimeZone,
   listCalendars,
@@ -761,12 +762,10 @@ type CalendarRuntime = {
 
 async function buildCalendarRuntime({
   agent,
-  businessProfile,
   contactId,
   workspaceId,
 }: {
   agent: AgentRow;
-  businessProfile: BusinessProfileAsset | null;
   contactId: string;
   workspaceId: string;
 }): Promise<CalendarRuntimeResult> {
@@ -848,21 +847,27 @@ async function buildCalendarRuntime({
     };
   }
 
-  // La zona del calendario de GHL es la autoridad. La del perfil del negocio
-  // solo sirve como respaldo si un calendario antiguo no expone timezone.
-  const profileTimezone = getBusinessVariables(businessProfile).timezone;
-  const fallbackTimezone =
-    profileTimezone && isValidTimeZone(profileTimezone) ? profileTimezone : null;
-  const ghlCalendars = await listCalendars({
-    apiKey: context.apiKey,
-    locationId: context.locationId,
-  });
+  // Los calendarios actuales de GHL heredan la zona de la subcuenta y no
+  // siempre la incluyen en GET /calendars. No usamos aqui la zona del perfil
+  // local: si difiere de GHL, desplaza todas las citas aunque el ISO sea valido.
+  const [ghlCalendars, locationTimezone] = await Promise.all([
+    listCalendars({
+      apiKey: context.apiKey,
+      locationId: context.locationId,
+    }),
+    getLocationTimezone({
+      apiKey: context.apiKey,
+      locationId: context.locationId,
+    }),
+  ]);
   const ghlTimezoneByCalendar = new Map(
     ghlCalendars.map((calendar) => [calendar.id, calendar.timezone]),
   );
   const runtimeCalendars = fallbackCalendars.map((calendar) => ({
     ...calendar,
-    timezone: ghlTimezoneByCalendar.get(calendar.calendarId) ?? fallbackTimezone,
+    timezone:
+      ghlTimezoneByCalendar.get(calendar.calendarId) ??
+      locationTimezone,
   }));
   const calendarWithoutTimezone = runtimeCalendars.find(
     (calendar) => !calendar.timezone,
@@ -871,7 +876,7 @@ async function buildCalendarRuntime({
   if (calendarWithoutTimezone) {
     return {
       reason:
-        `No se pudo determinar la zona horaria de "${calendarWithoutTimezone.calendarName}": configurala en el calendario de GHL o en Negocio.`,
+        `No se pudo leer la zona horaria de GHL para "${calendarWithoutTimezone.calendarName}". Habilita View Locations en el Private Integration Token.`,
       runtime: null,
     };
   }
@@ -936,6 +941,11 @@ async function runCalendarTool(
 
   const timezone = calendar.timezone;
   const requestContext = resolveCalendarRequestContext(messages, timezone);
+  const formatSlot = (slot: { iso: string; label: string }) => ({
+    cuando: slot.label,
+    hora: slot.label.split(", ").at(-1) ?? slot.label,
+    inicio: slot.iso,
+  });
 
   try {
     if (call.name === "consultar_disponibilidad") {
@@ -956,10 +966,11 @@ async function runCalendarTool(
       const endDate =
         zonedStartOfDay(addDaysToDateKey(dateKey, days), timezone) ??
         new Date(startDate.getTime() + days * 24 * 60 * 60 * 1000);
-      const { debug, slots } = await getFreeSlots({
+      const { debug, slots } = await getVerifiedFreeSlots({
         apiKey: runtime.apiKey,
         calendarId: calendar.calendarId,
         endDate,
+        locationId: runtime.locationId,
         startDate,
         timezone,
       });
@@ -968,11 +979,6 @@ async function runCalendarTool(
             slotMatchesRequestedTime(slot.iso, timezone, requestContext.time!),
           )
         : [];
-      const formatSlot = (slot: (typeof slots)[number]) => ({
-        cuando: slot.label,
-        inicio: slot.iso,
-      });
-
       if (slots.length === 0) {
         return {
           // Las claves crudas quedan en el metadata del mensaje: si GHL empieza
@@ -991,7 +997,7 @@ async function runCalendarTool(
       return {
         fecha_consultada: dateKey,
         hora_solicitada: requestContext.time?.label ?? null,
-        horarios: slots.slice(0, 12).map(formatSlot),
+        horarios: slots.map(formatSlot),
         horario_solicitado: requestedSlots[0]
           ? formatSlot(requestedSlots[0])
           : null,
@@ -1025,10 +1031,11 @@ async function runCalendarTool(
           return { error: "No se pudo resolver la fecha solicitada." };
         }
 
-        ({ slots: freeSlots } = await getFreeSlots({
+        ({ slots: freeSlots } = await getVerifiedFreeSlots({
           apiKey: runtime.apiKey,
           calendarId: calendar.calendarId,
           endDate: dayEnd,
+          locationId: runtime.locationId,
           startDate: dayStart,
           timezone,
         }));
@@ -1041,10 +1048,7 @@ async function runCalendarTool(
             error: "El horario solicitado ya no esta libre.",
             fecha_consultada: requestContext.dateKey,
             hora_solicitada: requestContext.time.label,
-            horarios_libres: freeSlots.slice(0, 8).map((slot) => ({
-              cuando: slot.label,
-              inicio: slot.iso,
-            })),
+            horarios_libres: freeSlots.map(formatSlot),
           };
         }
 
@@ -1063,10 +1067,11 @@ async function runCalendarTool(
 
         const dayStart = new Date(requested.getTime() - 24 * 60 * 60 * 1000);
         const dayEnd = new Date(requested.getTime() + 24 * 60 * 60 * 1000);
-        ({ slots: freeSlots } = await getFreeSlots({
+        ({ slots: freeSlots } = await getVerifiedFreeSlots({
           apiKey: runtime.apiKey,
           calendarId: calendar.calendarId,
           endDate: dayEnd,
+          locationId: runtime.locationId,
           startDate: dayStart,
           timezone,
         }));
@@ -1080,10 +1085,7 @@ async function runCalendarTool(
       );
 
       if (!isFree) {
-        const alternativas = freeSlots.slice(0, 8).map((slot) => ({
-          cuando: slot.label,
-          inicio: slot.iso,
-        }));
+        const alternativas = freeSlots.map(formatSlot);
 
         return {
           error:
@@ -1187,15 +1189,18 @@ function buildDirectBookingAnswer(
     ? result.horarios_libres
         .map((slot) =>
           slot && typeof slot === "object" && !Array.isArray(slot)
-            ? String((slot as Record<string, unknown>).cuando ?? "")
+            ? String(
+                (slot as Record<string, unknown>).hora ??
+                  (slot as Record<string, unknown>).cuando ??
+                  "",
+              )
             : "",
         )
         .filter(Boolean)
-        .slice(0, 3)
     : [];
 
   if (alternatives.length > 0) {
-    return `Ese horario ya no esta libre. Para ese mismo dia tengo ${alternatives.join(", ")}. Cual prefieres?`;
+    return `Ese horario ya no esta libre. Para ese mismo dia tengo:\n${alternatives.map((time) => `- ${time}`).join("\n")}\nCual prefieres?`;
   }
 
   return "No pude registrar la cita en GHL en este momento y no quedo agendada. Intenta de nuevo en un momento para volver a validarla.";
@@ -1231,7 +1236,11 @@ function buildDirectAvailabilityAnswer(
     ? result.horarios
         .map((slot) =>
           slot && typeof slot === "object" && !Array.isArray(slot)
-            ? String((slot as Record<string, unknown>).cuando ?? "")
+            ? String(
+                (slot as Record<string, unknown>).hora ??
+                  (slot as Record<string, unknown>).cuando ??
+                  "",
+              )
             : "",
         )
         .filter(Boolean)
@@ -1243,12 +1252,12 @@ function buildDirectAvailabilityAnswer(
 
   if (requestedTime && requestedAvailable === false) {
     return slots.length > 0
-      ? `${requestedTime} no esta disponible el ${dateLabel}. Los primeros horarios libres reales son ${slots.slice(0, 3).join(", ")}. Cual prefieres?`
+      ? `${requestedTime} no esta disponible el ${dateLabel}. Los horarios libres reales son:\n${slots.map((time) => `- ${time}`).join("\n")}\nCual prefieres?`
       : `${requestedTime} no esta disponible el ${dateLabel} y GHL no devolvio otros horarios libres para ese dia.`;
   }
 
   return slots.length > 0
-    ? `Para el ${dateLabel}, los primeros horarios libres reales son ${slots.slice(0, 3).join(", ")}. Cual prefieres?`
+    ? `Para el ${dateLabel}, los horarios libres reales son:\n${slots.map((time) => `- ${time}`).join("\n")}\nCual prefieres?`
     : `GHL no devolvio horarios libres para el ${dateLabel}. Quieres que revise otro dia?`;
 }
 
@@ -1311,7 +1320,8 @@ function textLooksLikeAvailabilityClaim(text: string) {
     /\b(puedo|podemos)\b.*\b(agendar|reservar|programar)\b.*\b(a las|para las)\b/,
     /\b(?:he|hemos)?\s*(?:consultado|revisado|verificado)\b.*\b(?:disponibilidad|agenda|horarios?)\b/,
     /\b(?:no hay|no tengo|no tenemos)\b.*\b(?:horarios?|disponibilidad|huecos?|espacios?)\b/,
-    /\b(?:tengo|tenemos|hay|te dejo|estas son)\b.*\b(?:opciones?|horarios?)\b/,
+    /\b(?:tengo|tenemos|hay|te dejo|estas son|estos son)\b.*\b(?:opciones?|horarios?)\b/,
+    /\bhorarios?\b.*\b(?:disponibles?|libres?)\b/,
   ].some((pattern) => pattern.test(normalized));
 }
 
@@ -1517,7 +1527,28 @@ async function generateReply(
   );
   const bookingCall = toolCalls.findLast((call) => call.name === "agendar_cita");
 
-  if (availabilityCall && !bookingCall) {
+  if (bookingCall) {
+    const result = bookingCall.result as Record<string, unknown>;
+
+    return {
+      answer: ensureAgentIntroduction(
+        buildDirectBookingAnswer(result, calendarRuntime!),
+        agent,
+        introduceAgent,
+      ),
+      calendarGuard:
+        result.confirmada === true
+          ? null
+          : "La reserva fue rechazada o el horario ya no estaba libre.",
+      timezoneWarning,
+      model: payload.model ?? model,
+      responseId: payload.id ?? null,
+      toolCalls,
+      usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+    };
+  }
+
+  if (availabilityCall) {
     const result = availabilityCall.result as Record<string, unknown>;
 
     return {
@@ -1797,7 +1828,6 @@ export async function POST(request: Request) {
         .maybeSingle();
       const calendarResult = await buildCalendarRuntime({
         agent: typedAgent,
-        businessProfile: businessProfile as BusinessProfileAsset | null,
         contactId: conversation.contact_id,
         workspaceId: conversation.workspace_id,
       });

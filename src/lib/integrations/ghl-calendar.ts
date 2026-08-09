@@ -13,9 +13,16 @@ type GhlCalendar = {
   timezone: string | null;
 };
 
-type FreeSlot = {
+export type FreeSlot = {
   iso: string;
   label: string;
+};
+
+export type CalendarEvent = {
+  endTime: string | null;
+  id: string | null;
+  startTime: string;
+  status: string | null;
 };
 
 function apiBase() {
@@ -216,10 +223,148 @@ export async function getCalendarTimezone({
   return calendars.find((calendar) => calendar.id === calendarId)?.timezone ?? null;
 }
 
+/** Zona horaria de la subcuenta de GHL. Los calendarios actuales no siempre
+ * incluyen timezone en su respuesta y, en ese caso, heredan la de Location. */
+export async function getLocationTimezone({
+  apiKey,
+  locationId,
+}: {
+  apiKey: string;
+  locationId: string;
+}) {
+  try {
+    const payload = await calendarFetch<Record<string, unknown>>({
+      apiKey,
+      method: "GET",
+      path: `/locations/${encodeURIComponent(locationId)}`,
+      version: CONTACTS_API_VERSION,
+    });
+    const location =
+      payload.location &&
+      typeof payload.location === "object" &&
+      !Array.isArray(payload.location)
+        ? (payload.location as Record<string, unknown>)
+        : payload;
+    const timezone =
+      typeof location.timezone === "string"
+        ? location.timezone
+        : typeof location.timeZone === "string"
+          ? location.timeZone
+          : null;
+
+    return timezone && isValidTimeZone(timezone) ? timezone : null;
+  } catch {
+    // Tokens antiguos pueden no tener locations.readonly. La zona del perfil
+    // sigue siendo el respaldo para no romper agendas ya conectadas.
+    return null;
+  }
+}
+
 export type FreeSlotsResult = {
-  debug: { responseKeys: string[] };
+  debug: {
+    eventCount?: number;
+    removedOccupiedSlots?: number;
+    responseKeys: string[];
+  };
   slots: FreeSlot[];
 };
+
+export async function getCalendarEvents({
+  apiKey,
+  calendarId,
+  endDate,
+  locationId,
+  startDate,
+}: {
+  apiKey: string;
+  calendarId: string;
+  endDate: Date;
+  locationId: string;
+  startDate: Date;
+}): Promise<CalendarEvent[]> {
+  const payload = await calendarFetch<{ events?: Array<Record<string, unknown>> }>({
+    apiKey,
+    method: "GET",
+    path: "/calendars/events",
+    query: {
+      calendarId,
+      endTime: String(endDate.getTime()),
+      locationId,
+      startTime: String(startDate.getTime()),
+    },
+  });
+
+  return (payload.events ?? [])
+    .map((event) => ({
+      endTime:
+        typeof event.endTime === "string"
+          ? event.endTime
+          : typeof event.end_time === "string"
+            ? event.end_time
+            : null,
+      id: typeof event.id === "string" ? event.id : null,
+      startTime:
+        typeof event.startTime === "string"
+          ? event.startTime
+          : typeof event.start_time === "string"
+            ? event.start_time
+            : "",
+      status:
+        typeof event.appointmentStatus === "string"
+          ? event.appointmentStatus
+          : typeof event.status === "string"
+            ? event.status
+            : null,
+    }))
+    .filter((event) => event.startTime && !Number.isNaN(Date.parse(event.startTime)));
+}
+
+export function removeOccupiedSlots(slots: FreeSlot[], events: CalendarEvent[]) {
+  const occupied = events
+    .filter((event) => !/^(cancelled|canceled|invalid)$/i.test(event.status ?? ""))
+    .map((event) => {
+      const start = Date.parse(event.startTime);
+      const parsedEnd = event.endTime ? Date.parse(event.endTime) : Number.NaN;
+      const end = Number.isNaN(parsedEnd) || parsedEnd <= start ? start + 1 : parsedEnd;
+      return { end, start };
+    });
+
+  return slots.filter((slot) => {
+    const instant = Date.parse(slot.iso);
+    return !occupied.some((event) => instant >= event.start && instant < event.end);
+  });
+}
+
+export async function getVerifiedFreeSlots({
+  apiKey,
+  calendarId,
+  endDate,
+  locationId,
+  startDate,
+  timezone,
+}: {
+  apiKey: string;
+  calendarId: string;
+  endDate: Date;
+  locationId: string;
+  startDate: Date;
+  timezone: string;
+}): Promise<FreeSlotsResult> {
+  const [freeSlots, events] = await Promise.all([
+    getFreeSlots({ apiKey, calendarId, endDate, startDate, timezone }),
+    getCalendarEvents({ apiKey, calendarId, endDate, locationId, startDate }),
+  ]);
+  const slots = removeOccupiedSlots(freeSlots.slots, events);
+
+  return {
+    debug: {
+      ...freeSlots.debug,
+      eventCount: events.length,
+      removedOccupiedSlots: freeSlots.slots.length - slots.length,
+    },
+    slots,
+  };
+}
 
 export async function getFreeSlots({
   apiKey,

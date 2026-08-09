@@ -7,7 +7,8 @@ import {
   deleteCalendarEvent,
   ensureGhlContact,
   getAppointment,
-  getFreeSlots,
+  getLocationTimezone,
+  getVerifiedFreeSlots,
   isValidTimeZone,
   listCalendars,
 } from "@/lib/integrations/ghl-calendar";
@@ -96,8 +97,7 @@ export async function POST(request: Request) {
     }
 
     const admin = createAdminClient();
-    const [{ data: integration }, { data: toolAssets }, { data: businessProfile }] =
-      await Promise.all([
+    const [{ data: integration }, { data: toolAssets }] = await Promise.all([
         admin
           .from("integrations")
           .select("config")
@@ -111,15 +111,6 @@ export async function POST(request: Request) {
           .eq("workspace_id", workspaceId)
           .eq("kind", "tool")
           .neq("status", "archived"),
-        admin
-          .from("workspace_assets")
-          .select("metadata")
-          .eq("workspace_id", workspaceId)
-          .eq("kind", "business_profile")
-          .eq("status", "active")
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
       ]);
     const config = asRecord(integration?.config);
     const locationId = readString(config.location_id);
@@ -166,8 +157,23 @@ export async function POST(request: Request) {
       status: "passed",
     });
 
-    const profileFields = asRecord(asRecord(businessProfile?.metadata).fields);
-    const businessTimezone = readString(profileFields.timezone);
+    const locationTimezone = await runStep(
+      steps,
+      "location_timezone",
+      "Zona horaria de la subcuenta GHL",
+      async () => {
+        const timezone = await getLocationTimezone({ apiKey: apiKey!, locationId });
+
+        if (!timezone) {
+          throw new Error(
+            "No se pudo leer la zona horaria de GHL. Agrega el permiso View Locations al Private Integration Token.",
+          );
+        }
+
+        return timezone;
+      },
+      (timezone) => timezone,
+    );
     const testNumber = String(Math.floor(Math.random() * 100)).padStart(2, "0");
     contactId = await runStep(
       steps,
@@ -190,7 +196,7 @@ export async function POST(request: Request) {
     );
 
     for (const calendar of configuredCalendars) {
-      const timezone = calendar.timezone ?? businessTimezone;
+      const timezone = calendar.timezone ?? locationTimezone;
 
       if (!timezone || !isValidTimeZone(timezone)) {
         throw new Error(
@@ -211,10 +217,11 @@ export async function POST(request: Request) {
         `availability:${calendar.id}`,
         `Disponibilidad: ${calendar.name}`,
         () =>
-          getFreeSlots({
+          getVerifiedFreeSlots({
             apiKey: apiKey!,
             calendarId: calendar.id,
             endDate,
+            locationId,
             startDate,
             timezone,
           }).then((result) => {
