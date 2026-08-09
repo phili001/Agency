@@ -242,6 +242,23 @@ export function resolveCalendarRequestContext(
     }
   }
 
+  // Una respuesta corta conserva el AM/PM de la ultima lista ofrecida.
+  // Sin esto, al salir del buffer el ultimo "PM" del cliente, "a la 1"
+  // podia resolverse como 01:00 AM por ser el primer hueco cronologico.
+  if (!inheritedMeridiem) {
+    for (let index = latestInboundIndex - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+
+      if (message.direction === "outbound") {
+        inheritedMeridiem = parseTime(message.body ?? "")?.explicitMeridiem ?? null;
+      }
+
+      if (inheritedMeridiem) {
+        break;
+      }
+    }
+  }
+
   return {
     dateKey: directDate ?? inheritedDate,
     inheritedDate: !directDate && Boolean(inheritedDate),

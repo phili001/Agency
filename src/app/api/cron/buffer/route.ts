@@ -10,7 +10,6 @@ import {
   addDaysToDateKey,
   resolveCalendarRequestContext,
   slotMatchesRequestedTime,
-  type CalendarRequestContext,
 } from "@/lib/calendar-request";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -22,10 +21,10 @@ import { getWorkspaceOpenAIKey } from "@/lib/integrations/openai";
 import {
   createAppointment,
   ensureGhlContact,
-  getCalendarTimezone,
   getFreeSlots,
   getWorkspaceCalendarContext,
   isValidTimeZone,
+  listCalendars,
   zonedStartOfDay,
 } from "@/lib/integrations/ghl-calendar";
 
@@ -747,7 +746,7 @@ type CalendarRuntimeResult =
 
 type CalendarRuntime = {
   apiKey: string;
-  calendars: CalendarTool[];
+  calendars: Array<CalendarTool & { timezone: string }>;
   contact: {
     email: string | null;
     fullName: string | null;
@@ -849,26 +848,37 @@ async function buildCalendarRuntime({
     };
   }
 
-  // Cada empresa tiene su propia zona horaria. Se toma la del perfil de negocio
-  // y, si no esta configurada, la que tenga el calendario en GHL. Nunca se
-  // adivina una por defecto: una zona equivocada agenda a la hora equivocada.
+  // La zona del calendario de GHL es la autoridad. La del perfil del negocio
+  // solo sirve como respaldo si un calendario antiguo no expone timezone.
   const profileTimezone = getBusinessVariables(businessProfile).timezone;
-  const timezone =
-    profileTimezone && isValidTimeZone(profileTimezone)
-      ? profileTimezone
-      : await getCalendarTimezone({
-          apiKey: context.apiKey,
-          calendarId: fallbackCalendars[0].calendarId,
-          locationId: context.locationId,
-        });
+  const fallbackTimezone =
+    profileTimezone && isValidTimeZone(profileTimezone) ? profileTimezone : null;
+  const ghlCalendars = await listCalendars({
+    apiKey: context.apiKey,
+    locationId: context.locationId,
+  });
+  const ghlTimezoneByCalendar = new Map(
+    ghlCalendars.map((calendar) => [calendar.id, calendar.timezone]),
+  );
+  const runtimeCalendars = fallbackCalendars.map((calendar) => ({
+    ...calendar,
+    timezone: ghlTimezoneByCalendar.get(calendar.calendarId) ?? fallbackTimezone,
+  }));
+  const calendarWithoutTimezone = runtimeCalendars.find(
+    (calendar) => !calendar.timezone,
+  );
 
-  if (!timezone) {
+  if (calendarWithoutTimezone) {
     return {
       reason:
-        "No se pudo determinar la zona horaria: configurala en Negocio o en el calendario de GHL.",
+        `No se pudo determinar la zona horaria de "${calendarWithoutTimezone.calendarName}": configurala en el calendario de GHL o en Negocio.`,
       runtime: null,
     };
   }
+
+  const calendarsWithTimezone = runtimeCalendars as Array<
+    CalendarTool & { timezone: string }
+  >;
 
   const metadata =
     contact.metadata && typeof contact.metadata === "object" && !Array.isArray(contact.metadata)
@@ -879,7 +889,7 @@ async function buildCalendarRuntime({
     reason: null,
     runtime: {
       apiKey: context.apiKey,
-      calendars: fallbackCalendars,
+      calendars: calendarsWithTimezone,
       contact: {
         email: contact.email,
         fullName: contact.full_name,
@@ -889,7 +899,7 @@ async function buildCalendarRuntime({
         phone: contact.phone_e164,
       },
       locationId: context.locationId,
-      timezone,
+      timezone: calendarsWithTimezone[0].timezone,
       workspaceId,
     },
   };
@@ -898,7 +908,7 @@ async function buildCalendarRuntime({
 async function runCalendarTool(
   runtime: CalendarRuntime,
   call: OpenAIOutputItem,
-  requestContext: CalendarRequestContext,
+  messages: MessageRow[],
 ): Promise<Record<string, unknown>> {
   let args: Record<string, unknown> = {};
 
@@ -924,6 +934,9 @@ async function runCalendarTool(
     };
   }
 
+  const timezone = calendar.timezone;
+  const requestContext = resolveCalendarRequestContext(messages, timezone);
+
   try {
     if (call.name === "consultar_disponibilidad") {
       // La medianoche se resuelve en la zona horaria de esta empresa, no en la
@@ -931,7 +944,7 @@ async function runCalendarTool(
       // La fecha resuelta desde la conversacion manda sobre la que proponga el
       // modelo. Asi "y a las 4?" conserva el viernes del turno anterior.
       const dateKey = requestContext.dateKey ?? String(args.fecha_inicio);
-      const startDate = zonedStartOfDay(dateKey, runtime.timezone);
+      const startDate = zonedStartOfDay(dateKey, timezone);
 
       if (!startDate) {
         return { error: "fecha_inicio invalida. Usa formato YYYY-MM-DD." };
@@ -941,18 +954,18 @@ async function runCalendarTool(
         ? 1
         : Math.min(Math.max(Number(args.dias) || 1, 1), 14);
       const endDate =
-        zonedStartOfDay(addDaysToDateKey(dateKey, days), runtime.timezone) ??
+        zonedStartOfDay(addDaysToDateKey(dateKey, days), timezone) ??
         new Date(startDate.getTime() + days * 24 * 60 * 60 * 1000);
       const { debug, slots } = await getFreeSlots({
         apiKey: runtime.apiKey,
         calendarId: calendar.calendarId,
         endDate,
         startDate,
-        timezone: runtime.timezone,
+        timezone,
       });
       const requestedSlots = requestContext.time
         ? slots.filter((slot) =>
-            slotMatchesRequestedTime(slot.iso, runtime.timezone, requestContext.time!),
+            slotMatchesRequestedTime(slot.iso, timezone, requestContext.time!),
           )
         : [];
       const formatSlot = (slot: (typeof slots)[number]) => ({
@@ -964,7 +977,7 @@ async function runCalendarTool(
         return {
           // Las claves crudas quedan en el metadata del mensaje: si GHL empieza
           // a responder con otra forma, es lo unico que permite verlo.
-          diagnostico: `GHL respondio sin huecos. Claves: ${debug.responseKeys.join(", ") || "(ninguna)"}. Calendario: ${calendar.calendarId}. Zona: ${runtime.timezone}.`,
+          diagnostico: `GHL respondio sin huecos. Claves: ${debug.responseKeys.join(", ") || "(ninguna)"}. Calendario: ${calendar.calendarId}. Zona: ${timezone}.`,
           fecha_consultada: dateKey,
           hora_solicitada: requestContext.time?.label ?? null,
           horarios: [],
@@ -985,7 +998,7 @@ async function runCalendarTool(
         horario_solicitado_disponible: requestContext.time
           ? requestedSlots.length > 0
           : null,
-        zona_horaria: runtime.timezone,
+        zona_horaria: timezone,
       };
     }
 
@@ -993,11 +1006,19 @@ async function runCalendarTool(
       let startTime = String(args.horario_iso ?? "");
       let freeSlots: Array<{ iso: string; label: string }>;
 
+      if (requestContext.time && requestContext.time.hours.length > 1) {
+        return {
+          error: `La hora ${requestContext.time.label} es ambigua. Pregunta si se refiere a AM o PM antes de reservar.`,
+          fecha_consultada: requestContext.dateKey,
+          hora_solicitada: requestContext.time.label,
+        };
+      }
+
       if (requestContext.dateKey && requestContext.time) {
-        const dayStart = zonedStartOfDay(requestContext.dateKey, runtime.timezone);
+        const dayStart = zonedStartOfDay(requestContext.dateKey, timezone);
         const dayEnd = zonedStartOfDay(
           addDaysToDateKey(requestContext.dateKey, 1),
-          runtime.timezone,
+          timezone,
         );
 
         if (!dayStart || !dayEnd) {
@@ -1009,10 +1030,10 @@ async function runCalendarTool(
           calendarId: calendar.calendarId,
           endDate: dayEnd,
           startDate: dayStart,
-          timezone: runtime.timezone,
+          timezone,
         }));
         const contextualSlot = freeSlots.find((slot) =>
-          slotMatchesRequestedTime(slot.iso, runtime.timezone, requestContext.time!),
+          slotMatchesRequestedTime(slot.iso, timezone, requestContext.time!),
         );
 
         if (!contextualSlot) {
@@ -1047,7 +1068,7 @@ async function runCalendarTool(
           calendarId: calendar.calendarId,
           endDate: dayEnd,
           startDate: dayStart,
-          timezone: runtime.timezone,
+          timezone,
         }));
       }
 
@@ -1123,7 +1144,12 @@ async function runCalendarTool(
         .eq("id", runtime.contact.id)
         .eq("workspace_id", runtime.workspaceId);
 
-      return { cita_id: appointmentId, confirmada: true, inicio: startTime };
+      return {
+        cita_id: appointmentId,
+        confirmada: true,
+        inicio: startTime,
+        zona_horaria: timezone,
+      };
     }
 
     return { error: `Tool desconocida: ${call.name}` };
@@ -1143,10 +1169,14 @@ function buildDirectBookingAnswer(
     typeof result.cita_id === "string" &&
     typeof result.inicio === "string"
   ) {
+    const resultTimezone =
+      typeof result.zona_horaria === "string"
+        ? result.zona_horaria
+        : runtime.timezone;
     const when = new Intl.DateTimeFormat("es-CO", {
       dateStyle: "full",
       timeStyle: "short",
-      timeZone: runtime.timezone,
+      timeZone: resultTimezone,
     }).format(new Date(result.inicio));
     const firstName = runtime.contact.fullName?.trim().split(/\s+/)[0];
 
@@ -1169,6 +1199,57 @@ function buildDirectBookingAnswer(
   }
 
   return "No pude registrar la cita en GHL en este momento y no quedo agendada. Intenta de nuevo en un momento para volver a validarla.";
+}
+
+function buildDirectAvailabilityAnswer(
+  result: Record<string, unknown>,
+  runtime: CalendarRuntime,
+) {
+  if (typeof result.error === "string") {
+    return "No pude consultar la agenda real en este momento. Intenta de nuevo en un momento y la reviso directamente en GHL.";
+  }
+
+  const timezone =
+    typeof result.zona_horaria === "string"
+      ? result.zona_horaria
+      : runtime.timezone;
+  const dateKey =
+    typeof result.fecha_consultada === "string"
+      ? result.fecha_consultada
+      : null;
+  const dayStart = dateKey ? zonedStartOfDay(dateKey, timezone) : null;
+  const dateLabel = dayStart
+    ? new Intl.DateTimeFormat("es-CO", {
+        dateStyle: "full",
+        timeZone: timezone,
+      }).format(dayStart)
+    : "ese dia";
+  const requestedTime =
+    typeof result.hora_solicitada === "string" ? result.hora_solicitada : null;
+  const requestedAvailable = result.horario_solicitado_disponible;
+  const slots = Array.isArray(result.horarios)
+    ? result.horarios
+        .map((slot) =>
+          slot && typeof slot === "object" && !Array.isArray(slot)
+            ? String((slot as Record<string, unknown>).cuando ?? "")
+            : "",
+        )
+        .filter(Boolean)
+    : [];
+
+  if (requestedTime && requestedAvailable === true) {
+    return `Si, ${requestedTime} esta disponible el ${dateLabel}. Quieres que reserve esa hora?`;
+  }
+
+  if (requestedTime && requestedAvailable === false) {
+    return slots.length > 0
+      ? `${requestedTime} no esta disponible el ${dateLabel}. Los primeros horarios libres reales son ${slots.slice(0, 3).join(", ")}. Cual prefieres?`
+      : `${requestedTime} no esta disponible el ${dateLabel} y GHL no devolvio otros horarios libres para ese dia.`;
+  }
+
+  return slots.length > 0
+    ? `Para el ${dateLabel}, los primeros horarios libres reales son ${slots.slice(0, 3).join(", ")}. Cual prefieres?`
+    : `GHL no devolvio horarios libres para el ${dateLabel}. Quieres que revise otro dia?`;
 }
 
 async function callResponsesApi({
@@ -1406,7 +1487,7 @@ async function generateReply(
       const result = await runCalendarTool(
         calendarRuntime,
         call,
-        calendarRequest ?? { dateKey: null, inheritedDate: false, time: null },
+        messages,
       );
       toolCalls.push({ name: call.name, result });
       input.push({
@@ -1426,6 +1507,35 @@ async function generateReply(
     });
     inputTokens += Number(payload.usage?.input_tokens ?? 0);
     outputTokens += Number(payload.usage?.output_tokens ?? 0);
+  }
+
+  // La disponibilidad se redacta con datos estructurados del servidor. Dejar
+  // esta parte al modelo permitia que un ISO de 01:00 AM terminara anunciado
+  // como 1 PM aunque la consulta a GHL hubiera sido correcta.
+  const availabilityCall = toolCalls.findLast(
+    (call) => call.name === "consultar_disponibilidad",
+  );
+  const bookingCall = toolCalls.findLast((call) => call.name === "agendar_cita");
+
+  if (availabilityCall && !bookingCall) {
+    const result = availabilityCall.result as Record<string, unknown>;
+
+    return {
+      answer: ensureAgentIntroduction(
+        buildDirectAvailabilityAnswer(result, calendarRuntime!),
+        agent,
+        introduceAgent,
+      ),
+      calendarGuard:
+        typeof result.error === "string"
+          ? "La consulta de disponibilidad fallo en GHL."
+          : null,
+      timezoneWarning,
+      model: payload.model ?? model,
+      responseId: payload.id ?? null,
+      toolCalls,
+      usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+    };
   }
 
   // Cuando el cliente elige una hora ya ofrecida, la reserva no depende de que
@@ -1448,7 +1558,7 @@ async function generateReply(
         }),
         name: "agendar_cita",
       },
-      calendarRequest,
+      messages,
     );
     toolCalls.push({ automatic: true, name: "agendar_cita", result });
 

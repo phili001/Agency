@@ -272,14 +272,17 @@ export async function getFreeSlots({
 
       slots.push({
         iso: slot,
-        label: new Intl.DateTimeFormat("es", {
+        label: `${new Intl.DateTimeFormat("es", {
           day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
           month: "long",
           timeZone: timezone,
           weekday: "long",
-        }).format(parsed),
+        }).format(parsed)}, ${new Intl.DateTimeFormat("en-US", {
+          hour: "2-digit",
+          hour12: true,
+          minute: "2-digit",
+          timeZone: timezone,
+        }).format(parsed)}`,
       });
     }
   }
