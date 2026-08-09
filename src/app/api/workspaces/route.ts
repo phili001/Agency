@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 
 import { requireUser, requireWorkspaceRole } from "@/lib/authz";
 import {
+  type DefaultConversationMode,
+  withDefaultConversationMode,
+} from "@/lib/conversation-default";
+import {
   getOnboardingChecklist,
   isChecklistComplete,
   setActiveWorkspaceId,
@@ -10,8 +14,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
   try {
-    const { action, workspaceId } = (await request.json()) as {
-      action?: "complete_onboarding" | "select";
+    const { action, defaultConversationMode, workspaceId } = (await request.json()) as {
+      action?: "complete_onboarding" | "select" | "set_default_conversation_mode";
+      defaultConversationMode?: DefaultConversationMode;
       workspaceId?: string;
     };
 
@@ -44,11 +49,23 @@ export async function POST(request: Request) {
       }
 
       const admin = createAdminClient();
+      const { data: workspace } = await admin
+        .from("workspaces")
+        .select("onboarding_state")
+        .eq("id", workspaceId)
+        .single();
       const { error } = await admin
         .from("workspaces")
         .update({
           onboarding_completed_at: new Date().toISOString(),
-          onboarding_state: checklist,
+          onboarding_state: {
+            ...(workspace?.onboarding_state &&
+            typeof workspace.onboarding_state === "object" &&
+            !Array.isArray(workspace.onboarding_state)
+              ? workspace.onboarding_state
+              : {}),
+            ...checklist,
+          },
         })
         .eq("id", workspaceId);
 
@@ -57,6 +74,43 @@ export async function POST(request: Request) {
       }
 
       return NextResponse.json({ checklist, ok: true });
+    }
+
+    if (action === "set_default_conversation_mode") {
+      if (!workspaceId || !["ai", "handoff"].includes(defaultConversationMode ?? "")) {
+        return NextResponse.json(
+          { error: "workspaceId y modo valido son requeridos." },
+          { status: 400 },
+        );
+      }
+
+      await requireWorkspaceRole(workspaceId, ["owner", "admin"]);
+      const admin = createAdminClient();
+      const { data: workspace, error: workspaceError } = await admin
+        .from("workspaces")
+        .select("onboarding_state")
+        .eq("id", workspaceId)
+        .single();
+
+      if (workspaceError) {
+        throw workspaceError;
+      }
+
+      const { error } = await admin
+        .from("workspaces")
+        .update({
+          onboarding_state: withDefaultConversationMode(
+            workspace.onboarding_state,
+            defaultConversationMode as DefaultConversationMode,
+          ),
+        })
+        .eq("id", workspaceId);
+
+      if (error) {
+        throw error;
+      }
+
+      return NextResponse.json({ defaultConversationMode, ok: true });
     }
 
     return NextResponse.json({ error: "Accion no soportada." }, { status: 400 });

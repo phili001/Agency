@@ -32,6 +32,7 @@ import {
   buildDefaultAgentPrompt,
   defaultAgentPresets,
 } from "@/lib/default-agents";
+import { getDefaultConversationMode } from "@/lib/conversation-default";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlatformAdmin } from "@/lib/platform-admin";
@@ -1044,6 +1045,9 @@ export async function AppShell({ section }: { section: AppSection }) {
                 agents={agents}
                 appUrl={normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL)}
                 assets={workspaceAssets}
+                defaultConversationMode={getDefaultConversationMode(
+                  workspace?.onboarding_state,
+                )}
                 initialTab={workspaceTab}
                 integrations={integrations}
                 members={displayMembers}

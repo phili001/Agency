@@ -32,6 +32,7 @@ import {
   normalizeVariableKey,
 } from "@/lib/business-profile";
 import type { Json } from "@/lib/supabase/database.types";
+import type { DefaultConversationMode } from "@/lib/conversation-default";
 import { createClient } from "@/lib/supabase/client";
 
 type IntegrationItem = {
@@ -93,6 +94,7 @@ type WorkspaceSettingsProps = {
   agents: AgentItem[];
   appUrl: string;
   assets: WorkspaceAsset[];
+  defaultConversationMode?: DefaultConversationMode;
   initialTab?: TabId;
   integrations: IntegrationItem[];
   members: WorkspaceMember[];
@@ -311,6 +313,7 @@ export function WorkspaceSettings({
   agents,
   appUrl,
   assets,
+  defaultConversationMode = "ai",
   initialTab = "agents",
   integrations,
   members,
@@ -1691,6 +1694,7 @@ export function WorkspaceSettings({
         {activeTab === "agents" ? (
           <AgentSettings
             agents={agents}
+            defaultConversationMode={defaultConversationMode}
             knowledgeAssets={knowledgeAssets}
             tools={tools}
             workspaceId={workspaceId}

@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   BookOpenText,
   Bot,
+  Headphones,
   Loader2,
   Play,
   Save,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 
 import type { Json } from "@/lib/supabase/database.types";
+import type { DefaultConversationMode } from "@/lib/conversation-default";
 import { createClient } from "@/lib/supabase/client";
 
 type AgentType = "setter" | "booking" | "support";
@@ -39,6 +41,7 @@ type WorkspaceAsset = {
 
 type AgentSettingsProps = {
   agents: AgentItem[];
+  defaultConversationMode?: DefaultConversationMode;
   knowledgeAssets?: WorkspaceAsset[];
   tools?: WorkspaceAsset[];
   workspaceId?: string | null;
@@ -55,9 +58,9 @@ type AgentConfig = {
 };
 
 const agentTypeOptions: Array<{ label: string; value: AgentType }> = [
-  { label: "Informacion y ventas", value: "setter" },
+  { label: "Setter / Ventas", value: "setter" },
   { label: "Citas", value: "booking" },
-  { label: "Soporte", value: "support" },
+  { label: "Informacion", value: "support" },
 ];
 
 function isAgentType(value: unknown): value is AgentType {
@@ -151,6 +154,17 @@ function toggleValue(values: string[], value: string) {
   return values.includes(value)
     ? values.filter((item) => item !== value)
     : [...values, value];
+}
+
+function sortAgents(agents: AgentItem[]) {
+  const order: Record<AgentType, number> = { support: 0, setter: 1, booking: 2 };
+
+  return [...agents].sort((left, right) => {
+    const leftType = getAgentConfig(left.config).default_agent_key;
+    const rightType = getAgentConfig(right.config).default_agent_key;
+
+    return (leftType ? order[leftType] : 3) - (rightType ? order[rightType] : 3);
+  });
 }
 
 const responseStyles = [
@@ -262,13 +276,16 @@ function ToggleSwitch({
 
 export function AgentSettings({
   agents,
+  defaultConversationMode = "ai",
   knowledgeAssets = [],
   tools = [],
   workspaceId,
 }: AgentSettingsProps) {
   const supabase = createClient();
-  const [localAgents, setLocalAgents] = useState(agents);
-  const [selectedAgentId, setSelectedAgentId] = useState(agents[0]?.id ?? "");
+  const [localAgents, setLocalAgents] = useState(() => sortAgents(agents));
+  const [selectedAgentId, setSelectedAgentId] = useState(
+    () => sortAgents(agents)[0]?.id ?? "",
+  );
   const selectedAgent =
     localAgents.find((agent) => agent.id === selectedAgentId) ?? localAgents[0];
   const selectedConfig = getAgentConfig(selectedAgent?.config ?? {});
@@ -297,7 +314,38 @@ export function AgentSettings({
   const [isTesting, setIsTesting] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [conversationMode, setConversationMode] = useState(defaultConversationMode);
+  const [isSavingConversationMode, setIsSavingConversationMode] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  async function saveDefaultConversationMode(mode: DefaultConversationMode) {
+    if (!workspaceId || mode === conversationMode) {
+      return;
+    }
+
+    setIsSavingConversationMode(true);
+    setStatus("");
+    const response = await fetch("/api/workspaces", {
+      body: JSON.stringify({
+        action: "set_default_conversation_mode",
+        defaultConversationMode: mode,
+        workspaceId,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    const payload = (await response.json()) as { error?: string };
+
+    if (!response.ok) {
+      setStatus(payload.error ?? "No se pudo guardar el modo de conversacion.");
+      setIsSavingConversationMode(false);
+      return;
+    }
+
+    setConversationMode(mode);
+    setStatus(`Conversaciones nuevas: ${mode === "ai" ? "IA" : "Handoff"}.`);
+    setIsSavingConversationMode(false);
+  }
 
   function selectAgent(agent: AgentItem) {
     const config = getAgentConfig(agent.config);
@@ -413,7 +461,7 @@ export function AgentSettings({
       return;
     }
 
-    setLocalAgents((current) => [data, ...current]);
+    setLocalAgents((current) => sortAgents([data, ...current]));
     setSelectedAgentId(data.id);
     const dataPrompt = parseAgentPrompt(data.system_prompt);
     const dataConfig = getAgentConfig(data.config);
@@ -546,14 +594,51 @@ export function AgentSettings({
   return (
     <>
     <section className="min-w-0 rounded-lg border border-[#d9ded3] bg-white p-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Bot className="text-[#35735b]" size={19} />
           <h2 className="text-base font-semibold">Configuracion de agentes</h2>
         </div>
-        <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
-          {getAgentTypeLabel(form.type)}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-[#647067]">Conversaciones nuevas</span>
+          <div className="inline-flex rounded-lg border border-[#cbd2c6] bg-[#f6f7f3] p-0.5">
+            <button
+              aria-pressed={conversationMode === "ai"}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition ${
+                conversationMode === "ai"
+                  ? "bg-[#10231c] text-white"
+                  : "text-[#4d5a51] hover:bg-white"
+              }`}
+              disabled={isSavingConversationMode}
+              onClick={() => saveDefaultConversationMode("ai")}
+              type="button"
+            >
+              <Bot size={14} />
+              IA
+            </button>
+            <button
+              aria-pressed={conversationMode === "handoff"}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition ${
+                conversationMode === "handoff"
+                  ? "bg-[#10231c] text-white"
+                  : "text-[#4d5a51] hover:bg-white"
+              }`}
+              disabled={isSavingConversationMode}
+              onClick={() => saveDefaultConversationMode("handoff")}
+              type="button"
+            >
+              {isSavingConversationMode ? (
+                <Loader2 className="animate-spin" size={14} />
+              ) : (
+                <Headphones size={14} />
+              )}
+              Handoff
+            </button>
+          </div>
+          <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
+            {getAgentTypeLabel(form.type)}
+          </span>
+        </div>
       </div>
 
       <div className="mt-4 grid gap-2 rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3 sm:grid-cols-3">

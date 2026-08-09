@@ -3,6 +3,10 @@ import "server-only";
 import { NextResponse } from "next/server";
 
 import { normalizeAppUrl } from "@/lib/app-url";
+import {
+  type DefaultConversationMode,
+  getDefaultConversationMode,
+} from "@/lib/conversation-default";
 import { handleInboundFlow } from "@/lib/flow-engine";
 import { syncContactToGoHighLevel } from "@/lib/integrations/gohighlevel";
 import { hashSecret } from "@/lib/integrations/secrets";
@@ -457,10 +461,12 @@ function normalizeMessageStatus(value: string | null) {
 }
 
 async function storeYCloudMessage({
+  defaultConversationMode,
   event,
   resolvedWorkspaceId,
   supabase,
 }: {
+  defaultConversationMode: DefaultConversationMode;
   event: NormalizedYCloudEvent;
   resolvedWorkspaceId: string;
   supabase: ReturnType<typeof createAdminClient>;
@@ -537,13 +543,15 @@ async function storeYCloudMessage({
 
   const { data: existingConversation } = await supabase
     .from("conversations")
-    .select("id")
+    .select("id, ai_enabled")
     .eq("workspace_id", resolvedWorkspaceId)
     .eq("contact_id", contact.id)
     .neq("status", "closed")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  const newConversationUsesAi =
+    event.direction === "inbound" && defaultConversationMode === "ai";
   const conversationId =
     existingConversation?.id ??
     (
@@ -553,8 +561,8 @@ async function storeYCloudMessage({
           contact_id: contact.id,
           external_conversation_id: event.externalId,
           last_message_at: new Date().toISOString(),
-          ai_enabled: false,
-          status: "pending_handoff",
+          ai_enabled: newConversationUsesAi,
+          status: newConversationUsesAi ? "open" : "pending_handoff",
           workspace_id: resolvedWorkspaceId,
         })
         .select("id")
@@ -661,6 +669,7 @@ async function storeYCloudMessage({
     conversationId,
     shouldStartAiBuffer:
       event.direction === "inbound" &&
+      (existingConversation?.ai_enabled ?? newConversationUsesAi) &&
       Boolean(event.messageText?.trim()) &&
       (existingContact?.messaging_status ?? "active") !== "blocked",
   };
@@ -680,15 +689,18 @@ export async function handleYCloudWebhook(
   const workspaceQuery = looksLikeCompanyCode(normalizedIdentifier)
     ? await supabase
         .from("workspaces")
-        .select("id, company_code")
+        .select("id, company_code, onboarding_state")
         .eq("company_code", normalizedIdentifier.toUpperCase())
         .maybeSingle()
     : await supabase
         .from("workspaces")
-        .select("id, company_code")
+        .select("id, company_code, onboarding_state")
         .eq("id", normalizedIdentifier)
         .maybeSingle();
   const resolvedWorkspaceId = workspaceQuery.data?.id ?? workspaceId;
+  const defaultConversationMode = getDefaultConversationMode(
+    workspaceQuery.data?.onboarding_state,
+  );
   const { data: integration } = await supabase
     .from("integrations")
     .select("id, workspace_id, config")
@@ -833,6 +845,7 @@ export async function handleYCloudWebhook(
         status = "stored";
       } else if (event.messageText && event.contactPhone) {
         const storedMessage = await storeYCloudMessage({
+          defaultConversationMode,
           event,
           resolvedWorkspaceId,
           supabase,
@@ -869,6 +882,7 @@ export async function handleYCloudWebhook(
       }
     } else if (event.contactPhone) {
       const storedMessage = await storeYCloudMessage({
+        defaultConversationMode,
         event,
         resolvedWorkspaceId,
         supabase,
