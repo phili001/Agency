@@ -513,6 +513,11 @@ function buildCalendarContext(calendarRuntime: CalendarRuntime | null) {
 - Antes de mencionar cualquier horario, llama a consultar_disponibilidad. Nunca inventes huecos.
 - Ofrece como maximo 3 opciones por mensaje, en lenguaje natural, sin mostrar fechas ISO ni IDs.
 - Solo llama a agendar_cita cuando el cliente haya elegido explicitamente uno de los horarios que le ofreciste, y ya tengas su nombre.
+- SOLO puedes decir que la cita quedo agendada si agendar_cita respondio con
+  "confirmada": true y un "cita_id". Esa respuesta es la unica prueba valida.
+- Si agendar_cita devuelve un error, o no devuelve "cita_id", la cita NO existe.
+  Dilo con claridad, discupate y ofrece reintentar u otro horario. Nunca digas
+  que quedo agendada, ni prometas recordatorios de una cita que fallo.
 - Si una tool devuelve un error, no lo repitas literal: explica el problema en palabras simples y ofrece otra opcion.`;
 }
 

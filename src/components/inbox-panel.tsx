@@ -286,6 +286,9 @@ export function InboxPanel({
     });
   }
 
+  // Id estable de la conversacion abierta, para que el polling pida sus mensajes.
+  const openConversationId = selectedConversation?.id ?? "";
+
   useEffect(() => {
     if (!workspaceId) {
       return;
@@ -294,9 +297,16 @@ export function InboxPanel({
     let cancelled = false;
 
     async function refreshSnapshot() {
-      const response = await fetch(
-        `/api/inbox/snapshot?workspaceId=${encodeURIComponent(workspaceId!)}`,
-      );
+      // Se pide explicitamente la conversacion abierta: el backend solo carga
+      // los mensajes de esa, para que el inbox no dependa de cuantos miles de
+      // mensajes tenga el workspace.
+      const query = new URLSearchParams({ workspaceId: workspaceId! });
+
+      if (openConversationId) {
+        query.set("conversationId", openConversationId);
+      }
+
+      const response = await fetch(`/api/inbox/snapshot?${query.toString()}`);
 
       if (!response.ok) {
         return;
@@ -305,6 +315,7 @@ export function InboxPanel({
       const payload = (await response.json()) as {
         conversations?: ConversationItem[];
         messages?: MessageItem[];
+        messagesConversationId?: string | null;
       };
 
       if (cancelled) {
@@ -316,10 +327,19 @@ export function InboxPanel({
         setSelectedConversationId((current) => current || payload.conversations?.[0]?.id || "");
       }
 
-      if (payload.messages) {
+      if (payload.messages && payload.messagesConversationId) {
         setLocalMessages((current) => {
-          const localPending = current.filter((message) => message.id.startsWith("local-"));
-          return [...payload.messages!, ...localPending];
+          // Se reemplazan solo los de la conversacion que vino; los de las
+          // demas se conservan para que volver a ellas sea inmediato.
+          const otras = current.filter(
+            (message) =>
+              message.conversation_id !== payload.messagesConversationId &&
+              !message.id.startsWith("local-"),
+          );
+          const pendientes = current.filter((message) =>
+            message.id.startsWith("local-"),
+          );
+          return [...otras, ...payload.messages!, ...pendientes];
         });
       }
     }
@@ -331,7 +351,7 @@ export function InboxPanel({
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [workspaceId]);
+  }, [openConversationId, workspaceId]);
 
   async function insertMessage({
     body,

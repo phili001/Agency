@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+/** Mensajes que se cargan de la conversacion abierta. */
+const MESSAGE_PAGE_SIZE = 300;
+
 function stableTime(value: string | null) {
   if (!value) {
     return "Nueva";
@@ -37,6 +40,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const workspaceId = searchParams.get("workspaceId")?.trim();
+    const requestedConversationId = searchParams.get("conversationId")?.trim();
 
     if (!workspaceId) {
       return NextResponse.json({ error: "workspaceId requerido." }, { status: 400 });
@@ -56,6 +60,11 @@ export async function GET(request: Request) {
     ]);
     const contactIds = [...new Set((conversations ?? []).map((item) => item.contact_id))];
     const conversationIds = (conversations ?? []).map((item) => item.id);
+    // Si la pedida ya no esta entre las visibles, se cae a la mas reciente.
+    const targetConversationId =
+      requestedConversationId && conversationIds.includes(requestedConversationId)
+        ? requestedConversationId
+        : conversationIds[0];
     const [{ data: contacts }, { data: messages }, { data: flowRuns }] = await Promise.all([
       contactIds.length
         ? admin
@@ -64,14 +73,18 @@ export async function GET(request: Request) {
             .eq("workspace_id", workspaceId)
             .in("id", contactIds)
         : Promise.resolve({ data: [] }),
-      conversationIds.length
+      // Solo los mensajes de la conversacion abierta, y los mas RECIENTES.
+      // Traer 2000 de las 100 conversaciones no escalaba, y pedirlos
+      // ascendentes hacia que el limite cortara justo los mensajes nuevos:
+      // pasados 2000 mensajes el inbox se quedaba congelado en el pasado.
+      targetConversationId
         ? admin
             .from("messages")
             .select("id, conversation_id, body, direction, role, message_type, created_at")
             .eq("workspace_id", workspaceId)
-            .in("conversation_id", conversationIds)
-            .order("created_at", { ascending: true })
-            .limit(2000)
+            .eq("conversation_id", targetConversationId)
+            .order("created_at", { ascending: false })
+            .limit(MESSAGE_PAGE_SIZE)
         : Promise.resolve({ data: [] }),
       conversationIds.length
         ? admin
@@ -158,7 +171,9 @@ export async function GET(request: Request) {
           workspaceId,
         };
       }),
-      messages: messages ?? [],
+      // Se invierten para mostrarlos en orden cronologico dentro del chat.
+      messages: [...(messages ?? [])].reverse(),
+      messagesConversationId: targetConversationId ?? null,
     });
   } catch (error) {
     return NextResponse.json(

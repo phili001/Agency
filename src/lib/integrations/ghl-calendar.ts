@@ -300,8 +300,9 @@ export async function createAppointment({
   title: string;
 }) {
   const payload = await calendarFetch<{
-    id?: string;
+    appointment?: { id?: string };
     event?: { id?: string };
+    id?: string;
   }>({
     apiKey,
     body: {
@@ -316,8 +317,19 @@ export async function createAppointment({
     method: "POST",
     path: "/calendars/events/appointments",
   });
+  const appointmentId =
+    payload.event?.id ?? payload.appointment?.id ?? payload.id ?? null;
 
-  return payload.event?.id ?? payload.id ?? null;
+  if (!appointmentId) {
+    // GHL respondio 2xx pero sin id: no hay prueba de que la cita exista. Se
+    // trata como fallo, porque devolver "confirmada" sin id hacia que el agente
+    // le dijera al cliente que estaba agendada cuando no aparecia en GHL.
+    throw new Error(
+      "GoHighLevel no devolvio el id de la cita, asi que no se puede confirmar que se creo.",
+    );
+  }
+
+  return appointmentId;
 }
 
 export async function ensureGhlContact({
