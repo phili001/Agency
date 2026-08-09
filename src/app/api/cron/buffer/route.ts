@@ -599,6 +599,11 @@ Recuerda: la fecha del sistema y los limites de arriba mandan sobre cualquier
 fecha, hora o ejemplo que aparezca en los documentos.`;
 }
 
+/** Cuando no hay calendario, se explica por que: antes fallaba en silencio. */
+type CalendarRuntimeResult =
+  | { reason: null; runtime: CalendarRuntime }
+  | { reason: string; runtime: null };
+
 type CalendarRuntime = {
   apiKey: string;
   calendars: CalendarTool[];
@@ -624,17 +629,24 @@ async function buildCalendarRuntime({
   businessProfile: BusinessProfileAsset | null;
   contactId: string;
   workspaceId: string;
-}): Promise<CalendarRuntime | null> {
+}): Promise<CalendarRuntimeResult> {
   // Solo el agente de citas agenda. El setter y el de soporte no deben tocar
   // el calendario aunque el workspace lo tenga conectado.
   if (agent.type !== "booking") {
-    return null;
+    return {
+      reason: `El agente "${agent.name}" es de tipo "${agent.type}", no "booking". Solo el agente de citas usa el calendario.`,
+      runtime: null,
+    };
   }
 
   const context = await getWorkspaceCalendarContext(workspaceId);
 
   if (!context) {
-    return null;
+    return {
+      reason:
+        "GoHighLevel no esta activo para esta empresa, falta la API key o falta el Location ID en Integraciones.",
+      runtime: null,
+    };
   }
 
   const admin = createAdminClient();
@@ -646,7 +658,10 @@ async function buildCalendarRuntime({
     .maybeSingle();
 
   if (!contact?.phone_e164) {
-    return null;
+    return {
+      reason: "El contacto no tiene telefono guardado, asi que no se puede crear en GHL.",
+      runtime: null,
+    };
   }
 
   // El agente elige entre los calendarios que tenga asignados, salvo que un
@@ -681,7 +696,11 @@ async function buildCalendarRuntime({
         : [];
 
   if (fallbackCalendars.length === 0) {
-    return null;
+    return {
+      reason:
+        "No hay ningun calendario elegido: habilita uno en Tools o seleccionalo en la tarjeta de GoHighLevel en Integraciones.",
+      runtime: null,
+    };
   }
 
   // Cada empresa tiene su propia zona horaria. Se toma la del perfil de negocio
@@ -698,7 +717,11 @@ async function buildCalendarRuntime({
         });
 
   if (!timezone) {
-    return null;
+    return {
+      reason:
+        "No se pudo determinar la zona horaria: configurala en Negocio o en el calendario de GHL.",
+      runtime: null,
+    };
   }
 
   const metadata =
@@ -707,19 +730,22 @@ async function buildCalendarRuntime({
       : {};
 
   return {
-    apiKey: context.apiKey,
-    calendars: fallbackCalendars,
-    contact: {
-      email: contact.email,
-      fullName: contact.full_name,
-      ghlContactId:
-        typeof metadata.ghl_contact_id === "string" ? metadata.ghl_contact_id : null,
-      id: contact.id,
-      phone: contact.phone_e164,
+    reason: null,
+    runtime: {
+      apiKey: context.apiKey,
+      calendars: fallbackCalendars,
+      contact: {
+        email: contact.email,
+        fullName: contact.full_name,
+        ghlContactId:
+          typeof metadata.ghl_contact_id === "string" ? metadata.ghl_contact_id : null,
+        id: contact.id,
+        phone: contact.phone_e164,
+      },
+      locationId: context.locationId,
+      timezone,
+      workspaceId,
     },
-    locationId: context.locationId,
-    timezone,
-    workspaceId,
   };
 }
 
@@ -1190,12 +1216,13 @@ export async function POST(request: Request) {
         .order("updated_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      const calendarRuntime = await buildCalendarRuntime({
+      const calendarResult = await buildCalendarRuntime({
         agent: typedAgent,
         businessProfile: businessProfile as BusinessProfileAsset | null,
         contactId: conversation.contact_id,
         workspaceId: conversation.workspace_id,
       });
+      const calendarRuntime = calendarResult.runtime;
       const reply = await generateReply(
         typedAgent,
         chronologicalMessages,
@@ -1224,6 +1251,7 @@ export async function POST(request: Request) {
           message_type: "text",
           metadata: {
             calendar_tool_calls: reply.toolCalls,
+            calendar_unavailable_reason: calendarResult.reason,
             delivery: "queued_only",
             kind: "buffer_ai_reply",
             openai_response_id: reply.responseId,
@@ -1327,6 +1355,8 @@ export async function POST(request: Request) {
       results.push({
         agentId: typedAgent.id,
         agentName: typedAgent.name,
+        // Por que el agente no pudo usar el calendario, si fue el caso.
+        calendarUnavailable: calendarResult.reason ?? undefined,
         conversationId: conversation.id,
         routerScore: routedAgent.score,
         routerStrategy: routedAgent.strategy,

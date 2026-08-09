@@ -112,6 +112,7 @@ type MessageItem = {
   displayTime?: string;
   id: string;
   message_type: string;
+  metadata?: { calendar_unavailable_reason?: string | null } | null;
   role: string;
 };
 
@@ -198,6 +199,12 @@ export function InboxPanel({
         : [],
     [messagesByConversation, selectedConversation],
   );
+  // Si el ultimo mensaje de la IA no pudo usar el calendario, se explica por que
+  // en pantalla, en vez de dejar al agente diciendo "no tengo acceso" sin motivo.
+  const calendarIssue = [...selectedMessages]
+    .reverse()
+    .find((message) => message.metadata?.calendar_unavailable_reason)
+    ?.metadata?.calendar_unavailable_reason;
   const messageListRef = useRef<HTMLDivElement>(null);
   const lastMessageId = selectedMessages.at(-1)?.id;
 
@@ -970,6 +977,12 @@ export function InboxPanel({
           {notice ? (
             <p className="mb-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
               {notice}
+            </p>
+          ) : null}
+          {calendarIssue ? (
+            <p className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <span className="font-semibold">El agente no pudo agendar:</span>{" "}
+              {calendarIssue}
             </p>
           ) : null}
           <div className="flex gap-2">

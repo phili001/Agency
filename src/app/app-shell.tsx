@@ -656,7 +656,7 @@ export async function AppShell({ section }: { section: AppSection }) {
     workspaceId && conversationIds.length > 0
       ? await supabase
           .from("messages")
-          .select("id, conversation_id, body, direction, role, message_type, created_at")
+          .select("id, conversation_id, body, direction, role, message_type, created_at, metadata")
           .eq("workspace_id", workspaceId)
           .eq("conversation_id", conversationIds[0])
           .order("created_at", { ascending: false })

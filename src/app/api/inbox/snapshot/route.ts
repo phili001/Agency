@@ -80,7 +80,7 @@ export async function GET(request: Request) {
       targetConversationId
         ? admin
             .from("messages")
-            .select("id, conversation_id, body, direction, role, message_type, created_at")
+            .select("id, conversation_id, body, direction, role, message_type, created_at, metadata")
             .eq("workspace_id", workspaceId)
             .eq("conversation_id", targetConversationId)
             .order("created_at", { ascending: false })
