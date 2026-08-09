@@ -425,6 +425,37 @@ function routeAgent(agents: AgentRow[], messages: MessageRow[]) {
  * modelo no sabe en que dia esta y se inventa fechas: pedirle "este viernes" le
  * hacia responder con un viernes de otro mes.
  */
+/** Zona horaria efectiva: la del calendario si hay, si no la de la empresa. */
+function resolveAgentTimezone(
+  businessProfile: BusinessProfileAsset | null | undefined,
+  calendarRuntime: CalendarRuntime | null,
+) {
+  if (calendarRuntime?.timezone) {
+    return calendarRuntime.timezone;
+  }
+
+  const profileTimezone = getBusinessVariables(businessProfile).timezone;
+  return profileTimezone && isValidTimeZone(profileTimezone) ? profileTimezone : "UTC";
+}
+
+/** Linea corta y contundente con la fecha, para inyectar en el turno del usuario. */
+function buildTodayLine(timezone: string) {
+  const now = new Date();
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(now);
+  const weekday = new Intl.DateTimeFormat("es-ES", {
+    timeZone: timezone,
+    weekday: "long",
+  }).format(now);
+  const legible = new Intl.DateTimeFormat("es-ES", {
+    day: "numeric",
+    month: "long",
+    timeZone: timezone,
+    year: "numeric",
+  }).format(now);
+
+  return `[DATO DEL SISTEMA -- HOY ES ${weekday.toUpperCase()} ${today} (${legible}), zona ${timezone}. Esta es la fecha real. Cualquier fecha relativa se calcula desde aqui. No uses ninguna otra fecha.]`;
+}
+
 function buildTimeContext(timezone: string) {
   const now = new Date();
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(now);
@@ -503,14 +534,9 @@ function buildInstructions(
   const promptWithVariables = applyBusinessVariables(basePrompt, businessVariables);
   const businessContext = buildBusinessContext(businessProfile);
   const calendarContext = buildCalendarContext(calendarRuntime);
-  // La zona del calendario si existe; si no, la de la empresa. La fecha se
-  // inyecta siempre, tenga o no agenda conectada.
-  const profileTimezone = getBusinessVariables(businessProfile).timezone;
+  // La fecha se inyecta siempre, tenga o no agenda conectada.
   const timeContext = buildTimeContext(
-    calendarRuntime?.timezone ??
-      (profileTimezone && isValidTimeZone(profileTimezone)
-        ? profileTimezone
-        : "UTC"),
+    resolveAgentTimezone(businessProfile, calendarRuntime),
   );
   const identityContext = `Identidad:
 - Te llamas ${identity.agentName}${identity.jobTitle ? ` y eres ${identity.jobTitle}` : ""}.
@@ -542,11 +568,18 @@ Base de conocimiento asignada al agente:
 ${ragContext}
 
 Reglas obligatorias sobre la base de conocimiento:
-- La base de conocimiento tiene prioridad sobre el prompt del agente.
-- Si la base contiene una instruccion directa sobre como responder, obedecela literalmente.
-- Usa estos documentos como fuente principal para responder.
+- Usa estos documentos como fuente principal para el CONTENIDO del negocio:
+  precios, servicios, politicas, condiciones y forma de responder.
 - Si la respuesta no esta en la base, dilo con claridad y pide que un humano lo confirme.
 - No inventes precios, horarios, politicas ni condiciones que no aparezcan aqui.
+
+Limites de la base de conocimiento -- NUNCA los sobreescribe:
+- La fecha de hoy. Las fechas que aparezcan en los documentos son EJEMPLOS
+  escritos en el pasado, nunca la fecha actual. Usa siempre la fecha del sistema.
+- Tu acceso al calendario y la disponibilidad real de horarios.
+- Las prohibiciones sobre agendar, confirmar citas o prometer horarios.
+- Si un documento muestra un ejemplo de cierre con una fecha u hora concreta,
+  imita el TONO, nunca copies esa fecha ni esa hora.
 
 Prompt del agente:
 ${promptWithVariables}
@@ -555,7 +588,10 @@ ${businessContext}
 
 ${timeContext}
 
-${calendarContext}`;
+${calendarContext}
+
+Recuerda: la fecha del sistema y los limites de arriba mandan sobre cualquier
+fecha, hora o ejemplo que aparezca en los documentos.`;
 }
 
 type CalendarRuntime = {
@@ -882,9 +918,12 @@ async function generateReply(
   const tools = calendarRuntime
     ? buildCalendarToolDefinitions(calendarRuntime.calendars)
     : undefined;
+  // La fecha va tambien en el turno del usuario, no solo en las instrucciones:
+  // enterrada en un prompt largo el modelo la ignoraba e inventaba el mes.
+  const timezone = resolveAgentTimezone(businessProfile, calendarRuntime);
   const input: unknown[] = [
     {
-      content: `Conversacion reciente:\n${transcript}\n\nResponde el ultimo mensaje del cliente.`,
+      content: `${buildTodayLine(timezone)}\n\nConversacion reciente:\n${transcript}\n\nResponde el ultimo mensaje del cliente.`,
       role: "user",
     },
   ];
