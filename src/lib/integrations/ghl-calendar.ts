@@ -216,6 +216,11 @@ export async function getCalendarTimezone({
   return calendars.find((calendar) => calendar.id === calendarId)?.timezone ?? null;
 }
 
+export type FreeSlotsResult = {
+  debug: { responseKeys: string[] };
+  slots: FreeSlot[];
+};
+
 export async function getFreeSlots({
   apiKey,
   calendarId,
@@ -228,7 +233,7 @@ export async function getFreeSlots({
   endDate: Date;
   startDate: Date;
   timezone: string;
-}): Promise<FreeSlot[]> {
+}): Promise<FreeSlotsResult> {
   const payload = await calendarFetch<Record<string, unknown>>({
     apiKey,
     method: "GET",
@@ -279,7 +284,12 @@ export async function getFreeSlots({
     }
   }
 
-  return slots.sort((left, right) => left.iso.localeCompare(right.iso));
+  return {
+    // Claves crudas de la respuesta: si no se parsea ningun hueco, es lo unico
+    // que permite saber si GHL devolvio vacio o con otra forma.
+    debug: { responseKeys: Object.keys(payload).slice(0, 12) },
+    slots: slots.sort((left, right) => left.iso.localeCompare(right.iso)),
+  };
 }
 
 export async function createAppointment({

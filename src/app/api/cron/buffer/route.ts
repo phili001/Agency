@@ -471,6 +471,9 @@ function resolveAgentTimezone(
   }
 
   const profileTimezone = getBusinessVariables(businessProfile).timezone;
+  // UTC solo como ultimo recurso para no dejar al agente sin fecha. Si se llega
+  // aqui, las horas que diga estaran corridas: hay que configurar la zona en
+  // Negocio. El aviso del inbox lo señala.
   return profileTimezone && isValidTimeZone(profileTimezone) ? profileTimezone : "UTC";
 }
 
@@ -825,7 +828,7 @@ async function runCalendarTool(
 
       const days = Math.min(Math.max(Number(args.dias) || 1, 1), 14);
       const endDate = new Date(startDate.getTime() + days * 24 * 60 * 60 * 1000);
-      const slots = await getFreeSlots({
+      const { debug, slots } = await getFreeSlots({
         apiKey: runtime.apiKey,
         calendarId: calendar.calendarId,
         endDate,
@@ -835,6 +838,9 @@ async function runCalendarTool(
 
       if (slots.length === 0) {
         return {
+          // Las claves crudas quedan en el metadata del mensaje: si GHL empieza
+          // a responder con otra forma, es lo unico que permite verlo.
+          diagnostico: `GHL respondio sin huecos. Claves: ${debug.responseKeys.join(", ") || "(ninguna)"}. Calendario: ${calendar.calendarId}. Zona: ${runtime.timezone}.`,
           horarios: [],
           mensaje:
             "No hay horarios libres en ese rango. Ofrece buscar en fechas posteriores.",
@@ -852,11 +858,44 @@ async function runCalendarTool(
 
     if (call.name === "agendar_cita") {
       const startTime = String(args.horario_iso ?? "");
+      const requested = new Date(startTime);
 
-      if (Number.isNaN(new Date(startTime).getTime())) {
+      if (Number.isNaN(requested.getTime())) {
         return {
           error:
             "horario_iso invalido. Copia exactamente el campo 'inicio' de consultar_disponibilidad.",
+        };
+      }
+
+      // Se vuelve a preguntar a GHL si ese hueco sigue libre. El prompt pide al
+      // modelo usar solo horarios de consultar_disponibilidad, pero eso no es
+      // garantia: sin esta comprobacion inventaba horas y sobreescribia citas
+      // que ya existian en el calendario.
+      const dayStart = new Date(requested.getTime() - 24 * 60 * 60 * 1000);
+      const dayEnd = new Date(requested.getTime() + 24 * 60 * 60 * 1000);
+      const { slots: freeSlots } = await getFreeSlots({
+        apiKey: runtime.apiKey,
+        calendarId: calendar.calendarId,
+        endDate: dayEnd,
+        startDate: dayStart,
+        timezone: runtime.timezone,
+      });
+      const isFree = freeSlots.some(
+        (slot) => new Date(slot.iso).getTime() === requested.getTime(),
+      );
+
+      if (!isFree) {
+        const alternativas = freeSlots.slice(0, 8).map((slot) => ({
+          cuando: slot.label,
+          inicio: slot.iso,
+        }));
+
+        return {
+          error:
+            alternativas.length > 0
+              ? "Ese horario ya no esta libre. Ofrece al cliente una de las alternativas y vuelve a intentarlo con la que elija."
+              : "Ese horario no esta libre y no quedan huecos cerca. Ofrece buscar en otra fecha.",
+          horarios_libres: alternativas,
         };
       }
 
@@ -988,6 +1027,11 @@ async function generateReply(
   // La fecha va tambien en el turno del usuario, no solo en las instrucciones:
   // enterrada en un prompt largo el modelo la ignoraba e inventaba el mes.
   const timezone = resolveAgentTimezone(businessProfile, calendarRuntime);
+  // Sin zona configurada, el agente habla en UTC y da horas corridas.
+  const timezoneWarning =
+    timezone === "UTC" && !calendarRuntime
+      ? "Falta la zona horaria en Negocio: el agente esta usando UTC y las horas que diga estaran corridas."
+      : null;
   const input: unknown[] = [
     {
       content: `${buildTodayLine(timezone)}\n\nConversacion reciente:\n${transcript}\n\nResponde el ultimo mensaje del cliente.`,
@@ -1048,6 +1092,7 @@ async function generateReply(
 
   return {
     answer: getResponseText(payload),
+    timezoneWarning,
     model: payload.model ?? model,
     responseId: payload.id ?? null,
     toolCalls,
@@ -1288,7 +1333,8 @@ export async function POST(request: Request) {
           message_type: "text",
           metadata: {
             calendar_tool_calls: reply.toolCalls,
-            calendar_unavailable_reason: calendarResult.reason,
+            calendar_unavailable_reason:
+              calendarResult.reason ?? reply.timezoneWarning ?? null,
             delivery: "queued_only",
             kind: "buffer_ai_reply",
             openai_response_id: reply.responseId,
