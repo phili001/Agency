@@ -649,16 +649,20 @@ export async function AppShell({ section }: { section: AppSection }) {
       latestFlowRunByConversation.set(run.conversation_id, run);
     }
   });
-  const { data: conversationMessages } =
+  // Se piden los mas RECIENTES y luego se invierten para mostrarlos en orden.
+  // Pidiendolos ascendentes, el limite recortaba por el final: pasados 2000
+  // mensajes en el workspace, los nuevos no llegaban nunca al inbox.
+  const { data: latestMessages } =
     workspaceId && conversationIds.length > 0
       ? await supabase
           .from("messages")
           .select("id, conversation_id, body, direction, role, message_type, created_at")
           .eq("workspace_id", workspaceId)
           .in("conversation_id", conversationIds)
-          .order("created_at", { ascending: true })
+          .order("created_at", { ascending: false })
           .limit(2000)
       : { data: [] };
+  const conversationMessages = [...(latestMessages ?? [])].reverse();
   const usageEvents = usageResult.data ?? [];
   const totalCost = usageEvents.reduce(
     (sum, event) => sum + Number(event.cost_usd ?? 0),
