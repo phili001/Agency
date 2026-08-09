@@ -323,6 +323,7 @@ function getAgentIntentBoost(agent: AgentRow, messageText: string) {
   const text = normalizeRoutingText(messageText);
   const groups: Record<string, string[]> = {
     booking: [
+      "agend",
       "agenda",
       "agendar",
       "cita",
@@ -419,9 +420,41 @@ function routeAgent(agents: AgentRow[], messages: MessageRow[]) {
   };
 }
 
+/**
+ * La fecha de hoy va SIEMPRE, tenga o no calendario conectado. Sin esto el
+ * modelo no sabe en que dia esta y se inventa fechas: pedirle "este viernes" le
+ * hacia responder con un viernes de otro mes.
+ */
+function buildTimeContext(timezone: string) {
+  const now = new Date();
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(now);
+  const weekday = new Intl.DateTimeFormat("es-ES", {
+    timeZone: timezone,
+    weekday: "long",
+  }).format(now);
+
+  return `Fecha actual:
+- Hoy es ${weekday} ${today} (formato YYYY-MM-DD), zona horaria ${timezone}.
+- Calcula "hoy", "manana", "este viernes" o "la proxima semana" a partir de esa fecha.
+- Nunca inventes una fecha ni cambies de mes. Si no puedes calcularla con certeza, preguntale al cliente.`;
+}
+
+/**
+ * Barrera anti-alucinacion para agentes sin calendario. Sin esto un agente
+ * afirmaba haber agendado citas que nunca existieron en GoHighLevel.
+ */
+function buildNoCalendarContext() {
+  return `Agenda -- NO tienes acceso:
+- No puedes consultar disponibilidad ni crear citas. No tienes ninguna tool de calendario.
+- PROHIBIDO decir que agendaste, reservaste, confirmaste o registraste una cita.
+- PROHIBIDO afirmar que tienes un horario libre o proponer una hora concreta.
+- PROHIBIDO prometer recordatorios o confirmaciones de una cita.
+- Si el cliente quiere agendar, dile con naturalidad que enseguida lo ayudan con la agenda y pidele que confirme que quiere reservar. No inventes el paso siguiente.`;
+}
+
 function buildCalendarContext(calendarRuntime: CalendarRuntime | null) {
   if (!calendarRuntime) {
-    return "";
+    return buildNoCalendarContext();
   }
 
   // Sin la fecha de hoy el modelo no puede resolver "manana" ni "el jueves".
@@ -470,9 +503,28 @@ function buildInstructions(
   const promptWithVariables = applyBusinessVariables(basePrompt, businessVariables);
   const businessContext = buildBusinessContext(businessProfile);
   const calendarContext = buildCalendarContext(calendarRuntime);
+  // La zona del calendario si existe; si no, la de la empresa. La fecha se
+  // inyecta siempre, tenga o no agenda conectada.
+  const profileTimezone = getBusinessVariables(businessProfile).timezone;
+  const timeContext = buildTimeContext(
+    calendarRuntime?.timezone ??
+      (profileTimezone && isValidTimeZone(profileTimezone)
+        ? profileTimezone
+        : "UTC"),
+  );
+  const identityContext = `Identidad:
+- Te llamas ${identity.agentName}${identity.jobTitle ? ` y eres ${identity.jobTitle}` : ""}.
+- En tu primer mensaje de la conversacion presentate por tu nombre y di en que puedes ayudar.
+- Habla siempre en primera persona como ${identity.agentName}. Nunca escribas "IA:" ni "assistant:" delante de tu respuesta.`;
 
   if (assets.length === 0) {
-    return [businessContext, promptWithVariables, calendarContext]
+    return [
+      identityContext,
+      businessContext,
+      promptWithVariables,
+      timeContext,
+      calendarContext,
+    ]
       .filter(Boolean)
       .join("\n\n");
   }
@@ -484,7 +536,9 @@ function buildInstructions(
     )
     .join("\n\n");
 
-  return `Base de conocimiento asignada al agente:
+  return `${identityContext}
+
+Base de conocimiento asignada al agente:
 ${ragContext}
 
 Reglas obligatorias sobre la base de conocimiento:
@@ -498,6 +552,8 @@ Prompt del agente:
 ${promptWithVariables}
 
 ${businessContext}
+
+${timeContext}
 
 ${calendarContext}`;
 }

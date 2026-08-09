@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
   CircleDollarSign,
@@ -191,9 +191,27 @@ export function InboxPanel({
       return grouped;
     }, {});
   }, [localMessages]);
-  const selectedMessages = selectedConversation
-    ? messagesByConversation[selectedConversation.id] ?? []
-    : [];
+  const selectedMessages = useMemo(
+    () =>
+      selectedConversation
+        ? messagesByConversation[selectedConversation.id] ?? []
+        : [],
+    [messagesByConversation, selectedConversation],
+  );
+  const messageListRef = useRef<HTMLDivElement>(null);
+  const lastMessageId = selectedMessages.at(-1)?.id;
+
+  // Al abrir una conversacion o al llegar un mensaje nuevo hay que ver el final,
+  // que es donde esta lo ultimo. Sin esto el chat abre arriba del todo.
+  useEffect(() => {
+    const list = messageListRef.current;
+
+    if (!list) {
+      return;
+    }
+
+    list.scrollTop = list.scrollHeight;
+  }, [lastMessageId, selectedConversation?.id]);
   const selectedUsageEvents = selectedConversation
     ? usageEvents.filter((event) => event.conversation_id === selectedConversation.id)
     : [];
@@ -867,7 +885,10 @@ export function InboxPanel({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+        <div
+          className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4"
+          ref={messageListRef}
+        >
           {selectedMessages.length > 0 ? (
             selectedMessages.map((message) => {
               const isOutbound = message.direction === "outbound";

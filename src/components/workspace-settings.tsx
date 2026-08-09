@@ -10,6 +10,7 @@ import {
   Loader2,
   Plus,
   PlugZap,
+  Pencil,
   Save,
   Trash2,
   UsersRound,
@@ -182,8 +183,16 @@ function asRecord(value: Json): Record<string, string> {
   );
 }
 
+/** Kinds con un solo registro por workspace: el editor abre sobre el existente. */
+const singletonAssetKinds = new Set<WorkspaceAsset["kind"]>(["business_profile"]);
+
 function buildAssetDraft(kind: WorkspaceAsset["kind"], assets: WorkspaceAsset[]) {
-  const current = assets.find((asset) => asset.kind === kind);
+  // Los kinds de coleccion arrancan en blanco. Si se precargaran con el primer
+  // documento, editarlo y guardar creaba un duplicado en vez de actualizarlo.
+  const current = singletonAssetKinds.has(kind)
+    ? assets.find((asset) => asset.kind === kind)
+    : undefined;
+
   return {
     content: current?.content ?? "",
     id: current?.id ?? "",
@@ -716,7 +725,13 @@ export function WorkspaceSettings({
         title: options?.forceCreate ? "" : data.title,
       },
     }));
-    setStatus(options?.forceCreate ? "Documento agregado." : "Workspace actualizado.");
+    setStatus(
+      options?.forceCreate
+        ? "Documento agregado."
+        : singletonAssetKinds.has(kind)
+          ? "Workspace actualizado."
+          : "Cambios guardados.",
+    );
     setSavingKey("");
   }
 
@@ -1414,24 +1429,66 @@ export function WorkspaceSettings({
     );
   }
 
+  function editAsset(asset: WorkspaceAsset) {
+    setAssetDrafts((current) => ({
+      ...current,
+      [asset.kind]: {
+        content: asset.content,
+        id: asset.id,
+        metadata: asset.metadata,
+        status: asset.status,
+        title: asset.title,
+      },
+    }));
+    setStatus("");
+    // El editor esta arriba de la lista: sin esto el usuario no ve que paso.
+    if (typeof window !== "undefined") {
+      window.scrollTo({ behavior: "smooth", top: 0 });
+    }
+  }
+
   function assetList(kind: WorkspaceAsset["kind"], empty: string) {
     const currentAssets = assetsByKind[kind] ?? [];
+    const editingId = assetDrafts[kind].id;
 
     return (
       <div className="grid gap-2">
         {currentAssets.map((asset) => (
           <div
-            className="flex items-start justify-between gap-3 rounded-lg border border-[#e2e6df] p-3 text-sm"
+            className={`flex items-start justify-between gap-3 rounded-lg border p-3 text-sm ${
+              editingId === asset.id
+                ? "border-[#35735b] bg-[#f3f8ee]"
+                : "border-[#e2e6df]"
+            }`}
             key={asset.id}
           >
-            <div className="min-w-0">
-              <p className="font-semibold">{asset.title}</p>
+            <button
+              className="min-w-0 flex-1 text-left"
+              onClick={() => editAsset(asset)}
+              type="button"
+            >
+              <p className="font-semibold">
+                {asset.title}
+                {editingId === asset.id ? (
+                  <span className="ml-2 text-xs font-normal text-[#35735b]">
+                    editando
+                  </span>
+                ) : null}
+              </p>
               <p className="mt-1 line-clamp-2 text-[#647067]">{asset.content}</p>
-            </div>
+            </button>
             <div className="flex shrink-0 items-center gap-2">
               <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
                 {asset.status}
               </span>
+              <button
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#cbd2c6] bg-white px-2 text-xs font-medium text-[#10231c]"
+                onClick={() => editAsset(asset)}
+                type="button"
+              >
+                <Pencil size={13} />
+                Editar
+              </button>
               <button
                 className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2 text-xs font-medium text-red-700 disabled:opacity-60"
                 disabled={savingKey === `asset:delete:${asset.id}`}
@@ -1469,12 +1526,46 @@ export function WorkspaceSettings({
     title: string;
   }) {
     const draft = assetDrafts[kind];
+    const isEditing = Boolean(draft.id) && !singletonAssetKinds.has(kind);
 
     return (
-      <div className="grid gap-3">
-        <div>
-          <h3 className="text-sm font-semibold">{title}</h3>
-          <p className="mt-1 text-sm text-[#647067]">{helper}</p>
+      <div
+        className={`grid gap-3 ${
+          isEditing ? "rounded-lg border border-[#35735b] bg-[#f7faf4] p-3" : ""
+        }`}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold">
+              {isEditing ? `Editando: ${draft.title || "sin titulo"}` : title}
+            </h3>
+            <p className="mt-1 text-sm text-[#647067]">
+              {isEditing
+                ? "Los cambios reemplazan el documento existente."
+                : helper}
+            </p>
+          </div>
+          {isEditing ? (
+            <button
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm font-medium text-[#10231c]"
+              onClick={() =>
+                setAssetDrafts((current) => ({
+                  ...current,
+                  [kind]: {
+                    content: "",
+                    id: "",
+                    metadata: {},
+                    status: "draft",
+                    title: "",
+                  },
+                }))
+              }
+              type="button"
+            >
+              <Plus size={15} />
+              Nuevo
+            </button>
+          ) : null}
         </div>
         <input
           className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
@@ -1519,7 +1610,9 @@ export function WorkspaceSettings({
           <button
             className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]"
             disabled={savingKey === kind}
-            onClick={() => saveAsset(kind, { forceCreate: kind === "knowledge" })}
+            // Solo se crea uno nuevo cuando no se esta editando ninguno. Antes
+            // forzaba crear siempre, asi que editar generaba duplicados.
+            onClick={() => saveAsset(kind, { forceCreate: !draft.id })}
             type="button"
           >
             {savingKey === kind ? (
@@ -1527,7 +1620,7 @@ export function WorkspaceSettings({
             ) : (
               <Save size={16} />
             )}
-            {kind === "knowledge" ? "Agregar" : "Guardar"}
+            {isEditing ? "Guardar cambios" : "Agregar"}
           </button>
         </div>
       </div>
