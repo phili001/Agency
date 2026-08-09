@@ -9,15 +9,17 @@ export type DefaultAgentPreset = {
   type: "setter" | "booking" | "support";
 };
 
-export const DEFAULT_AGENT_PROMPT_VERSION = 3;
+export const DEFAULT_AGENT_PROMPT_VERSION = 4;
 
 export const defaultAgentPresets: DefaultAgentPreset[] = [
   {
     handoffKeywords: ["caro", "humano", "asesor", "persona"],
     key: "setter",
     name: "Sofia - Setter IA",
+    // Sin las palabras "citas"/"agendar": estaban aqui y hacian que el setter
+    // compitiera con el agente de citas justo cuando el cliente pedia cita.
     routerDescription:
-      "Usar para primeros mensajes, calificacion de leads, dudas generales, interes inicial, servicios, precios simples, ubicacion y pasar a citas cuando el contacto quiera agendar.",
+      "Usar para primeros mensajes, calificacion de leads, dudas generales, interes inicial, servicios, precios simples y ubicacion.",
     rules:
       "Responde en espanol claro, natural y breve.\nUsa {company_name} como nombre oficial del negocio y {business_name} solo como alias de compatibilidad.\nSi el contacto pregunta donde atienden, usa {location} y {address}; si falta alguno, pide confirmacion humana.\nSi pregunta horarios, usa {business_hours} y considera {timezone} para hablar de fechas y horas.\nSi pregunta que ofrecen, usa {services}; si pregunta por pagos, usa {payment_methods}; si pregunta condiciones, usa {policies}.\nSi menciona equipo o especialistas, usa {team}.\nHaz una pregunta a la vez para calificar interes, necesidad, urgencia y datos basicos.\nResume el interes del contacto antes de pasarlo al agente de citas.\nSi detectas intencion de compra o agenda, deriva a flujo de citas.",
     restrictions:

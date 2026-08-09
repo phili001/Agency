@@ -331,11 +331,19 @@ function getAgentIntentBoost(agent: AgentRow, messageText: string) {
       "reserva",
       "disponibilidad",
       "horario",
-      "hora",
       "manana",
       "hoy",
       "calendario",
       "confirmar",
+      // Dias: "este viernes a las 3pm" no marcaba intencion de cita.
+      "lunes",
+      "martes",
+      "miercoles",
+      "jueves",
+      "viernes",
+      "sabado",
+      "domingo",
+      "semana",
     ],
     setter: [
       "info",
@@ -365,13 +373,34 @@ function getAgentIntentBoost(agent: AgentRow, messageText: string) {
     ],
   };
 
-  return (groups[key] ?? []).reduce(
-    (score, keyword) => score + (text.includes(keyword) ? 3 : 0),
+  const wordScore = (groups[key] ?? []).reduce(
+    (score, keyword) => score + (text.includes(keyword) ? 1 : 0),
     0,
+  );
+
+  if (key !== "booking") {
+    return wordScore;
+  }
+
+  // Horas sueltas necesitan limite de palabra: como subcadena, "am" hacia match
+  // dentro de "progr-am-a" y "hora" dentro de "a-hora", mandando a citas
+  // conversaciones que no tenian nada que ver.
+  const timePatterns = [
+    /\b\d{1,2}\s*[:.]\d{2}\b/,
+    /\b\d{1,2}\s*(am|pm)\b/,
+    /\bhoras?\b/,
+  ];
+
+  return (
+    wordScore + timePatterns.reduce((score, rx) => score + (rx.test(text) ? 1 : 0), 0)
   );
 }
 
-function routeAgent(agents: AgentRow[], messages: MessageRow[]) {
+function routeAgent(
+  agents: AgentRow[],
+  messages: MessageRow[],
+  currentAgentId?: string | null,
+) {
   if (agents.length <= 1) {
     return {
       agent: agents[0] ?? null,
@@ -382,7 +411,11 @@ function routeAgent(agents: AgentRow[], messages: MessageRow[]) {
 
   const transcript = messages.map((message) => message.body ?? "").join("\n");
   const latest = messages.at(-1)?.body ?? "";
-  const messageTokens = new Set(getRoutingTokens(`${latest}\n${transcript}`));
+  // El overlap se mide solo contra el ULTIMO mensaje. Midiendolo contra toda la
+  // conversacion, las palabras de los primeros mensajes seguian votando para
+  // siempre y el setter se quedaba pegado aunque el cliente ya pidiera cita.
+  const latestTokens = new Set(getRoutingTokens(latest));
+  const normalizedLatest = normalizeRoutingText(latest);
   const ranked = agents
     .map((agent) => {
       const description = getRouterDescription(agent);
@@ -391,24 +424,27 @@ function routeAgent(agents: AgentRow[], messages: MessageRow[]) {
         `${agent.name} ${agent.type} ${description} ${keywordText}`,
       );
       const overlap = routerTokens.reduce(
-        (score, token) => score + (messageTokens.has(token) ? 2 : 0),
+        (score, token) => score + (latestTokens.has(token) ? 2 : 0),
         0,
       );
       const keywordBoost = getRoutingKeywords(agent).reduce(
         (score, keyword) =>
-          score +
-          (normalizeRoutingText(`${latest}\n${transcript}`).includes(
-            normalizeRoutingText(keyword),
-          )
-            ? 4
-            : 0),
+          score + (normalizedLatest.includes(normalizeRoutingText(keyword)) ? 4 : 0),
         0,
       );
-      const intentBoost = getAgentIntentBoost(agent, `${latest}\n${transcript}`);
+      // La intencion del mensaje actual pesa mucho mas que la del historial: es
+      // lo que el cliente esta pidiendo AHORA. El historial solo desempata.
+      const intentBoost =
+        getAgentIntentBoost(agent, latest) * 12 +
+        getAgentIntentBoost(agent, transcript);
+      // El agente que ya venia atendiendo se queda salvo señal clara de cambio.
+      // Sin esto, respuestas de puro dato ("Felipe, restaurante") devolvian la
+      // conversacion al setter en mitad del agendamiento.
+      const stickiness = currentAgentId && agent.id === currentAgentId ? 8 : 0;
 
       return {
         agent,
-        score: overlap + keywordBoost + intentBoost,
+        score: overlap + keywordBoost + intentBoost + stickiness,
       };
     })
     .sort((left, right) => right.score - left.score);
@@ -1186,6 +1222,7 @@ export async function POST(request: Request) {
     const routedAgent = routeAgent(
       ((activeAgents ?? []) as AgentRow[]),
       chronologicalMessages,
+      conversation.agent_id,
     );
     const agent = routedAgent.agent;
 
