@@ -43,6 +43,114 @@ function splitName(fullName: string | null) {
   };
 }
 
+export async function syncContactToGoHighLevel({
+  contactId,
+  source = "LEVY WhatsApp",
+  workspaceId,
+}: {
+  contactId: string;
+  source?: string;
+  workspaceId: string;
+}): Promise<
+  | { ghlContactId: string; status: "already_synced" | "synced" }
+  | { error?: string; status: "failed" | "not_configured" }
+> {
+  const admin = createAdminClient();
+  const [{ data: contact }, { data: integration }, apiKey] = await Promise.all([
+    admin
+      .from("contacts")
+      .select("id, workspace_id, full_name, phone_e164, email, metadata")
+      .eq("id", contactId)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle(),
+    admin
+      .from("integrations")
+      .select("config")
+      .eq("workspace_id", workspaceId)
+      .eq("provider", "gohighlevel")
+      .eq("status", "active")
+      .maybeSingle(),
+    getWorkspaceGoHighLevelKey(workspaceId),
+  ]);
+
+  if (!contact?.phone_e164) {
+    return { error: "El contacto no tiene telefono.", status: "failed" };
+  }
+
+  const currentMetadata = getConfigRecord(contact.metadata);
+  const existingGhlContactId = configString(currentMetadata, "ghl_contact_id");
+
+  if (existingGhlContactId) {
+    return { ghlContactId: existingGhlContactId, status: "already_synced" };
+  }
+
+  if (!integration || !apiKey) {
+    return { status: "not_configured" };
+  }
+
+  const locationId = configString(getConfigRecord(integration.config), "location_id");
+
+  if (!locationId) {
+    return { error: "Falta Location ID de GoHighLevel.", status: "failed" };
+  }
+
+  try {
+    const { firstName, lastName } = splitName(contact.full_name);
+    const payload = await ghlFetch<{
+      contact?: { id?: string };
+      id?: string;
+    }>({
+      apiKey,
+      body: {
+        email: contact.email ?? undefined,
+        firstName,
+        lastName,
+        locationId,
+        phone: contact.phone_e164,
+        source,
+      },
+      method: "POST",
+      path: "/contacts/upsert",
+    });
+    const ghlContactId = payload.contact?.id ?? payload.id ?? null;
+
+    if (!ghlContactId) {
+      throw new Error("GoHighLevel no devolvio contact id.");
+    }
+
+    await admin
+      .from("contacts")
+      .update({
+        metadata: {
+          ...currentMetadata,
+          ghl_contact_id: ghlContactId,
+          ghl_last_error: null,
+          ghl_synced_at: new Date().toISOString(),
+        },
+      })
+      .eq("id", contact.id)
+      .eq("workspace_id", workspaceId);
+
+    return { ghlContactId, status: "synced" };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Error desconocido.";
+
+    await admin
+      .from("contacts")
+      .update({
+        metadata: {
+          ...currentMetadata,
+          ghl_last_error: message,
+          ghl_sync_failed_at: new Date().toISOString(),
+        },
+      })
+      .eq("id", contact.id)
+      .eq("workspace_id", workspaceId);
+
+    return { error: message, status: "failed" };
+  }
+}
+
 async function ghlFetch<T>({
   apiKey,
   body,

@@ -67,6 +67,19 @@ function getAgentIdentity(agent: AgentLike) {
   };
 }
 
+function buildIdentityContext(agent: AgentLike) {
+  const identity = getAgentIdentity(agent);
+  const jobTitle = identity.jobTitle.replace(/\s+IA$/i, "").trim();
+  const introduction = jobTitle
+    ? `Soy ${identity.agentName}, del equipo de ${jobTitle.toLocaleLowerCase("es")}.`
+    : `Soy ${identity.agentName}.`;
+
+  return `Identidad personalizada:
+- Te llamas ${identity.agentName}${identity.jobTitle ? ` y eres ${identity.jobTitle}` : ""}.
+- Cuando tomes una conversacion, presentate de forma natural como: "${introduction}"
+- Habla en primera persona y no uses prefijos como "IA:" o "assistant:".`;
+}
+
 function getKnowledgeAssetIds(config: Json) {
   if (!config || typeof config !== "object" || Array.isArray(config)) {
     return [];
@@ -96,9 +109,12 @@ function buildInstructions(
   };
   const promptWithVariables = applyBusinessVariables(basePrompt, businessVariables);
   const businessContext = buildBusinessContext(businessProfile);
+  const identityContext = buildIdentityContext(agent);
 
   if (assets.length === 0) {
-    return [businessContext, promptWithVariables].filter(Boolean).join("\n\n");
+    return [identityContext, businessContext, promptWithVariables]
+      .filter(Boolean)
+      .join("\n\n");
   }
 
   const ragContext = assets
@@ -108,7 +124,9 @@ function buildInstructions(
     )
     .join("\n\n");
 
-  return `Base de conocimiento asignada al agente:
+  return `${identityContext}
+
+Base de conocimiento asignada al agente:
 ${ragContext}
 
 Reglas obligatorias sobre la base de conocimiento:

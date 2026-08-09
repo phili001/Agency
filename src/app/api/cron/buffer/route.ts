@@ -110,6 +110,34 @@ function getAgentIdentity(agent: AgentRow) {
   };
 }
 
+function getAgentIntroduction(agent: AgentRow) {
+  const identity = getAgentIdentity(agent);
+  const jobTitle = identity.jobTitle.replace(/\s+IA$/i, "").trim();
+
+  return jobTitle
+    ? `Soy ${identity.agentName}, del equipo de ${jobTitle.toLocaleLowerCase("es")}.`
+    : `Soy ${identity.agentName}.`;
+}
+
+function ensureAgentIntroduction(
+  answer: string,
+  agent: AgentRow,
+  introduceAgent: boolean,
+) {
+  if (!introduceAgent || !answer.trim()) {
+    return answer;
+  }
+
+  const identity = getAgentIdentity(agent);
+  const opening = normalizeRoutingText(answer.slice(0, 160));
+
+  if (opening.includes(normalizeRoutingText(identity.agentName))) {
+    return answer;
+  }
+
+  return `${getAgentIntroduction(agent)}\n\n${answer}`;
+}
+
 function isAuthorized(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = request.headers.get("authorization");
@@ -387,6 +415,14 @@ function getAgentIntentBoost(agent: AgentRow, messageText: string) {
       "problema",
       "ayuda",
       "soporte",
+      "proyecto",
+      "negocio",
+      "explica",
+      "explicacion",
+      "informacion",
+      "oferta",
+      "servicio",
+      "precio",
       "queja",
       "reclamo",
       "humano",
@@ -443,6 +479,15 @@ function isContextualBookingFollowUp(messages: MessageRow[]) {
   return shortTimeFollowUp && previousBookingContext;
 }
 
+function isExplicitBookingRequest(messages: MessageRow[]) {
+  const latest = normalizeRoutingText(messages.at(-1)?.body ?? "");
+
+  return (
+    /\b(?:agend\w*|reserv\w*|program\w*)\b/.test(latest) ||
+    /\b(?:confirmo|elijo|quiero)\b.*\b(?:cita|horario|opcion)\b/.test(latest)
+  );
+}
+
 function routeAgent(
   agents: AgentRow[],
   messages: MessageRow[],
@@ -456,7 +501,6 @@ function routeAgent(
     };
   }
 
-  const transcript = messages.map((message) => message.body ?? "").join("\n");
   const latest = messages.at(-1)?.body ?? "";
   // El overlap se mide solo contra el ULTIMO mensaje. Midiendolo contra toda la
   // conversacion, las palabras de los primeros mensajes seguian votando para
@@ -480,11 +524,10 @@ function routeAgent(
           score + (normalizedLatest.includes(normalizeRoutingText(keyword)) ? 4 : 0),
         0,
       );
-      // La intencion del mensaje actual pesa mucho mas que la del historial: es
-      // lo que el cliente esta pidiendo AHORA. El historial solo desempata.
-      const intentBoost =
-        getAgentIntentBoost(agent, latest) * 12 +
-        getAgentIntentBoost(agent, transcript);
+      // El historial no vota permanentemente por un agente: los seguimientos
+      // cortos se resuelven con contextBoost y una intencion nueva puede sacar
+      // la conversacion de citas para volver al agente de informacion.
+      const intentBoost = getAgentIntentBoost(agent, latest) * 12;
       // El agente que ya venia atendiendo se queda salvo señal clara de cambio.
       // Sin esto, respuestas de puro dato ("Felipe, restaurante") devolvian la
       // conversacion al setter en mitad del agendamiento.
@@ -618,6 +661,7 @@ function buildInstructions(
   assets: KnowledgeAsset[],
   businessProfile: BusinessProfileAsset | null | undefined,
   calendarRuntime: CalendarRuntime | null,
+  introduceAgent: boolean,
 ) {
   const basePrompt =
     agent.system_prompt ||
@@ -637,7 +681,12 @@ function buildInstructions(
   );
   const identityContext = `Identidad:
 - Te llamas ${identity.agentName}${identity.jobTitle ? ` y eres ${identity.jobTitle}` : ""}.
-- En tu primer mensaje de la conversacion presentate por tu nombre y di en que puedes ayudar.
+- Tu presentacion personalizada es: "${getAgentIntroduction(agent)}"
+${
+  introduceAgent
+    ? `- Acabas de tomar esta conversacion. Empieza esta respuesta identificandote como ${identity.agentName} y menciona brevemente tu trabajo.`
+    : "- Ya estas atendiendo esta conversacion. No repitas tu presentacion en cada mensaje."
+}
 - Habla siempre en primera persona como ${identity.agentName}. Nunca escribas "IA:" ni "assistant:" delante de tu respuesta.`;
 
   if (assets.length === 0) {
@@ -941,29 +990,70 @@ async function runCalendarTool(
     }
 
     if (call.name === "agendar_cita") {
-      const startTime = String(args.horario_iso ?? "");
-      const requested = new Date(startTime);
+      let startTime = String(args.horario_iso ?? "");
+      let freeSlots: Array<{ iso: string; label: string }>;
 
-      if (Number.isNaN(requested.getTime())) {
-        return {
-          error:
-            "horario_iso invalido. Copia exactamente el campo 'inicio' de consultar_disponibilidad.",
-        };
+      if (requestContext.dateKey && requestContext.time) {
+        const dayStart = zonedStartOfDay(requestContext.dateKey, runtime.timezone);
+        const dayEnd = zonedStartOfDay(
+          addDaysToDateKey(requestContext.dateKey, 1),
+          runtime.timezone,
+        );
+
+        if (!dayStart || !dayEnd) {
+          return { error: "No se pudo resolver la fecha solicitada." };
+        }
+
+        ({ slots: freeSlots } = await getFreeSlots({
+          apiKey: runtime.apiKey,
+          calendarId: calendar.calendarId,
+          endDate: dayEnd,
+          startDate: dayStart,
+          timezone: runtime.timezone,
+        }));
+        const contextualSlot = freeSlots.find((slot) =>
+          slotMatchesRequestedTime(slot.iso, runtime.timezone, requestContext.time!),
+        );
+
+        if (!contextualSlot) {
+          return {
+            error: "El horario solicitado ya no esta libre.",
+            fecha_consultada: requestContext.dateKey,
+            hora_solicitada: requestContext.time.label,
+            horarios_libres: freeSlots.slice(0, 8).map((slot) => ({
+              cuando: slot.label,
+              inicio: slot.iso,
+            })),
+          };
+        }
+
+        // El servidor usa el ISO real de GHL. El modelo no necesita recordar
+        // un valor oculto de una consulta anterior ni puede inventarlo.
+        startTime = contextualSlot.iso;
+      } else {
+        const requested = new Date(startTime);
+
+        if (Number.isNaN(requested.getTime())) {
+          return {
+            error:
+              "horario_iso invalido. Copia exactamente el campo 'inicio' de consultar_disponibilidad.",
+          };
+        }
+
+        const dayStart = new Date(requested.getTime() - 24 * 60 * 60 * 1000);
+        const dayEnd = new Date(requested.getTime() + 24 * 60 * 60 * 1000);
+        ({ slots: freeSlots } = await getFreeSlots({
+          apiKey: runtime.apiKey,
+          calendarId: calendar.calendarId,
+          endDate: dayEnd,
+          startDate: dayStart,
+          timezone: runtime.timezone,
+        }));
       }
 
-      // Se vuelve a preguntar a GHL si ese hueco sigue libre. El prompt pide al
-      // modelo usar solo horarios de consultar_disponibilidad, pero eso no es
-      // garantia: sin esta comprobacion inventaba horas y sobreescribia citas
-      // que ya existian en el calendario.
-      const dayStart = new Date(requested.getTime() - 24 * 60 * 60 * 1000);
-      const dayEnd = new Date(requested.getTime() + 24 * 60 * 60 * 1000);
-      const { slots: freeSlots } = await getFreeSlots({
-        apiKey: runtime.apiKey,
-        calendarId: calendar.calendarId,
-        endDate: dayEnd,
-        startDate: dayStart,
-        timezone: runtime.timezone,
-      });
+      // Se vuelve a preguntar a GHL justo antes de crear. El prompt no es una
+      // garantia y el hueco puede haberse ocupado desde la consulta anterior.
+      const requested = new Date(startTime);
       const isFree = freeSlots.some(
         (slot) => new Date(slot.iso).getTime() === requested.getTime(),
       );
@@ -1042,6 +1132,43 @@ async function runCalendarTool(
       error: error instanceof Error ? error.message : "Error al llamar GoHighLevel.",
     };
   }
+}
+
+function buildDirectBookingAnswer(
+  result: Record<string, unknown>,
+  runtime: CalendarRuntime,
+) {
+  if (
+    result.confirmada === true &&
+    typeof result.cita_id === "string" &&
+    typeof result.inicio === "string"
+  ) {
+    const when = new Intl.DateTimeFormat("es-CO", {
+      dateStyle: "full",
+      timeStyle: "short",
+      timeZone: runtime.timezone,
+    }).format(new Date(result.inicio));
+    const firstName = runtime.contact.fullName?.trim().split(/\s+/)[0];
+
+    return `Listo${firstName ? `, ${firstName}` : ""}. Tu cita quedo agendada para ${when}.`;
+  }
+
+  const alternatives = Array.isArray(result.horarios_libres)
+    ? result.horarios_libres
+        .map((slot) =>
+          slot && typeof slot === "object" && !Array.isArray(slot)
+            ? String((slot as Record<string, unknown>).cuando ?? "")
+            : "",
+        )
+        .filter(Boolean)
+        .slice(0, 3)
+    : [];
+
+  if (alternatives.length > 0) {
+    return `Ese horario ya no esta libre. Para ese mismo dia tengo ${alternatives.join(", ")}. Cual prefieres?`;
+  }
+
+  return "No pude registrar la cita en GHL en este momento y no quedo agendada. Intenta de nuevo en un momento para volver a validarla.";
 }
 
 async function callResponsesApi({
@@ -1131,9 +1258,10 @@ function hasAvailabilityLookup(toolCalls: Array<Record<string, unknown>>) {
         : {};
 
     return (
-      call.name === "consultar_disponibilidad" &&
-      !result.error &&
-      Array.isArray(result.horarios)
+      (call.name === "consultar_disponibilidad" &&
+        !result.error &&
+        Array.isArray(result.horarios)) ||
+      (call.name === "agendar_cita" && Array.isArray(result.horarios_libres))
     );
   });
 }
@@ -1198,6 +1326,7 @@ async function generateReply(
   knowledgeAssets: KnowledgeAsset[],
   businessProfile: BusinessProfileAsset | null | undefined,
   calendarRuntime: CalendarRuntime | null,
+  introduceAgent: boolean,
 ) {
   const apiKey = await getWorkspaceOpenAIKey(agent.workspace_id);
 
@@ -1212,6 +1341,7 @@ async function generateReply(
     knowledgeAssets,
     businessProfile,
     calendarRuntime,
+    introduceAgent,
   );
   const transcript = buildTranscript(messages);
   const tools = calendarRuntime
@@ -1228,6 +1358,7 @@ async function generateReply(
   const calendarRequest = calendarRuntime
     ? resolveCalendarRequestContext(messages, calendarRuntime.timezone)
     : null;
+  const explicitBookingRequest = isExplicitBookingRequest(messages);
   const resolvedRequestLine = calendarRequest?.dateKey
     ? `[SOLICITUD DE AGENDA RESUELTA POR EL SISTEMA: fecha ${calendarRequest.dateKey}${
         calendarRequest.time ? `, hora ${calendarRequest.time.label}` : ""
@@ -1296,6 +1427,49 @@ async function generateReply(
     inputTokens += Number(payload.usage?.input_tokens ?? 0);
     outputTokens += Number(payload.usage?.output_tokens ?? 0);
   }
+
+  // Cuando el cliente elige una hora ya ofrecida, la reserva no depende de que
+  // el modelo conserve el ISO de una tool anterior. El servidor vuelve a
+  // validar esa fecha/hora en GHL y crea la cita con el slot real.
+  if (
+    explicitBookingRequest &&
+    calendarRuntime &&
+    calendarRuntime.calendars.length === 1 &&
+    calendarRequest?.dateKey &&
+    calendarRequest.time &&
+    !toolCalls.some((call) => call.name === "agendar_cita")
+  ) {
+    const result = await runCalendarTool(
+      calendarRuntime,
+      {
+        arguments: JSON.stringify({
+          motivo: "Cita",
+          nombre: calendarRuntime.contact.fullName ?? "Cliente",
+        }),
+        name: "agendar_cita",
+      },
+      calendarRequest,
+    );
+    toolCalls.push({ automatic: true, name: "agendar_cita", result });
+
+    return {
+      answer: ensureAgentIntroduction(
+        buildDirectBookingAnswer(result, calendarRuntime),
+        agent,
+        introduceAgent,
+      ),
+      calendarGuard:
+        result.confirmada === true
+          ? null
+          : "La reserva directa fue rechazada o el horario ya no estaba libre.",
+      timezoneWarning,
+      model: payload.model ?? model,
+      responseId: payload.id ?? null,
+      toolCalls,
+      usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+    };
+  }
+
   const sanitized = sanitizeCalendarAnswer({
     answer: getResponseText(payload),
     calendarRuntime,
@@ -1303,7 +1477,7 @@ async function generateReply(
   });
 
   return {
-    answer: sanitized.answer,
+    answer: ensureAgentIntroduction(sanitized.answer, agent, introduceAgent),
     calendarGuard: sanitized.blockedReason,
     timezoneWarning,
     model: payload.model ?? model,
@@ -1457,7 +1631,7 @@ export async function POST(request: Request) {
       .eq("workspace_id", conversation.workspace_id)
       .eq("conversation_id", conversation.id)
       .order("created_at", { ascending: false })
-      .limit(8);
+      .limit(20);
     const chronologicalMessages = [...(messages ?? [])].reverse() as MessageRow[];
     const latestMessage = chronologicalMessages.at(-1);
 
@@ -1524,6 +1698,7 @@ export async function POST(request: Request) {
         (knowledgeAssets ?? []) as KnowledgeAsset[],
         businessProfile as BusinessProfileAsset | null,
         calendarRuntime,
+        !conversation.agent_id || conversation.agent_id !== typedAgent.id,
       );
       const insights = await generateContactInsights(
         typedAgent,
@@ -1578,6 +1753,10 @@ export async function POST(request: Request) {
         input_tokens: Number(reply.usage.input_tokens ?? 0),
         message_id: message.id,
         metadata: {
+          calendar_guard: reply.calendarGuard,
+          calendar_tool_calls: reply.toolCalls,
+          calendar_unavailable_reason:
+            calendarResult.reason ?? reply.timezoneWarning ?? null,
           kind: "buffer_ai_reply",
           openai_response_id: reply.responseId,
           rag_document_ids: knowledgeAssetIds,

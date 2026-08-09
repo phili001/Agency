@@ -146,8 +146,9 @@ export async function POST(request: Request) {
       .from("contacts")
       .select("id, workspace_id, full_name, phone_e164, email, metadata")
       .eq("workspace_id", integration.workspace_id)
-      .order("updated_at", { ascending: false })
-      .limit(25);
+      .is("metadata->>ghl_contact_id", null)
+      .order("updated_at", { ascending: true })
+      .limit(100);
 
     if (contactsError) {
       results.push({
@@ -167,6 +168,10 @@ export async function POST(request: Request) {
           contact,
           locationId,
         });
+
+        if (!highLevel.contactId) {
+          throw new Error("GoHighLevel no devolvio contact id.");
+        }
 
         await supabase
           .from("contacts")

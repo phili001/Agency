@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { normalizeAppUrl } from "@/lib/app-url";
 import { handleInboundFlow } from "@/lib/flow-engine";
+import { syncContactToGoHighLevel } from "@/lib/integrations/gohighlevel";
 import { hashSecret } from "@/lib/integrations/secrets";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -524,6 +525,16 @@ async function storeYCloudMessage({
     throw contactError;
   }
 
+  if (event.direction === "inbound") {
+    // El contacto entra a GHL desde su primer mensaje. El upsert usa telefono,
+    // evita duplicados y guarda el ghl_contact_id; un fallo de GHL queda en el
+    // metadata local sin impedir que WhatsApp continue procesandose.
+    await syncContactToGoHighLevel({
+      contactId: contact.id,
+      workspaceId: resolvedWorkspaceId,
+    });
+  }
+
   const { data: existingConversation } = await supabase
     .from("conversations")
     .select("id")
@@ -558,7 +569,7 @@ async function storeYCloudMessage({
   let { data: existingMessage } = messageProviderId
     ? await supabase
         .from("messages")
-        .select("id, created_at")
+        .select("id, created_at, metadata")
         .eq("workspace_id", resolvedWorkspaceId)
         .eq("provider_message_id", messageProviderId)
         .maybeSingle()
@@ -568,7 +579,7 @@ async function storeYCloudMessage({
     const since = new Date(Date.now() - 1000 * 60 * 10).toISOString();
     const { data: matchingMessages } = await supabase
       .from("messages")
-      .select("id, created_at")
+      .select("id, created_at, metadata")
       .eq("workspace_id", resolvedWorkspaceId)
       .eq("conversation_id", conversationId)
       .eq("direction", "outbound")
@@ -584,6 +595,7 @@ async function storeYCloudMessage({
         .from("messages")
         .update({
           metadata: {
+            ...(existingMessage.metadata ?? {}),
             deduped_from_ycloud_status: event.status,
             raw_event_type: event.eventType,
           },
@@ -733,14 +745,14 @@ export async function handleYCloudWebhook(
       if (providerIds.length > 0 && nextStatus) {
         let { data: existingMessages } = await supabase
           .from("messages")
-          .select("id, conversation_id")
+          .select("id, conversation_id, metadata")
           .eq("workspace_id", resolvedWorkspaceId)
           .in("provider_message_id", providerIds)
           .limit(1);
         if (!existingMessages?.length) {
           const { data } = await supabase
             .from("messages")
-            .select("id, conversation_id")
+            .select("id, conversation_id, metadata")
             .eq("workspace_id", resolvedWorkspaceId)
             .or(
               providerIds
@@ -762,6 +774,7 @@ export async function handleYCloudWebhook(
             .from("messages")
             .update({
               metadata: {
+                ...(existingMessage.metadata ?? {}),
                 raw_event_type: event.eventType,
                 ycloud_status: event.status,
               },
@@ -786,7 +799,7 @@ export async function handleYCloudWebhook(
           const since = new Date(Date.now() - 1000 * 60 * 10).toISOString();
           const { data: matchingMessages } = await supabase
             .from("messages")
-            .select("id")
+            .select("id, metadata")
             .eq("workspace_id", resolvedWorkspaceId)
             .eq("contact_id", contact.id)
             .eq("direction", "outbound")
@@ -801,6 +814,7 @@ export async function handleYCloudWebhook(
               .from("messages")
               .update({
                 metadata: {
+                  ...(matchingMessage.metadata ?? {}),
                   deduped_from_ycloud_status: event.status,
                   raw_event_type: event.eventType,
                 },
