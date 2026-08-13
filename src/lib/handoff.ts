@@ -25,11 +25,19 @@ export type HandoffSource =
 export function buildHandoffContext() {
   return `Cuando no sepas algo:
 - Si no tienes la respuesta, o el tema no es tuyo, o el cliente reporta un problema con algo que ya contrato, DILO EN CLARO: "no tengo esa informacion" o "eso no lo puedo resolver yo".
-- En cuanto lo digas, la conversacion pasa automaticamente a una persona del equipo. No tienes que hacer nada mas.
+- En cuanto lo digas, la conversacion pasa automaticamente a una persona del equipo, y el sistema se lo avisa al cliente por ti. No lo anuncies tu ni lo repitas.
 - PROHIBIDO inventarte la respuesta para salir del paso. Preferimos mil veces un "no lo se" que un dato falso.
 - No derives al cliente a un tercero ajeno al negocio. Si el problema es de un servicio del negocio, se resuelve aqui dentro.
 - No prometas plazos ni soluciones concretas al decirlo.`;
 }
+
+/**
+ * Lo que lee el cliente cuando la conversacion cambia de manos. Se anade desde
+ * el servidor y no se deja a criterio del modelo: un "no tengo esa informacion"
+ * a secas deja al cliente pensando que ahi se acabo la conversacion.
+ */
+export const HANDOFF_CLIENT_NOTICE =
+  "Te paso con una persona del equipo para que lo revise y te responda por aqui mismo.";
 
 export function normalizeHandoffText(value: string) {
   return value
@@ -102,6 +110,30 @@ const HANDOFF_PROMISE_PATTERNS = [
   // "se pondran en contacto contigo"
   /\bse\s+(pongan|pondra|pondran|ponen)\s+en\s+contacto\b/,
 ];
+
+/**
+ * El aviso solo se anade si el agente no lo dijo ya por su cuenta. Los patrones
+ * de promesa son justo la senal de "aqui ya se anuncia un humano", asi que se
+ * reutilizan: sin esto el cliente leia lo mismo tres veces seguidas.
+ */
+export function withHandoffNotice(answer: string | null | undefined) {
+  const clean = (answer ?? "").trim();
+
+  if (!clean) {
+    return HANDOFF_CLIENT_NOTICE;
+  }
+
+  const normalized = normalizeHandoffText(clean);
+
+  if (
+    normalized.includes("una persona del equipo") ||
+    HANDOFF_PROMISE_PATTERNS.some((pattern) => pattern.test(normalized))
+  ) {
+    return clean;
+  }
+
+  return `${clean}\n\n${HANDOFF_CLIENT_NOTICE}`;
+}
 
 /**
  * "No se" explicito. Los patrones son cerrados a proposito: "no se si prefieres

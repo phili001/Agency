@@ -23,6 +23,8 @@ import {
   detectAnswerHandoff,
   findHandoffKeyword,
   getHandoffKeywords,
+  withHandoffNotice,
+  HANDOFF_CLIENT_NOTICE,
 } from "@/lib/handoff";
 import { getWorkspaceOpenAIKey } from "@/lib/integrations/openai";
 import {
@@ -1834,7 +1836,7 @@ export async function POST(request: Request) {
           workspaceId: conversation.workspace_id,
         });
         await supabase.from("messages").insert({
-          body: "Te paso con una persona del equipo, en un momento continua por aqui.",
+          body: HANDOFF_CLIENT_NOTICE,
           contact_id: conversation.contact_id,
           conversation_id: conversation.id,
           direction: "outbound",
@@ -1900,10 +1902,20 @@ export async function POST(request: Request) {
         continue;
       }
 
+      // Si el agente admitio que no sabe, o prometio que alguien contactaria al
+      // cliente, la conversacion pasa a la bandeja de handoff de la empresa. Se
+      // mira lo que escribio, que es lo unico comprobable.
+      const answerHandoff = detectAnswerHandoff(reply.answer);
+      // El cliente tiene que enterarse de que cambia de interlocutor. Sin esto
+      // leia un "no tengo esa informacion" y parecia un callejon sin salida.
+      const answerBody = answerHandoff
+        ? withHandoffNotice(reply.answer)
+        : reply.answer;
+
       const { data: message, error: messageError } = await supabase
         .from("messages")
         .insert({
-          body: reply.answer,
+          body: answerBody,
           contact_id: conversation.contact_id,
           conversation_id: conversation.id,
           direction: "outbound",
@@ -2017,11 +2029,6 @@ export async function POST(request: Request) {
         })
         .eq("id", conversation.id)
         .eq("workspace_id", conversation.workspace_id);
-
-      // Si el agente admitio que no sabe, o prometio que alguien contactaria al
-      // cliente, la conversacion pasa a la bandeja de handoff de la empresa. Se
-      // mira lo que escribio, que es lo unico comprobable.
-      const answerHandoff = detectAnswerHandoff(reply.answer);
 
       if (answerHandoff) {
         await applyConversationHandoff({
