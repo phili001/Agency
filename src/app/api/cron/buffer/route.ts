@@ -17,6 +17,13 @@ import {
   buildBusinessContext,
   getBusinessVariables,
 } from "@/lib/business-profile";
+import {
+  applyConversationHandoff,
+  buildHandoffContext,
+  detectAnswerHandoff,
+  findHandoffKeyword,
+  getHandoffKeywords,
+} from "@/lib/handoff";
 import { getWorkspaceOpenAIKey } from "@/lib/integrations/openai";
 import {
   createAppointment,
@@ -675,6 +682,9 @@ function buildInstructions(
   const promptWithVariables = applyBusinessVariables(basePrompt, businessVariables);
   const businessContext = buildBusinessContext(businessProfile);
   const calendarContext = buildCalendarContext(calendarRuntime);
+  // Se inyecta en runtime a proposito: asi la regla de escalada aplica tambien
+  // a los agentes ya creados, sin tener que reescribir sus prompts guardados.
+  const handoffContext = buildHandoffContext();
   // La fecha se inyecta siempre, tenga o no agenda conectada.
   const timeContext = buildTimeContext(
     resolveAgentTimezone(businessProfile, calendarRuntime),
@@ -696,6 +706,7 @@ ${
       promptWithVariables,
       timeContext,
       calendarContext,
+      handoffContext,
     ]
       .filter(Boolean)
       .join("\n\n");
@@ -735,6 +746,8 @@ ${businessContext}
 ${timeContext}
 
 ${calendarContext}
+
+${handoffContext}
 
 Recuerda: la fecha del sistema y los limites de arriba mandan sobre cualquier
 fecha, hora o ejemplo que aparezca en los documentos.`;
@@ -1494,11 +1507,7 @@ async function generateReply(
     }
 
     for (const call of functionCalls) {
-      const result = await runCalendarTool(
-        calendarRuntime,
-        call,
-        messages,
-      );
+      const result = await runCalendarTool(calendarRuntime, call, messages);
       toolCalls.push({ name: call.name, result });
       input.push({
         call_id: call.call_id,
@@ -1806,6 +1815,47 @@ export async function POST(request: Request) {
 
     try {
       const typedAgent = agent as AgentRow;
+      // Si el contacto pide un humano, no se gasta una respuesta de IA: se
+      // escala y se le avisa. Antes estas palabras estaban configuradas pero
+      // no las leia nadie.
+      const matchedKeyword = findHandoffKeyword(
+        latestMessage.body,
+        getHandoffKeywords(typedAgent.config),
+      );
+
+      if (matchedKeyword) {
+        await applyConversationHandoff({
+          contactId: conversation.contact_id,
+          conversationId: conversation.id,
+          reason: `El contacto escribio "${matchedKeyword}".`,
+          source: "keyword",
+          summary: latestMessage.body?.trim() ?? null,
+          supabase,
+          workspaceId: conversation.workspace_id,
+        });
+        await supabase.from("messages").insert({
+          body: "Te paso con una persona del equipo, en un momento continua por aqui.",
+          contact_id: conversation.contact_id,
+          conversation_id: conversation.id,
+          direction: "outbound",
+          message_type: "text",
+          metadata: {
+            delivery: "queued_only",
+            handoff_keyword: matchedKeyword,
+            kind: "handoff_ack",
+          },
+          role: "assistant",
+          status: "queued",
+          workspace_id: conversation.workspace_id,
+        });
+        results.push({
+          conversationId: conversation.id,
+          handoffSource: "keyword",
+          status: "handoff",
+        });
+        continue;
+      }
+
       const knowledgeAssetIds = getKnowledgeAssetIds(typedAgent.config);
       const { data: knowledgeAssets } =
         knowledgeAssetIds.length > 0
@@ -1968,12 +2018,30 @@ export async function POST(request: Request) {
         .eq("id", conversation.id)
         .eq("workspace_id", conversation.workspace_id);
 
+      // Si el agente admitio que no sabe, o prometio que alguien contactaria al
+      // cliente, la conversacion pasa a la bandeja de handoff de la empresa. Se
+      // mira lo que escribio, que es lo unico comprobable.
+      const answerHandoff = detectAnswerHandoff(reply.answer);
+
+      if (answerHandoff) {
+        await applyConversationHandoff({
+          contactId: conversation.contact_id,
+          conversationId: conversation.id,
+          reason: answerHandoff.reason,
+          source: answerHandoff.source,
+          summary: latestMessage.body?.trim() ?? null,
+          supabase,
+          workspaceId: conversation.workspace_id,
+        });
+      }
+
       results.push({
         agentId: typedAgent.id,
         agentName: typedAgent.name,
         // Por que el agente no pudo usar el calendario, si fue el caso.
         calendarUnavailable: calendarResult.reason ?? undefined,
         conversationId: conversation.id,
+        handoffSource: answerHandoff?.source,
         routerScore: routedAgent.score,
         routerStrategy: routedAgent.strategy,
         status: "queued",

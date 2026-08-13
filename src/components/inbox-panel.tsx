@@ -51,6 +51,11 @@ type ConversationItem = {
     ycloud_contact_name?: string;
   } | null;
   contactPhone?: string | null;
+  handoff?: {
+    handoffAt: string;
+    reason: string;
+    source: string;
+  };
   id: string;
   name: string;
   onboarding?: {
@@ -69,7 +74,14 @@ type ConversationItem = {
   workspaceId?: string | null;
 };
 
-type InboxView = "conversations" | "onboarding";
+type InboxView = "ai" | "handoff" | "onboarding";
+
+const handoffSourceLabel: Record<string, string> = {
+  flow_review: "Revision de onboarding",
+  keyword: "Lo pidio el contacto",
+  promise_guard: "La IA prometio un humano",
+  unknown_answer: "La IA no supo responder",
+};
 
 const pendingOnboardingStatuses = new Set([
   "active",
@@ -161,7 +173,7 @@ export function InboxPanel({
   const [selectedConversationId, setSelectedConversationId] = useState(
     conversations[0]?.id ?? "",
   );
-  const [inboxView, setInboxView] = useState<InboxView>("conversations");
+  const [inboxView, setInboxView] = useState<InboxView>("ai");
   const [draft, setDraft] = useState("");
   const [noteDraft, setNoteDraft] = useState("");
   const [error, setError] = useState("");
@@ -179,8 +191,25 @@ export function InboxPanel({
     () => localConversations.filter((conversation) => !isPendingOnboarding(conversation)),
     [localConversations],
   );
-  const visibleConversations =
-    inboxView === "onboarding" ? onboardingConversations : regularConversations;
+  // La bandeja se parte por quien esta al mando: si la IA responde o si la
+  // conversacion espera a una persona. Mezcladas no se veia que estaba parado.
+  const aiConversations = useMemo(
+    () => regularConversations.filter((conversation) => conversation.aiEnabled),
+    [regularConversations],
+  );
+  const handoffConversations = useMemo(
+    () => regularConversations.filter((conversation) => !conversation.aiEnabled),
+    [regularConversations],
+  );
+  const conversationsByView = useMemo(
+    () => ({
+      ai: aiConversations,
+      handoff: handoffConversations,
+      onboarding: onboardingConversations,
+    }),
+    [aiConversations, handoffConversations, onboardingConversations],
+  );
+  const visibleConversations = conversationsByView[inboxView];
   const selectedConversation =
     visibleConversations.find(
       (conversation) => conversation.id === selectedConversationId,
@@ -249,12 +278,8 @@ export function InboxPanel({
   const canReply = canSend && !isBlocked;
 
   function selectInboxView(nextView: InboxView) {
-    const nextConversations =
-      nextView === "onboarding"
-        ? onboardingConversations
-        : regularConversations;
     setInboxView(nextView);
-    setSelectedConversationId(nextConversations[0]?.id ?? "");
+    setSelectedConversationId(conversationsByView[nextView][0]?.id ?? "");
   }
 
   function stableTime(value: string) {
@@ -671,6 +696,13 @@ export function InboxPanel({
 
     setError("");
     const previous = selectedConversation;
+
+    // Al encender o apagar la IA la conversacion cambia de pestana; sin esto
+    // desaparecia de la vista y parecia que se habia perdido.
+    if (next.aiEnabled !== undefined && next.aiEnabled !== previous.aiEnabled) {
+      setInboxView(next.aiEnabled ? "ai" : "handoff");
+    }
+
     setLocalConversations((current) =>
       current.map((conversation) =>
         conversation.id === selectedConversation.id
@@ -707,26 +739,43 @@ export function InboxPanel({
   return (
     <div className="grid h-[calc(100vh-260px)] min-h-[430px] overflow-hidden xl:grid-cols-[320px_1fr_300px]">
       <div className="flex min-h-0 flex-col border-b border-[#e2e6df] lg:border-b-0 lg:border-r">
-        <div className="grid shrink-0 grid-cols-2 gap-1 border-b border-[#e2e6df] bg-white p-2">
+        <div className="grid shrink-0 grid-cols-3 gap-1 border-b border-[#e2e6df] bg-white p-2">
           <button
             className={`flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition ${
-              inboxView === "conversations"
+              inboxView === "ai"
                 ? "bg-[#10231c] text-white"
                 : "bg-[#f3f4ef] text-[#4d5a51] hover:bg-[#e8ece5]"
             }`}
-            onClick={() => selectInboxView("conversations")}
+            onClick={() => selectInboxView("ai")}
             type="button"
           >
-            <MessageSquareText size={14} />
-            <span className="truncate">Conversaciones</span>
+            <Bot size={14} />
+            <span className="truncate">Respondiendo IA</span>
             <span
               className={`rounded-md px-1.5 py-0.5 text-[10px] ${
-                inboxView === "conversations"
-                  ? "bg-white/15"
-                  : "bg-white text-[#4d5a51]"
+                inboxView === "ai" ? "bg-white/15" : "bg-white text-[#4d5a51]"
               }`}
             >
-              {regularConversations.length}
+              {aiConversations.length}
+            </span>
+          </button>
+          <button
+            className={`flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition ${
+              inboxView === "handoff"
+                ? "bg-[#8a5a12] text-white"
+                : "bg-[#f3f4ef] text-[#4d5a51] hover:bg-[#e8ece5]"
+            }`}
+            onClick={() => selectInboxView("handoff")}
+            type="button"
+          >
+            <Hand size={14} />
+            <span className="truncate">Handoff</span>
+            <span
+              className={`rounded-md px-1.5 py-0.5 text-[10px] ${
+                inboxView === "handoff" ? "bg-white/15" : "bg-white text-[#4d5a51]"
+              }`}
+            >
+              {handoffConversations.length}
             </span>
           </button>
           <button
@@ -791,6 +840,16 @@ export function InboxPanel({
             <span className="mt-2 inline-flex rounded-md border border-[#d9ded3] px-2 py-0.5 text-[11px]">
               {conversation.status}
             </span>
+            {inboxView === "handoff" && conversation.handoff ? (
+              <span className="ml-1.5 mt-2 inline-flex max-w-full rounded-md bg-[#fdf1dd] px-2 py-0.5 text-[11px] font-medium text-[#8a5a12]">
+                {handoffSourceLabel[conversation.handoff.source] ?? "Escalada"}
+              </span>
+            ) : null}
+            {inboxView === "handoff" && conversation.handoff ? (
+              <p className="mt-1.5 line-clamp-1 text-[11px] text-[#7a847c]">
+                {conversation.handoff.reason}
+              </p>
+            ) : null}
             {pendingOnboarding && conversation.onboarding ? (
               <>
                 <span className="ml-1.5 mt-2 inline-flex max-w-full rounded-md bg-[#dff0e5] px-2 py-0.5 text-[11px] font-medium text-[#285844]">
@@ -822,13 +881,17 @@ export function InboxPanel({
             <div>
               {inboxView === "onboarding" ? (
                 <GitBranch className="mx-auto text-[#a8b0aa]" size={22} />
+              ) : inboxView === "handoff" ? (
+                <Hand className="mx-auto text-[#a8b0aa]" size={22} />
               ) : (
-                <MessageSquareText className="mx-auto text-[#a8b0aa]" size={22} />
+                <Bot className="mx-auto text-[#a8b0aa]" size={22} />
               )}
               <p className="mt-2 text-sm font-semibold text-[#4d5a51]">
                 {inboxView === "onboarding"
                   ? "No hay contactos en onboarding"
-                  : "No hay conversaciones normales"}
+                  : inboxView === "handoff"
+                    ? "No hay conversaciones esperando a una persona"
+                    : "No hay conversaciones con IA activa"}
               </p>
               <p className="mt-1 text-xs text-[#7a847c]">
                 Esta vista se actualiza automaticamente.

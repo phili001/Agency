@@ -33,6 +33,7 @@ import {
   defaultAgentPresets,
 } from "@/lib/default-agents";
 import { getDefaultConversationMode } from "@/lib/conversation-default";
+import { getConversationHandoffInfo } from "@/lib/handoff";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlatformAdmin } from "@/lib/platform-admin";
@@ -660,6 +661,14 @@ export async function AppShell({ section }: { section: AppSection }) {
   const pendingReviewByConversation = new Map(
     (pendingReviews ?? []).map((review) => [review.conversation_id, review]),
   );
+  const handoffByConversation =
+    workspaceId && conversationIds.length > 0
+      ? await getConversationHandoffInfo(
+          createAdminClient(),
+          workspaceId,
+          conversationIds,
+        )
+      : new Map();
   const latestFlowRunByConversation = new Map<
     string,
     (typeof flowRuns)[number]
@@ -728,6 +737,7 @@ export async function AppShell({ section }: { section: AppSection }) {
                   totalSteps: contactMetadata?.flow_progress?.totalSteps ?? 0,
                 }
               : undefined,
+            handoff: handoffByConversation.get(conversation.id) ?? undefined,
             id: conversation.id,
             rawStatus: conversation.status,
             status: conversation.ai_enabled ? "IA activa" : "Handoff",

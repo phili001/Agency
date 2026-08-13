@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireWorkspaceRole } from "@/lib/authz";
+import { getConversationHandoffInfo } from "@/lib/handoff";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /** Mensajes que se cargan de la conversacion abierta. */
@@ -108,6 +109,11 @@ export async function GET(request: Request) {
           .in("conversation_id", conversationIds)
           .order("created_at", { ascending: false })
       : { data: [] };
+    const handoffByConversation = await getConversationHandoffInfo(
+      admin,
+      workspaceId,
+      conversationIds,
+    );
     const pendingReviewByConversation = new Map(
       (pendingReviews ?? []).map((review) => [review.conversation_id, review]),
     );
@@ -161,6 +167,7 @@ export async function GET(request: Request) {
                 totalSteps: Number(flowProgress.totalSteps ?? 0),
               }
             : undefined,
+          handoff: handoffByConversation.get(conversation.id) ?? undefined,
           rawStatus: conversation.status,
           status: conversation.ai_enabled ? "IA activa" : "Handoff",
           summary:
