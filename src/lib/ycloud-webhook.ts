@@ -878,7 +878,7 @@ export async function handleYCloudWebhook(
         status = "stored";
       } else {
         status = "ignored";
-        errorMessage = "Actualizacion de estado sin mensaje saliente previo en Levi.";
+        errorMessage = "Actualizacion de estado sin mensaje saliente previo en Levy.";
       }
     } else if (event.contactPhone) {
       const storedMessage = await storeYCloudMessage({

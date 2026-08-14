@@ -886,7 +886,7 @@ export async function AppShell({ section }: { section: AppSection }) {
               <Bot size={22} />
             </div>
             <div>
-              <p className="text-sm font-semibold">Levi</p>
+              <p className="text-sm font-semibold">Levy</p>
               <p className="text-xs text-[#b7c4bd]">Panel de empresas</p>
             </div>
           </div>

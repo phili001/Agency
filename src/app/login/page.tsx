@@ -18,7 +18,7 @@ export default async function LoginPage({
             <Bot size={23} />
           </div>
           <div>
-            <p className="text-sm font-semibold text-[#647067]">Levi</p>
+            <p className="text-sm font-semibold text-[#647067]">Levy</p>
             <h1 className="text-xl font-semibold">Entrar</h1>
           </div>
         </div>
