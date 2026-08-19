@@ -8,6 +8,7 @@ import {
   GitBranch,
   Hand,
   ListPlus,
+  ListX,
   Loader2,
   MessageSquareText,
   NotebookPen,
@@ -35,6 +36,11 @@ type ConversationItem = {
       flowId?: string;
       totalSteps?: number;
       updatedAt?: string;
+    };
+    flow_opt_out?: {
+      at?: string;
+      by?: string | null;
+      reason?: string;
     };
     ghl_contact_id?: string;
     ghl_last_error?: string;
@@ -662,6 +668,89 @@ export function InboxPanel({
     setFlowAction("");
   }
 
+  async function handleRemoveFromFlow() {
+    if (
+      !selectedConversation?.workspaceId ||
+      !selectedConversation.contactId ||
+      activeRole === "viewer"
+    ) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        "Sacar a este contacto del flujo? Se cancelan los mensajes pendientes y la conversacion pasa a una persona.",
+      )
+    ) {
+      return;
+    }
+
+    setError("");
+    setNotice("");
+    setFlowAction("stop");
+    const response = await fetch("/api/flows/stop", {
+      body: JSON.stringify({
+        contactId: selectedConversation.contactId,
+        conversationId: selectedConversation.id,
+        workspaceId: selectedConversation.workspaceId,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    const payload = (await response.json()) as {
+      error?: string;
+      reason?: string;
+      runIds?: string[];
+    };
+
+    if (!response.ok) {
+      setError(payload.error ?? "No se pudo sacar al contacto del flujo.");
+      setFlowAction("");
+      return;
+    }
+
+    setLocalConversations((current) =>
+      current.map((conversation) =>
+        conversation.id === selectedConversation.id
+          ? {
+              ...conversation,
+              aiEnabled: false,
+              contactMetadata: {
+                ...conversation.contactMetadata,
+                automation_labels: Array.from(
+                  new Set([
+                    ...(conversation.contactMetadata?.automation_labels ?? []).filter(
+                      (label) =>
+                        ![
+                          "blocked_invalid_answers",
+                          "onboarding_eligible",
+                          "onboarding_review_pending",
+                        ].includes(label),
+                    ),
+                    "flow_opt_out",
+                  ]),
+                ),
+                flow_opt_out: {
+                  at: new Date().toISOString(),
+                  reason: payload.reason,
+                },
+                pending_review: undefined,
+              },
+              onboarding: conversation.onboarding
+                ? { ...conversation.onboarding, status: "transferred" }
+                : undefined,
+              rawStatus: "pending_handoff",
+              status: "Handoff",
+            }
+          : conversation,
+      ),
+    );
+    setInboxView("handoff");
+    setSelectedConversationId(selectedConversation.id);
+    setNotice("Contacto fuera del flujo. La conversacion quedo con una persona.");
+    setFlowAction("");
+  }
+
   async function handleInternalNote(formData: FormData) {
     const body = String(formData.get("note") ?? "").trim();
 
@@ -803,6 +892,10 @@ export function InboxPanel({
         <div className="min-h-0 flex-1 divide-y divide-[#edf0ea] overflow-y-auto">
         {visibleConversations.map((conversation) => {
           const pendingOnboarding = isPendingOnboarding(conversation);
+          const optedOutOfFlow =
+            conversation.contactMetadata?.automation_labels?.includes(
+              "flow_opt_out",
+            ) ?? false;
           const completedOnboarding =
             conversation.onboarding?.status === "completed" ||
             conversation.onboarding?.status === "transferred" ||
@@ -868,6 +961,10 @@ export function InboxPanel({
                   {onboardingStatusLabel(conversation.onboarding.status)}
                 </span>
               </>
+            ) : optedOutOfFlow ? (
+              <span className="ml-1.5 mt-2 inline-flex rounded-md bg-[#f6e9e9] px-2 py-0.5 text-[11px] text-[#8a2f2f]">
+                Fuera del flujo
+              </span>
             ) : completedOnboarding ? (
               <span className="ml-1.5 mt-2 inline-flex rounded-md bg-[#eef2eb] px-2 py-0.5 text-[11px] text-[#4d5a51]">
                 Onboarding completado
@@ -933,6 +1030,26 @@ export function InboxPanel({
                 )}
                 Agregar al flujo
               </button>
+              {selectedConversation && isPendingOnboarding(selectedConversation) ? (
+                <button
+                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#e0c3c3] bg-white px-3 text-sm font-medium text-[#8a2f2f] disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={
+                    !canSend ||
+                    !selectedConversation.contactId ||
+                    activeRole === "viewer" ||
+                    flowAction === "stop"
+                  }
+                  onClick={handleRemoveFromFlow}
+                  type="button"
+                >
+                  {flowAction === "stop" ? (
+                    <Loader2 className="animate-spin" size={16} />
+                  ) : (
+                    <ListX size={16} />
+                  )}
+                  Sacar del flujo
+                </button>
+              ) : null}
               <button
                 className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium ${
                   selectedConversation?.aiEnabled

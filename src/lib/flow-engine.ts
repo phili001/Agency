@@ -24,6 +24,20 @@ type ConversationContext = {
 const MAX_STEPS_PER_TICK = 8;
 const TERMINAL_RUN_STATUSES = ["blocked", "completed", "transferred"];
 
+// Etiqueta que marca a un contacto sacado del flujo a mano. Mientras la tenga,
+// ningun disparador automatico lo vuelve a meter; solo un inicio manual la quita.
+export const FLOW_OPT_OUT_LABEL = "flow_opt_out";
+
+// Estados de ejecucion que todavia pueden avanzar y que hay que cerrar al sacar
+// a un contacto del flujo.
+const STOPPABLE_RUN_STATUSES = [
+  "active",
+  "blocked",
+  "paused",
+  "review_pending",
+  "waiting",
+];
+
 function withLabel(labels: string[], label: string) {
   return Array.from(new Set([...labels, label]));
 }
@@ -792,6 +806,10 @@ async function getMatchingFlow(
     .order("created_at", { ascending: true });
   const inboundText = (context.inboundText ?? "").toLowerCase();
 
+  if ((contact.automation_labels ?? []).includes(FLOW_OPT_OUT_LABEL)) {
+    return null;
+  }
+
   for (const flow of (flows ?? []) as FlowRow[]) {
     const config = getRecord(flow.trigger_config);
     const audience = String(config.audience ?? "all");
@@ -895,6 +913,10 @@ export async function startWebhookFlow({
     return { handled: false, status: "contact_not_found" };
   }
 
+  if ((contact.automation_labels ?? []).includes(FLOW_OPT_OUT_LABEL)) {
+    return { handled: true, status: "contact_opted_out" };
+  }
+
   const { data: run, error } = await supabase
     .from("flow_runs")
     .insert({
@@ -993,11 +1015,13 @@ export async function startManualContactFlow({
   delete cleanMetadata.flow_answers;
   delete cleanMetadata.flow_progress;
   delete cleanMetadata.pending_review;
+  delete cleanMetadata.flow_opt_out;
   const cleanLabels = [
     "onboarding_excluded_existing",
     "onboarding_completed",
     "onboarding_review_pending",
     "blocked_invalid_answers",
+    FLOW_OPT_OUT_LABEL,
   ].reduce((labels, label) => withoutLabel(labels, label), contact.automation_labels ?? []);
 
   const { data: previousRuns } = await supabase
@@ -1691,6 +1715,159 @@ export async function decideFlowAnswerReview({
     startStepId: getNextStepId(steps, step),
     supabase,
   });
+}
+
+/**
+ * Saca a un contacto del flujo: cierra sus ejecuciones abiertas, cancela los
+ * mensajes que quedaron en cola, descarta las revisiones pendientes y lo marca
+ * con FLOW_OPT_OUT_LABEL para que ningun disparador automatico lo reingrese.
+ * La conversacion queda con una persona (o con la IA si nextMode es "ai").
+ */
+export async function stopContactFlow({
+  contactId,
+  conversationId,
+  nextMode = "handoff",
+  reason,
+  stoppedBy,
+  supabase,
+  workspaceId,
+}: {
+  contactId: string;
+  conversationId?: string | null;
+  nextMode?: "ai" | "handoff";
+  reason?: string | null;
+  stoppedBy?: string | null;
+  supabase: AdminClient;
+  workspaceId: string;
+}) {
+  const { data: contact } = await supabase
+    .from("contacts")
+    .select("*")
+    .eq("id", contactId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+
+  if (!contact) {
+    throw new Error("El contacto no pertenece a esta empresa.");
+  }
+
+  const now = new Date().toISOString();
+  const stopReason = reason?.trim() || "Sacado del flujo manualmente.";
+  const enableAi = nextMode === "ai";
+
+  const [{ data: openRuns }, { data: conversations }] = await Promise.all([
+    supabase
+      .from("flow_runs")
+      .select("id, flow_id")
+      .eq("workspace_id", workspaceId)
+      .eq("contact_id", contactId)
+      .in("status", STOPPABLE_RUN_STATUSES),
+    supabase
+      .from("conversations")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .eq("contact_id", contactId)
+      .neq("status", "closed"),
+  ]);
+  const runIds = (openRuns ?? []).map((run) => run.id);
+  const conversationIds = (conversations ?? []).map((item) => item.id);
+  const metadata = getRecord(contact.metadata);
+  const cleanMetadata = { ...metadata };
+  delete cleanMetadata.flow_progress;
+  delete cleanMetadata.pending_review;
+  const labels = withLabel(
+    [
+      "onboarding_eligible",
+      "onboarding_review_pending",
+      "blocked_invalid_answers",
+    ].reduce(
+      (current, label) => withoutLabel(current, label),
+      contact.automation_labels ?? [],
+    ),
+    FLOW_OPT_OUT_LABEL,
+  );
+
+  await Promise.all([
+    runIds.length
+      ? supabase
+          .from("flow_runs")
+          .update({
+            completed_at: now,
+            last_error: stopReason,
+            status: "transferred",
+          })
+          .in("id", runIds)
+          .eq("workspace_id", workspaceId)
+      : Promise.resolve(),
+    runIds.length
+      ? supabase
+          .from("flow_answer_reviews")
+          .update({
+            decided_at: now,
+            decided_by: stoppedBy ?? null,
+            human_decision_reason: stopReason,
+            status: "rejected_by_human",
+          })
+          .in("flow_run_id", runIds)
+          .eq("workspace_id", workspaceId)
+          .eq("status", "pending_human")
+      : Promise.resolve(),
+    // Sin esto el cron de entrega seguiria mandando los mensajes que el flujo
+    // ya habia encolado antes de sacar al contacto.
+    supabase
+      .from("messages")
+      .update({ status: "failed" })
+      .eq("workspace_id", workspaceId)
+      .eq("contact_id", contactId)
+      .eq("direction", "outbound")
+      .eq("role", "assistant")
+      .eq("status", "queued"),
+    supabase
+      .from("contacts")
+      .update({
+        automation_labels: labels,
+        messaging_status: "active",
+        metadata: {
+          ...cleanMetadata,
+          flow_opt_out: {
+            at: now,
+            by: stoppedBy ?? null,
+            reason: stopReason,
+          },
+        },
+      })
+      .eq("id", contactId)
+      .eq("workspace_id", workspaceId),
+    conversationIds.length
+      ? supabase
+          .from("conversations")
+          .update({
+            ai_enabled: enableAi,
+            status: enableAi ? "open" : "pending_handoff",
+          })
+          .in("id", conversationIds)
+          .eq("workspace_id", workspaceId)
+      : Promise.resolve(),
+  ]);
+
+  await logFlowEvent({
+    contactId,
+    conversationId: conversationId ?? conversationIds[0] ?? null,
+    eventType: "flow_stopped_manually",
+    flowId: (openRuns ?? [])[0]?.flow_id ?? null,
+    flowRunId: runIds[0] ?? null,
+    payload: { nextMode, reason: stopReason, runIds, stoppedBy: stoppedBy ?? null },
+    supabase,
+    workspaceId,
+  });
+
+  return {
+    conversationIds,
+    nextMode,
+    reason: stopReason,
+    runIds,
+    status: "stopped",
+  };
 }
 
 export async function unblockFlowContact({
