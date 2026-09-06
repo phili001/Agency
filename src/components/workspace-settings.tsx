@@ -130,12 +130,12 @@ const hashToTab: Record<string, TabId> = {
 
 const providers = [
   {
-    description: "Datos del numero conectado en YCloud.",
+    description: "Datos del número conectado en YCloud.",
     fields: [
       ["api_key", "YCloud API key"],
-      ["phone_e164", "Numero WhatsApp con pais"],
+      ["phone_e164", "Número WhatsApp con pais"],
       ["waba_id", "WABA ID de YCloud"],
-      ["phone_id", "Phone ID del numero (opcional)"],
+      ["phone_id", "Phone ID del número (opcional)"],
       ["webhook_secret", "Secreto webhook"],
     ],
     label: "YCloud",
@@ -164,27 +164,27 @@ const providers = [
 const toolPresets = [
   {
     content:
-      "Accion: crea una cita directamente en GoHighLevel. Inputs: nombre, telefono, fecha, hora, calendario y notas. Requiere GoHighLevel conectado en esta empresa.",
+      "Acción: crea una cita directamente en GoHighLevel. Inputs: nombre, teléfono, fecha, hora, calendario y notas. Requiere GoHighLevel conectado en esta empresa.",
     title: "Agendar en GoHighLevel",
   },
   {
     content:
-      "Accion: consulta horarios disponibles en el calendario de GoHighLevel antes de reservar. Inputs: rango de fechas y calendario.",
+      "Acción: consulta horarios disponibles en el calendario de GoHighLevel antes de reservar. Inputs: rango de fechas y calendario.",
     title: "Consultar disponibilidad",
   },
   {
     content:
-      "Accion: devuelve el link de agenda para que el contacto reserve por su cuenta. Es una tool de lectura.",
+      "Acción: devuelve el link de agenda para que el contacto reserve por su cuenta. Es una tool de lectura.",
     title: "Agendamiento por link",
   },
   {
     content:
-      "Accion: herramienta de prueba que devuelve el mensaje recibido. Usala solo para validar flujos internos.",
+      "Acción: herramienta de prueba que devuelve el mensaje recibido. Usala solo para validar flujos internos.",
     title: "Echo",
   },
   {
     content:
-      "Accion: llama un webhook HTTPS propio con payload JSON. Usar solo cuando el endpoint y permisos esten claros.",
+      "Acción: llama un webhook HTTPS propio con payload JSON. Usar solo cuando el endpoint y permisos esten claros.",
     title: "Webhook personalizado",
   },
 ] as const;
@@ -255,7 +255,7 @@ function fieldHelp(provider: string, key: string) {
   if (provider === "ycloud") {
     const helpers: Record<string, { help: string; placeholder: string }> = {
       phone_e164: {
-        help: "El numero real conectado en YCloud. Ejemplo: +34600111222.",
+        help: "El número real conectado en YCloud. Ejemplo: +34600111222.",
         placeholder: "+34600111222",
       },
       waba_id: {
@@ -263,15 +263,15 @@ function fieldHelp(provider: string, key: string) {
         placeholder: "123456789012345",
       },
       phone_id: {
-        help: "Opcional. Si YCloud no lo muestra en esta pantalla, dejalo vacio; el webhook tambien buscara por WABA ID o numero.",
-        placeholder: "Opcional: phone_... o el ID tecnico si YCloud lo muestra",
+        help: "Opcional. Si YCloud no lo muestra en esta pantalla, dejalo vacio; el webhook también buscara por WABA ID o número.",
+        placeholder: "Opcional: phone_... o el ID técnico si YCloud lo muestra",
       },
       webhook_secret: {
         help: "Se usara solo para generar y validar la URL del webhook de esta empresa.",
-        placeholder: "Dejalo vacio para generar uno automaticamente",
+        placeholder: "Dejalo vacio para generar uno automáticamente",
       },
       api_key: {
-        help: "Se cifra en el backend y se usa solo para enviar mensajes de este numero.",
+        help: "Se cifra en el backend y se usa solo para enviar mensajes de este número.",
         placeholder: "YCloud API key",
       },
     };
@@ -303,7 +303,7 @@ function fieldHelp(provider: string, key: string) {
   }
 
   return {
-    help: "Dato de configuracion de esta integracion.",
+    help: "Dato de configuración de esta integración.",
     placeholder: key,
   };
 }
@@ -562,7 +562,7 @@ export function WorkspaceSettings({
       };
 
       if (!response.ok || !payload.integration) {
-        setStatus(payload.error ?? "No se pudo guardar la integracion.");
+        setStatus(payload.error ?? "No se pudo guardar la integración.");
         setSavingKey("");
         return;
       }
@@ -602,7 +602,7 @@ export function WorkspaceSettings({
       setStatus(
         regenerateWebhookSecret
           ? "Secreto nuevo generado. Copialo ahora: no se vuelve a mostrar."
-          : "Integracion conectada.",
+          : "Integración conectada.",
       );
       setSavingKey("");
       return;
@@ -644,7 +644,7 @@ export function WorkspaceSettings({
       );
       return [...withoutProvider, data as IntegrationItem];
     });
-    setStatus("Integracion guardada.");
+    setStatus("Integración guardada.");
     setSavingKey("");
   }
 
@@ -676,9 +676,9 @@ export function WorkspaceSettings({
     }
 
     const successMessages: Record<IntegrationItem["provider"], string> = {
-      gohighlevel: "GoHighLevel respondio correctamente. La conexion esta lista.",
-      openai: "OpenAI respondio correctamente.",
-      ycloud: "YCloud respondio correctamente.",
+      gohighlevel: "GoHighLevel respondió correctamente. La conexión esta lista.",
+      openai: "OpenAI respondió correctamente.",
+      ycloud: "YCloud respondió correctamente.",
     };
 
     setStatus(payload.message ?? successMessages[provider]);
@@ -696,7 +696,7 @@ export function WorkspaceSettings({
 
     const draft = assetDrafts[kind];
     if (kind === "knowledge" && (!draft.title.trim() || !draft.content.trim())) {
-      setStatus("Escribe titulo y contenido para agregar el documento.");
+      setStatus("Escribe título y contenido para agregar el documento.");
       setSavingKey("");
       return;
     }
@@ -1001,7 +1001,7 @@ export function WorkspaceSettings({
     setMemberResetPassword(false);
     setMemberTemporaryPassword("");
     setStatus(
-      "Miembro agregado. Si creaste o reseteaste la contrasena, ya puede iniciar sesion y cambiar de empresa desde el selector.",
+      "Miembro agregado. Si creaste o reseteaste la contraseña, ya puede iniciar sesión y cambiar de empresa desde el selector.",
     );
     setSavingKey("");
   }
@@ -1011,22 +1011,22 @@ export function WorkspaceSettings({
     const next = newPassword.trim();
 
     if (!current) {
-      setStatus("Escribe tu contrasena actual.");
+      setStatus("Escribe tu contraseña actual.");
       return;
     }
 
     if (next.length < 8) {
-      setStatus("La nueva contrasena debe tener minimo 8 caracteres.");
+      setStatus("La nueva contraseña debe tener mínimo 8 caracteres.");
       return;
     }
 
     if (next !== newPasswordConfirmation.trim()) {
-      setStatus("La confirmacion no coincide con la nueva contrasena.");
+      setStatus("La confirmación no coincide con la nueva contraseña.");
       return;
     }
 
     if (current === next) {
-      setStatus("La nueva contrasena debe ser diferente a la actual.");
+      setStatus("La nueva contraseña debe ser diferente a la actual.");
       return;
     }
 
@@ -1046,7 +1046,7 @@ export function WorkspaceSettings({
     const payload = (await response.json()) as { error?: string };
 
     if (!response.ok) {
-      setStatus(payload.error ?? "No se pudo cambiar la contrasena.");
+      setStatus(payload.error ?? "No se pudo cambiar la contraseña.");
       setSavingKey("");
       return;
     }
@@ -1054,7 +1054,7 @@ export function WorkspaceSettings({
     setCurrentPassword("");
     setNewPassword("");
     setNewPasswordConfirmation("");
-    setStatus("Contrasena actualizada.");
+    setStatus("Contraseña actualizada.");
     setSavingKey("");
   }
 
@@ -1390,7 +1390,7 @@ export function WorkspaceSettings({
                           value: event.target.value,
                         })
                       }
-                      placeholder="Ej: 30 dias para cambios por defectos de fabrica."
+                      placeholder="Ej: 30 días para cambios por defectos de fabrica."
                       value={field.value}
                     />
                   </label>
@@ -1411,7 +1411,7 @@ export function WorkspaceSettings({
             })}
             {(metadata.custom_fields ?? []).length === 0 ? (
               <p className="rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
-                No hay campos adicionales. Puedes agregar politicas, promociones,
+                No hay campos adicionales. Puedes agregar políticas, promociones,
                 especialidades, URLs o cualquier dato que el agente deba conocer.
               </p>
             ) : null}
@@ -1562,7 +1562,7 @@ export function WorkspaceSettings({
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h3 className="text-sm font-semibold">
-              {isEditing ? `Editando: ${draft.title || "sin titulo"}` : title}
+              {isEditing ? `Editando: ${draft.title || "sin título"}` : title}
             </h3>
             <p className="mt-1 text-sm text-[#647067]">
               {isEditing
@@ -1600,7 +1600,7 @@ export function WorkspaceSettings({
               [kind]: { ...current[kind], title: event.target.value },
             }))
           }
-          placeholder="Titulo"
+          placeholder="Título"
           value={draft.title}
         />
         <textarea
@@ -1740,7 +1740,7 @@ export function WorkspaceSettings({
                       <p className="mt-2">
                         {ycloudSecretValue
                           ? "Esta URL usa el secreto de esta empresa."
-                          : "Guarda YCloud para generar un secreto unico y pegar esta URL en YCloud."}
+                          : "Guarda YCloud para generar un secreto único y pegar esta URL en YCloud."}
                       </p>
                     </div>
                   ) : null}
@@ -1848,7 +1848,7 @@ export function WorkspaceSettings({
                       )}
                       {provider.provider === "gohighlevel"
                         ? "Probar citas"
-                        : "Probar conexion"}
+                        : "Probar conexión"}
                     </button>
                   </div>
                   {provider.provider === "gohighlevel" &&
@@ -1902,7 +1902,7 @@ export function WorkspaceSettings({
                 <h3 className="text-sm font-semibold">Calendarios de agendamiento</h3>
                 <p className="mt-1 text-sm text-[#647067]">
                   Habilita los calendarios y describe cuando usar cada uno. El
-                  agente elige segun lo que pida el cliente. Asignaselos en la
+                  agente elige según lo que pida el cliente. Asignaselos en la
                   pestana Agentes.
                 </p>
               </div>
@@ -2031,7 +2031,7 @@ export function WorkspaceSettings({
               helper: "Crea una tool personalizada si necesitas un flujo que no esta en el catalogo.",
               kind: "tool",
               placeholder:
-                "Tool: agendar_cita\nCuando usarla: si el contacto pide fecha/hora\nInputs: nombre, telefono, fecha...",
+                "Tool: agendar_cita\nCuando usarla: si el contacto pide fecha/hora\nInputs: nombre, teléfono, fecha...",
               title: "Tool personalizada",
             })}
             <div>
@@ -2060,10 +2060,10 @@ export function WorkspaceSettings({
         {activeTab === "knowledge" ? (
           <div className="grid gap-5">
             {assetEditor({
-              helper: "FAQ, objeciones, politicas, precios y respuestas aprobadas para asignar a agentes.",
+              helper: "FAQ, objeciones, políticas, precios y respuestas aprobadas para asignar a agentes.",
               kind: "knowledge",
               placeholder:
-                "Pregunta: cuanto cuesta?\nRespuesta: depende del plan...\n\nPregunta: donde estan ubicados?",
+                "Pregunta: ¿cuánto cuesta?\nRespuesta: depende del plan...\n\nPregunta: ¿dónde están ubicados?",
               title: "Agregar documento",
             })}
             <div>
@@ -2098,7 +2098,7 @@ export function WorkspaceSettings({
                 />
               </label>
               <label className="grid gap-1.5 text-sm font-medium">
-                Contrasena temporal
+                Contraseña temporal
                 <input
                   className="h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
                   minLength={8}
@@ -2143,26 +2143,26 @@ export function WorkspaceSettings({
                   onChange={(event) => setMemberResetPassword(event.target.checked)}
                   type="checkbox"
                 />
-                Resetear contrasena si este correo ya existe
+                Resetear contraseña si este correo ya existe
               </label>
               <p className="text-xs text-[#647067] md:col-span-4">
-                Para un usuario nuevo, la contrasena temporal es obligatoria. Para un
-                usuario existente, no se cambia su contrasena salvo que marques el reset.
+                Para un usuario nuevo, la contraseña temporal es obligatoria. Para un
+                usuario existente, no se cambia su contraseña salvo que marques el reset.
               </p>
             </div>
             <div className="mt-4 rounded-lg border border-[#e2e6df] bg-white p-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h4 className="text-sm font-semibold">Cambiar mi contrasena</h4>
+                  <h4 className="text-sm font-semibold">Cambiar mi contraseña</h4>
                   <p className="mt-1 text-sm text-[#647067]">
-                    Usa tu contrasena anterior para confirmar el cambio.
+                    Usa tu contraseña anterior para confirmar el cambio.
                   </p>
                 </div>
                 <KeyRound className="shrink-0 text-[#35735b]" size={18} />
               </div>
               <div className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
                 <label className="grid gap-1.5 text-sm font-medium">
-                  Contrasena actual
+                  Contraseña actual
                   <input
                     className="h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
                     onChange={(event) => setCurrentPassword(event.target.value)}
@@ -2172,7 +2172,7 @@ export function WorkspaceSettings({
                   />
                 </label>
                 <label className="grid gap-1.5 text-sm font-medium">
-                  Nueva contrasena
+                  Nueva contraseña
                   <input
                     className="h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
                     minLength={8}
@@ -2281,8 +2281,8 @@ export function WorkspaceSettings({
           <div className="rounded-lg border border-[#e2e6df] p-4">
             <h3 className="text-sm font-semibold">Automatizaciones</h3>
             <p className="mt-1 text-sm text-[#647067]">
-              Aqui vamos a conectar reglas como buffer IA, entrega de mensajes,
-              recordatorios y sincronizacion con GHL. Por ahora quedan listas las
+              Aquí vamos a conectar reglas como buffer IA, entrega de mensajes,
+              recordatorios y sincronización con GHL. Por ahora quedan listas las
               bases para configurar agentes, tools y conocimiento.
             </p>
           </div>

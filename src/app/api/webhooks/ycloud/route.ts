@@ -4,7 +4,7 @@ export async function POST() {
   return NextResponse.json(
     {
       error:
-        "Webhook ambiguo. Usa /api/webhooks/ycloud/[companyCode]/[secret] para conectar YCloud a una empresa especifica.",
+        "Webhook ambiguo. Usa /api/webhooks/ycloud/[companyCode]/[secret] para conectar YCloud a una empresa específica.",
     },
     { status: 400 },
   );

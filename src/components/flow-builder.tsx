@@ -332,7 +332,7 @@ function GhlActionsEditor({
           onClick={() =>
             onChange([
               ...actions,
-              { label: "Nueva accion", tag: "", type: "add_tag" },
+              { label: "Nueva acción", tag: "", type: "add_tag" },
             ])
           }
           type="button"
@@ -428,7 +428,7 @@ function GhlActionsEditor({
               <input
                 className="h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
                 onChange={(event) => patchAction(index, { taskTitle: event.target.value })}
-                placeholder="Titulo de tarea"
+                placeholder="Título de tarea"
                 value={"taskTitle" in action ? action.taskTitle ?? "" : ""}
               />
             ) : null}
@@ -454,7 +454,7 @@ function GhlActionsEditor({
                   ))}
                 </select>
                 <p className="text-xs text-[#647067]">
-                  A partir de aqui, el agente de citas agenda a este contacto en
+                  A partir de aquí, el agente de citas agenda a este contacto en
                   este calendario en vez del de por defecto de Tools.
                 </p>
               </div>
@@ -508,7 +508,7 @@ function StepEditor({
           <p className="text-xs font-semibold uppercase text-[#647067]">
             {stageLabel}
           </p>
-          <h3 className="text-base font-semibold">Configuracion del paso</h3>
+          <h3 className="text-base font-semibold">Configuración del paso</h3>
         </div>
         <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
           {stepType?.label ?? step.type}
@@ -534,6 +534,7 @@ function StepEditor({
           ))}
         </select>
         <button
+          aria-label="Subir paso"
           className="inline-flex h-10 items-center justify-center rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium disabled:opacity-40"
           disabled={!canMoveUp}
           onClick={onMoveUp}
@@ -543,6 +544,7 @@ function StepEditor({
           <ArrowUp size={15} />
         </button>
         <button
+          aria-label="Bajar paso"
           className="inline-flex h-10 items-center justify-center rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium disabled:opacity-40"
           disabled={!canMoveDown}
           onClick={onMoveDown}
@@ -552,8 +554,10 @@ function StepEditor({
           <ArrowDown size={15} />
         </button>
         <button
+          aria-label="Eliminar paso"
           className="inline-flex h-10 items-center justify-center rounded-lg border border-red-200 px-3 text-sm font-medium text-red-700"
           onClick={onDelete}
+          title="Eliminar paso"
           type="button"
         >
           <Trash2 size={15} />
@@ -594,7 +598,7 @@ function StepEditor({
               </span>
               <span className="block text-xs text-[#647067]">
                 Envia este mensaje, marca el check y continua el siguiente paso con
-                el proximo mensaje del cliente.
+                el próximo mensaje del cliente.
               </span>
             </span>
           </label>
@@ -629,7 +633,7 @@ function StepEditor({
 
       {["options", "question"].includes(step.type) ? (
         <label className="mt-3 grid gap-1.5 text-sm font-medium">
-          Guardar respuesta en campo LEVY
+          Guardar respuesta en campo Levy
           <input
             className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
             onChange={(event) => onChange({ ...step, fieldKey: event.target.value })}
@@ -731,7 +735,7 @@ function StepEditor({
                     options: (step.options ?? []).filter((_, index) => index !== optionIndex),
                   })
                 }
-                title="Eliminar opcion"
+                title="Eliminar opción"
                 type="button"
               >
                 <Trash2 size={14} />
@@ -768,7 +772,7 @@ function StepEditor({
                   onChange={(event) =>
                     onChange({ ...step, validationCriteria: event.target.value })
                   }
-                  placeholder="Que informacion debe contener para considerarse completa."
+                  placeholder="Que información debe contener para considerarse completa."
                   value={step.validationCriteria ?? ""}
                 />
               </label>
@@ -783,7 +787,7 @@ function StepEditor({
                 />
               </label>
               <label className="grid gap-1.5 text-sm font-medium">
-                Minimo de caracteres utiles
+                Mínimo de caracteres útiles
                 <input
                   className="h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 outline-none"
                   min={1}
@@ -830,7 +834,7 @@ function StepEditor({
             >
               <option value="minutes">Minutos</option>
               <option value="hours">Horas</option>
-              <option value="days">Dias</option>
+              <option value="days">Días</option>
             </select>
           </label>
         </div>
@@ -844,7 +848,7 @@ function StepEditor({
             onChange={(event) => onChange({ ...step, agentId: event.target.value })}
             value={step.agentId ?? ""}
           >
-            <option value="">Router automatico</option>
+            <option value="">Router automático</option>
             {agents.map((agent) => (
               <option key={agent.id} value={agent.id}>
                 {agent.name}
@@ -1049,7 +1053,7 @@ export function FlowBuilder({
     setSelectedFlowId(created.id);
     setDraft(created);
     setSelectedStepId(created.steps[0]?.id ?? "");
-    setStatus("Plantilla LEVY creada en borrador.");
+    setStatus("Plantilla Levy creada en borrador.");
     setSaving("");
   }
 
@@ -1230,12 +1234,12 @@ export function FlowBuilder({
                 type="button"
               >
                 {saving === "template" ? <Loader2 className="animate-spin" size={16} /> : <Bot size={16} />}
-                Plantilla LEVY
+                Plantilla Levy
               </button>
             </>
           ) : (
             <p className="rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3 text-xs text-[#647067]">
-              En esta version hay un solo flujo por empresa. La lista de abajo es el recorrido paso a paso.
+              En esta versión hay un solo flujo por empresa. La lista de abajo es el recorrido paso a paso.
             </p>
           )}
           {draft ? (
@@ -1325,7 +1329,7 @@ export function FlowBuilder({
                       ? "Continua al cumplirse el tiempo"
                       : step.type === "message" && step.waitForInbound !== false
                         ? "Continua cuando el cliente escriba"
-                        : "Se completa automaticamente"}
+                        : "Se completa automáticamente"}
                 </p>
               </button>
                       );
@@ -1341,7 +1345,7 @@ export function FlowBuilder({
             : null}
           {!draft ? (
             <p className="rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
-              Crea un flujo desde cero o duplica la plantilla LEVY.
+              Crea un flujo desde cero o duplica la plantilla Levy.
             </p>
           ) : null}
         </div>
@@ -1404,7 +1408,7 @@ export function FlowBuilder({
               </div>
               <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_280px]">
                 <label className="grid gap-1.5 text-sm font-medium">
-                  Descripcion interna
+                  Descripción interna
                   <input
                     className="h-10 rounded-lg border border-[#cbd2c6] px-3 outline-none"
                     onChange={(event) => updateDraft({ description: event.target.value })}
@@ -1417,7 +1421,7 @@ export function FlowBuilder({
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[#647067]">
                 <span className="inline-flex items-center gap-1 rounded-lg bg-[#eef2eb] px-2 py-1">
                   <GitBranch size={13} />
-                  Company code: {workspaceCode ?? "sin codigo"}
+                  Company code: {workspaceCode ?? "sin código"}
                 </span>
                 <span className="inline-flex items-center gap-1 rounded-lg bg-[#eef2eb] px-2 py-1">
                   <MessageSquareText size={13} />
@@ -1522,7 +1526,7 @@ export function FlowBuilder({
             </div>
 
             <div className="rounded-lg border border-[#d9ded3] bg-white p-4">
-              <h3 className="text-sm font-semibold">Preview rapido</h3>
+              <h3 className="text-sm font-semibold">Preview rápido</h3>
               <div className="mt-3 grid gap-2">
                 {draft.steps
                   .filter((step) => step.message)

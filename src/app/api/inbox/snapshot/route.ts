@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { apiErrorResponse } from "@/lib/api-error";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { getConversationHandoffInfo } from "@/lib/handoff";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -172,8 +173,8 @@ export async function GET(request: Request) {
           status: conversation.ai_enabled ? "IA activa" : "Handoff",
           summary:
             conversation.status === "pending_handoff"
-              ? "Conversacion esperando atencion humana."
-              : "Conversacion sincronizada desde WhatsApp.",
+              ? "Conversación esperando atención humana."
+              : "Conversación sincronizada desde WhatsApp.",
           time: stableTime(conversation.last_message_at ?? conversation.created_at),
           workspaceId,
         };
@@ -183,9 +184,6 @@ export async function GET(request: Request) {
       messagesConversationId: targetConversationId ?? null,
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Error desconocido." },
-      { status: 500 },
-    );
+    return apiErrorResponse(error, "inbox/snapshot");
   }
 }

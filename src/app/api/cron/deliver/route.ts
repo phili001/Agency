@@ -210,7 +210,7 @@ export async function POST(request: Request) {
           .update({
             metadata: {
               ...(message.metadata ?? {}),
-              delivery_error: "Contacto bloqueado por respuestas invalidas.",
+              delivery_error: "Contacto bloqueado por respuestas inválidas.",
             },
             status: "failed",
           })
@@ -235,7 +235,7 @@ export async function POST(request: Request) {
       }
 
       if (!from) {
-        throw new Error("Falta phone_id o numero emisor en Integraciones > YCloud.");
+        throw new Error("Falta phone_id o número emisor en Integraciones > YCloud.");
       }
 
       const ycloudResult = await sendYCloudMessage({

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHash, randomBytes } from "crypto";
+import { createHash, randomBytes, timingSafeEqual } from "crypto";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -24,6 +24,20 @@ export function maskSecret(value?: string | null) {
 
 export function hashSecret(value: string) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+/**
+ * Compara hashes en tiempo constante. Con `!==` el tiempo de respuesta depende
+ * de cuantos caracteres coinciden, que es justo lo que explota un ataque de
+ * temporizacion para adivinar el secreto byte a byte.
+ */
+export function secretMatchesHash(value: string, expectedHash: string) {
+  const received = Buffer.from(hashSecret(value), "hex");
+  const expected = Buffer.from(expectedHash, "hex");
+
+  return (
+    received.length === expected.length && timingSafeEqual(received, expected)
+  );
 }
 
 export function generateWebhookSecret() {

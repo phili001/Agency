@@ -264,7 +264,7 @@ export function OnboardingWizard({
             </div>
             <div>
               <p className="text-xs font-semibold uppercase text-[#647067]">
-                Configuracion inicial
+                Configuración inicial
               </p>
               <h1 className="text-lg font-semibold">Primer agente WhatsApp</h1>
             </div>
@@ -457,7 +457,7 @@ export function OnboardingWizard({
             <h2 className="text-base font-semibold">6. Equipo y salida</h2>
             <p className="mt-1 text-sm text-[#647067]">
               Puedes invitar trabajadores desde Equipo. Para finalizar, debe existir al
-              menos un mensaje/webhook de prueba del numero conectado.
+              menos un mensaje/webhook de prueba del número conectado.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <a

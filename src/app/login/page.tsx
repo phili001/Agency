@@ -1,13 +1,14 @@
 import { Bot, LogIn, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 
 import { signIn } from "./actions";
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; updated?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, updated } = await searchParams;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#f6f7f3] p-5 text-[#20231f]">
@@ -23,10 +24,17 @@ export default async function LoginPage({
           </div>
         </div>
 
+        {updated ? (
+          <p className="mt-5 rounded-lg border border-[#cfe8b0] bg-[#e7f6ce] px-3 py-2 text-sm text-[#31521d]">
+            Contraseña actualizada. Entra con la nueva.
+          </p>
+        ) : null}
+
         <form action={signIn} className="mt-6 grid gap-4">
           <label className="grid gap-1.5 text-sm font-medium">
             Email
             <input
+              autoComplete="email"
               className="h-11 rounded-lg border border-[#cbd2c6] px-3 outline-none transition focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
               name="email"
               placeholder="tu@email.com"
@@ -36,8 +44,9 @@ export default async function LoginPage({
           </label>
 
           <label className="grid gap-1.5 text-sm font-medium">
-            Password
+            Contraseña
             <input
+              autoComplete="current-password"
               className="h-11 rounded-lg border border-[#cbd2c6] px-3 outline-none transition focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
               name="password"
               placeholder="********"
@@ -58,10 +67,17 @@ export default async function LoginPage({
           </button>
         </form>
 
+        <Link
+          className="mt-4 inline-block text-sm font-medium text-[#35735b] underline underline-offset-4"
+          href="/recuperar"
+        >
+          ¿Olvidaste tu contraseña?
+        </Link>
+
         <div className="mt-5 flex gap-2 rounded-lg bg-[#eef2eb] p-3 text-sm text-[#4d5a51]">
           <ShieldCheck className="mt-0.5 shrink-0 text-[#35735b]" size={17} />
           <p>
-            Entra para gestionar tus empresas, agentes, numeros y equipo.
+            Entra para gestionar tus empresas, agentes, números y equipo.
           </p>
         </div>
       </div>
@@ -73,7 +89,7 @@ export default async function LoginPage({
           </div>
           <div>
             <p className="text-sm font-semibold text-[#647067]">Nuevo cliente</p>
-            <h1 className="text-xl font-semibold">Acceso por invitacion</h1>
+            <h2 className="text-xl font-semibold">Acceso por invitación</h2>
           </div>
         </div>
 
@@ -82,8 +98,8 @@ export default async function LoginPage({
             Tu cuenta debe ser creada o vinculada por un superadmin antes de entrar.
           </p>
           <p>
-            Cuando recibas tu correo y contrasena temporal, entra desde el formulario
-            de la izquierda y continuaras el onboarding de tu empresa.
+            Cuando recibas tu correo y contraseña temporal, entra desde el formulario
+            de la izquierda y continuarás el onboarding de tu empresa.
           </p>
         </div>
       </div>

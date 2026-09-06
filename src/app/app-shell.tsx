@@ -39,42 +39,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlatformAdmin } from "@/lib/platform-admin";
 import { getActiveWorkspaceId } from "@/lib/workspaces";
 
-const conversations = [
-  {
-    name: "Sofia Ramirez",
-    business: "Clinica Dental Norte",
-    contactId: null,
-    contactPhone: "+57 300 000 0000",
-    id: "mock-sofia",
-    status: "IA activa",
-    summary: "Quiere limpieza dental y envio un audio con disponibilidad.",
-    time: "09:42",
-    workspaceId: null,
-  },
-  {
-    name: "Carlos Medina",
-    business: "Inmobiliaria Delta",
-    contactId: null,
-    contactPhone: "+57 311 111 1111",
-    id: "mock-carlos",
-    status: "Handoff",
-    summary: "Pide hablar con asesor por credito hipotecario.",
-    time: "09:31",
-    workspaceId: null,
-  },
-  {
-    name: "Laura Prieto",
-    business: "Academia FitPro",
-    contactId: null,
-    contactPhone: "+57 322 222 2222",
-    id: "mock-laura",
-    status: "Agendada",
-    summary: "Cita guardada en GHL para clase de prueba.",
-    time: "09:18",
-    workspaceId: null,
-  },
-];
-
 const deployChecks = [
   {
     description: "Base de datos y autenticacion disponibles",
@@ -91,22 +55,22 @@ const deployChecks = [
     label: "OpenAI",
   },
   {
-    description: "Endpoint publico para recibir mensajes",
+    description: "Endpoint público para recibir mensajes",
     envKeys: ["NEXT_PUBLIC_APP_URL"],
     label: "YCloud API",
   },
   {
-    description: "Proteccion de cron buffer/deliver",
+    description: "Protección de cron buffer/deliver",
     envKeys: ["CRON_SECRET"],
     label: "Cron secret",
   },
   {
-    description: "Dominio publico para webhooks",
+    description: "Dominio público para webhooks",
     envKeys: ["NEXT_PUBLIC_APP_URL"],
     label: "App URL",
   },
   {
-    description: "Sincronizacion de contactos/leads por empresa",
+    description: "Sincronización de contactos/leads por empresa",
     envKeys: ["INTEGRATION_ENCRYPTION_KEY"],
     label: "GoHighLevel",
   },
@@ -465,7 +429,9 @@ export async function AppShell({ section }: { section: AppSection }) {
   const needsAssets = isWorkspaceSection;
   const needsAgents = isWorkspaceSection || isFlows;
   const needsFlows = isFlows;
-  const needsFlowRuns = isFlows || isDashboard;
+  // El dashboard solo necesita las ejecuciones de las conversaciones visibles;
+  // el constructor de flujos si necesita la foto completa del workspace.
+  const needsWorkspaceFlowRuns = isFlows;
   const needsWebhooks = isDashboard || isObservability;
   const needsAgency = true;
   const [
@@ -563,7 +529,7 @@ export async function AppShell({ section }: { section: AppSection }) {
               .neq("status", "archived")
               .order("updated_at", { ascending: false })
           : Promise.resolve({ data: [], error: null }),
-        needsFlowRuns
+        needsWorkspaceFlowRuns
           ? supabase
               .from("flow_runs")
               .select(
@@ -669,11 +635,22 @@ export async function AppShell({ section }: { section: AppSection }) {
           conversationIds,
         )
       : new Map();
+  const { data: conversationFlowRuns } =
+    isDashboard && workspaceId && conversationIds.length > 0
+      ? await supabase
+          .from("flow_runs")
+          .select(
+            "id, flow_id, contact_id, conversation_id, current_step_id, status, updated_at",
+          )
+          .eq("workspace_id", workspaceId)
+          .in("conversation_id", conversationIds)
+          .order("updated_at", { ascending: false })
+      : { data: null };
   const latestFlowRunByConversation = new Map<
     string,
     (typeof flowRuns)[number]
   >();
-  flowRuns.forEach((run) => {
+  (conversationFlowRuns ?? flowRuns).forEach((run) => {
     if (
       run.conversation_id &&
       !latestFlowRunByConversation.has(run.conversation_id)
@@ -743,8 +720,8 @@ export async function AppShell({ section }: { section: AppSection }) {
             status: conversation.ai_enabled ? "IA activa" : "Handoff",
             summary:
               conversation.status === "pending_handoff"
-                ? "Conversacion esperando atencion humana."
-                : "Conversacion sincronizada desde WhatsApp.",
+                ? "Conversación esperando atención humana."
+                : "Conversación sincronizada desde WhatsApp.",
             time: conversation.last_message_at
               ? stableTime(conversation.last_message_at)
               : "Nueva",
@@ -772,13 +749,12 @@ export async function AppShell({ section }: { section: AppSection }) {
             contact.phone_e164,
           rawStatus: "open",
           status: "Handoff",
-          summary: "Contacto creado; falta abrir conversacion.",
-          time: "Seed",
+          summary: "Contacto sin conversación abierta todavía.",
+          time: "",
           workspaceId,
         }));
 
-  const visibleConversations =
-    dashboardConversations.length > 0 ? dashboardConversations : conversations;
+  const visibleConversations = dashboardConversations;
   const displayMessages =
     conversationMessages?.map((message) => ({
       ...message,
@@ -851,7 +827,7 @@ export async function AppShell({ section }: { section: AppSection }) {
     {
       label: "Conversaciones",
       value: String(realConversations.length),
-      detail: "chats del numero conectado",
+      detail: "chats del número conectado",
       icon: MessageSquareText,
     },
     {
@@ -872,6 +848,9 @@ export async function AppShell({ section }: { section: AppSection }) {
     ready: check.envKeys.every((key) => Boolean(process.env[key])),
   }));
   const readyDeployChecks = deployReadiness.filter((check) => check.ready).length;
+  // Cuando ya no falta nada, el preflight solo ocupa sitio en el dashboard.
+  // En Observabilidad se sigue mostrando siempre: ahi es el motivo de la pagina.
+  const deployReadinessComplete = readyDeployChecks === deployReadiness.length;
   const header = sectionTitles[section];
   const workspaceTab = isWorkspaceSection
     ? (section as (typeof workspaceTabs)[number])
@@ -891,10 +870,10 @@ export async function AppShell({ section }: { section: AppSection }) {
             </div>
           </div>
 
-          <nav className="mt-8 grid gap-1 text-sm">
+          <nav aria-label="Secciones" className="mt-5 flex gap-1 overflow-x-auto pb-1 text-sm lg:mt-8 lg:grid lg:overflow-visible lg:pb-0">
             {platformAdmin ? (
               <Link
-                className="flex h-10 items-center gap-3 rounded-lg px-3 text-left text-[#dbe5df] transition hover:bg-white/10"
+                className="flex h-10 shrink-0 items-center gap-3 rounded-lg px-3 text-left text-[#dbe5df] transition hover:bg-white/10"
                 href="/admin"
                 prefetch
               >
@@ -904,7 +883,8 @@ export async function AppShell({ section }: { section: AppSection }) {
             ) : null}
             {sidebarItems.map((item) => (
               <Link
-                className={`flex h-10 items-center gap-3 rounded-lg px-3 text-left transition ${
+                aria-current={item.section === section ? "page" : undefined}
+                className={`flex h-10 shrink-0 items-center gap-3 rounded-lg px-3 text-left transition ${
                   item.section === section
                     ? "bg-white/10 text-white"
                     : "text-[#dbe5df] hover:bg-white/10"
@@ -971,7 +951,7 @@ export async function AppShell({ section }: { section: AppSection }) {
                     <p className="font-semibold">Falta crear una empresa.</p>
                     <p className="mt-1">
                       Entra al onboarding para crear tu empresa y conectar el primer
-                      numero de WhatsApp.
+                      número de WhatsApp.
                     </p>
                   </div>
                 </section>
@@ -986,7 +966,7 @@ export async function AppShell({ section }: { section: AppSection }) {
                   <div>
                     <h2 className="text-base font-semibold">Inbox vivo</h2>
                     <p className="text-sm text-[#647067]">
-                      Conversaciones y mensajes del numero conectado.
+                      Conversaciones y mensajes del número conectado.
                     </p>
                   </div>
                   <span className="rounded-lg bg-[#e7f6ce] px-2.5 py-1 text-xs font-semibold text-[#31521d]">
@@ -1042,7 +1022,7 @@ export async function AppShell({ section }: { section: AppSection }) {
                   {contacts.length === 0 ? (
                     <p className="rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
                       Aun no hay contactos. Cuando entren mensajes por YCloud van
-                      a aparecer aqui.
+                      a aparecer aquí.
                     </p>
                   ) : null}
                 </div>
@@ -1097,7 +1077,7 @@ export async function AppShell({ section }: { section: AppSection }) {
                       <div>
                         <h2 className="text-base font-semibold">Deploy readiness</h2>
                         <p className="mt-1 text-sm text-[#647067]">
-                          Variables necesarias para produccion.
+                          Variables necesarias para producción.
                         </p>
                       </div>
                       <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
@@ -1128,13 +1108,15 @@ export async function AppShell({ section }: { section: AppSection }) {
                         </div>
                       ))}
                     </div>
-                    <a
-                      className="mt-3 inline-flex h-9 items-center justify-center rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium text-[#20231f]"
-                      href="/api/health/readiness"
-                      target="_blank"
-                    >
-                      Abrir preflight JSON
-                    </a>
+                    {platformAdmin ? (
+                      <a
+                        className="mt-3 inline-flex h-9 items-center justify-center rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium text-[#20231f]"
+                        href="/api/health/readiness"
+                        target="_blank"
+                      >
+                        Abrir preflight JSON
+                      </a>
+                    ) : null}
                   </section>
                 </>
               ) : null}
@@ -1142,7 +1124,7 @@ export async function AppShell({ section }: { section: AppSection }) {
 
             {section === "dashboard" ? (
             <aside className="grid content-start gap-5">
-              <section className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-2">
+              <section className="grid content-start gap-3 sm:w-1/2">
                 {dashboardMetrics.map((item) => (
                   <div
                     className="min-h-28 self-start rounded-lg border border-[#d9ded3] bg-white p-4"
@@ -1158,53 +1140,57 @@ export async function AppShell({ section }: { section: AppSection }) {
                 ))}
               </section>
 
-              <section
-                className="scroll-mt-5 rounded-lg border border-[#d9ded3] bg-white p-4"
-                id="observability"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-semibold">Deploy readiness</h2>
-                    <p className="mt-1 text-sm text-[#647067]">
-                      Variables necesarias para produccion.
-                    </p>
-                  </div>
-                  <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
-                    {readyDeployChecks}/{deployReadiness.length}
-                  </span>
-                </div>
-                <div className="mt-4 grid gap-2">
-                  {deployReadiness.map((check) => (
-                    <div
-                      className="flex items-center justify-between gap-3 rounded-lg border border-[#e2e6df] p-3"
-                      key={check.label}
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold">{check.label}</p>
-                        <p className="mt-1 text-xs text-[#647067]">
-                          {check.description}
-                        </p>
-                      </div>
-                      <span
-                        className={`shrink-0 rounded-lg px-2 py-1 text-xs ${
-                          check.ready
-                            ? "bg-[#e7f6ce] text-[#31521d]"
-                            : "bg-amber-50 text-amber-800"
-                        }`}
-                      >
-                        {check.ready ? "Listo" : "Falta"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <a
-                  className="mt-3 inline-flex h-9 items-center justify-center rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium text-[#20231f]"
-                  href="/api/health/readiness"
-                  target="_blank"
+              {deployReadinessComplete ? null : (
+                <section
+                  className="scroll-mt-5 rounded-lg border border-[#d9ded3] bg-white p-4"
+                  id="observability"
                 >
-                  Abrir preflight JSON
-                </a>
-              </section>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-base font-semibold">Deploy readiness</h2>
+                      <p className="mt-1 text-sm text-[#647067]">
+                        Variables necesarias para producción.
+                      </p>
+                    </div>
+                    <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
+                      {readyDeployChecks}/{deployReadiness.length}
+                    </span>
+                  </div>
+                  <div className="mt-4 grid gap-2">
+                    {deployReadiness.map((check) => (
+                      <div
+                        className="flex items-center justify-between gap-3 rounded-lg border border-[#e2e6df] p-3"
+                        key={check.label}
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold">{check.label}</p>
+                          <p className="mt-1 text-xs text-[#647067]">
+                            {check.description}
+                          </p>
+                        </div>
+                        <span
+                          className={`shrink-0 rounded-lg px-2 py-1 text-xs ${
+                            check.ready
+                              ? "bg-[#e7f6ce] text-[#31521d]"
+                              : "bg-amber-50 text-amber-800"
+                          }`}
+                        >
+                          {check.ready ? "Listo" : "Falta"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {platformAdmin ? (
+                    <a
+                      className="mt-3 inline-flex h-9 items-center justify-center rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium text-[#20231f]"
+                      href="/api/health/readiness"
+                      target="_blank"
+                    >
+                      Abrir preflight JSON
+                    </a>
+                  ) : null}
+                </section>
+              )}
 
               <section className="rounded-lg border border-[#d9ded3] bg-white p-4">
                 <div className="flex items-center justify-between gap-3">

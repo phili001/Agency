@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+import { isOperatorRequest } from "@/lib/authz";
 import { getSupabaseBrowserEnv } from "@/lib/supabase/env";
 
-export async function GET() {
+export async function GET(request: Request) {
+  if (!(await isOperatorRequest(request))) {
+    return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+  }
+
   const { supabaseAnonKey, supabaseUrl } = getSupabaseBrowserEnv();
 
   if (!supabaseUrl || !supabaseAnonKey) {

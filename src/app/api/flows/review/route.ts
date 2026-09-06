@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { apiErrorResponse } from "@/lib/api-error";
 import { requireWorkspaceRole } from "@/lib/authz";
 import {
   decideFlowAnswerReview,
@@ -91,9 +92,6 @@ export async function POST(request: Request) {
     );
     return NextResponse.json(result);
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Error desconocido." },
-      { status: 500 },
-    );
+    return apiErrorResponse(error, "flows/review");
   }
 }

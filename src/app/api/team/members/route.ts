@@ -97,7 +97,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "Ese usuario no existe. Ingresa una contrasena temporal de minimo 8 caracteres para crearlo.",
+            "Ese usuario no existe. Ingresa una contraseña temporal de mínimo 8 caracteres para crearlo.",
         },
         { status: 400 },
       );
@@ -131,7 +131,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "Para resetear la contrasena, ingresa una contrasena temporal de minimo 8 caracteres.",
+            "Para resetear la contraseña, ingresa una contraseña temporal de mínimo 8 caracteres.",
         },
         { status: 400 },
       );
@@ -147,7 +147,7 @@ export async function POST(request: Request) {
         {
           error:
             updated.error?.message ??
-            "No se pudo actualizar la contrasena del usuario.",
+            "No se pudo actualizar la contraseña del usuario.",
         },
         { status: 400 },
       );
@@ -256,7 +256,7 @@ export async function PATCH(request: Request) {
 
     if ((count ?? 0) <= 1) {
       return NextResponse.json(
-        { error: "No puedes cambiar el rol del ultimo owner del workspace." },
+        { error: "No puedes cambiar el rol del último owner del workspace." },
         { status: 400 },
       );
     }
@@ -346,7 +346,7 @@ export async function DELETE(request: Request) {
 
   if (targetMember.user_id === user.id) {
     return NextResponse.json(
-      { error: "No puedes eliminar tu propio acceso desde aqui." },
+      { error: "No puedes eliminar tu propio acceso desde aquí." },
       { status: 400 },
     );
   }
@@ -364,7 +364,7 @@ export async function DELETE(request: Request) {
 
     if ((count ?? 0) <= 1) {
       return NextResponse.json(
-        { error: "No puedes eliminar el ultimo owner del workspace." },
+        { error: "No puedes eliminar el último owner del workspace." },
         { status: 400 },
       );
     }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { isOperatorRequest } from "@/lib/authz";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type Check = {
@@ -75,7 +76,12 @@ function envCheck(key: string, severity: Check["severity"]): Check {
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  // El preflight revela que env vars existen y que tablas fallan: solo operacion.
+  if (!(await isOperatorRequest(request))) {
+    return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+  }
+
   let supabase: SupabaseClient | null = null;
 
   try {

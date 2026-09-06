@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { apiErrorResponse } from "@/lib/api-error";
 import { normalizeAppUrl } from "@/lib/app-url";
 import { requireWorkspaceRole } from "@/lib/authz";
 import {
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
 
     if (!cleanKey && !storedKey) {
       return NextResponse.json(
-        { error: "Pega la API key de GoHighLevel para conectar la integracion." },
+        { error: "Pega la API key de GoHighLevel para conectar la integración." },
         { status: 400 },
       );
     }
@@ -121,9 +122,6 @@ export async function POST(request: Request) {
       webhookUrl: webhookUrl(),
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Error desconocido." },
-      { status: 500 },
-    );
+    return apiErrorResponse(error, "integrations/gohighlevel");
   }
 }

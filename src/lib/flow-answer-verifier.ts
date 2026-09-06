@@ -67,12 +67,12 @@ export function validateAnswerLocally(answer: string, minimumLength = 3) {
   if (/^(no se|nose|n\/a|na|ninguno|nada|x+)$/i.test(normalized)) {
     return {
       normalized,
-      reason: "La respuesta no aporta informacion suficiente.",
+      reason: "La respuesta no aporta información suficiente.",
       valid: false,
     };
   }
 
-  return { normalized, reason: "Supero las reglas basicas.", valid: true };
+  return { normalized, reason: "Supero las reglas básicas.", valid: true };
 }
 
 export async function verifyFlowAnswer({
@@ -142,7 +142,7 @@ export async function verifyFlowAnswer({
                 {
                   text:
                     "Evalua una respuesta de onboarding comercial. Rechaza texto sin sentido, evasivo, irrelevante o insuficiente. No inventes datos. Normaliza ortografia y espacios sin cambiar el significado.\n\n" +
-                    `Pregunta: ${question}\nCriterio esperado: ${criteria || "Debe responder directamente la pregunta con informacion util."}\nRespuesta: ${local.normalized}`,
+                    `Pregunta: ${question}\nCriterio esperado: ${criteria || "Debe responder directamente la pregunta con información útil."}\nRespuesta: ${local.normalized}`,
                   type: "input_text",
                 },
               ],
@@ -183,7 +183,7 @@ export async function verifyFlowAnswer({
             payload.error &&
             typeof getRecord(payload.error).message === "string"
             ? String(getRecord(payload.error).message)
-            : "OpenAI rechazo la validacion.",
+            : "OpenAI rechazo la validación.",
         );
       }
 
@@ -200,12 +200,12 @@ export async function verifyFlowAnswer({
         reason:
           typeof parsed.reason === "string"
             ? parsed.reason
-            : "Validacion semantica completada.",
+            : "Validación semantica completada.",
         source: "ai",
         valid: parsed.valid === true,
       };
     } catch (error) {
-      lastError = error instanceof Error ? error.message : "Fallo tecnico de OpenAI.";
+      lastError = error instanceof Error ? error.message : "Fallo técnico de OpenAI.";
     }
   }
 

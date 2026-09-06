@@ -83,8 +83,8 @@ type ConversationItem = {
 type InboxView = "ai" | "handoff" | "onboarding";
 
 const handoffSourceLabel: Record<string, string> = {
-  flow_review: "Revision de onboarding",
-  keyword: "Lo pidio el contacto",
+  flow_review: "Revisión de onboarding",
+  keyword: "Lo pidió el contacto",
   promise_guard: "La IA prometio un humano",
   unknown_answer: "La IA no supo responder",
 };
@@ -110,7 +110,7 @@ function onboardingStatusLabel(status: string) {
     case "waiting":
       return "Esperando respuesta";
     case "review_pending":
-      return "Revision";
+      return "Revisión";
     case "blocked":
       return "Bloqueado";
     case "paused":
@@ -276,9 +276,7 @@ export function InboxPanel({
     (message) => message.direction === "internal",
   ).length;
   const canSend =
-    Boolean(selectedConversation?.workspaceId) &&
-    Boolean(selectedConversation?.id) &&
-    !selectedConversation?.id.startsWith("mock-");
+    Boolean(selectedConversation?.workspaceId) && Boolean(selectedConversation?.id);
   const isBlocked =
     selectedConversation?.contactMetadata?.messaging_status === "blocked";
   const canReply = canSend && !isBlocked;
@@ -401,7 +399,7 @@ export function InboxPanel({
     role: "human";
   }) {
     if (!selectedConversation || !canSend) {
-      return { errorMessage: "Selecciona una conversacion real." };
+      return { errorMessage: "Selecciona una conversación real." };
     }
 
     const now = new Date().toISOString();
@@ -679,7 +677,7 @@ export function InboxPanel({
 
     if (
       !window.confirm(
-        "Sacar a este contacto del flujo? Se cancelan los mensajes pendientes y la conversacion pasa a una persona.",
+        "Sacar a este contacto del flujo? Se cancelan los mensajes pendientes y la conversación pasa a una persona.",
       )
     ) {
       return;
@@ -747,7 +745,7 @@ export function InboxPanel({
     );
     setInboxView("handoff");
     setSelectedConversationId(selectedConversation.id);
-    setNotice("Contacto fuera del flujo. La conversacion quedo con una persona.");
+    setNotice("Contacto fuera del flujo. La conversación quedo con una persona.");
     setFlowAction("");
   }
 
@@ -826,8 +824,8 @@ export function InboxPanel({
   }
 
   return (
-    <div className="grid h-[calc(100vh-260px)] min-h-[430px] overflow-hidden xl:grid-cols-[320px_1fr_300px]">
-      <div className="flex min-h-0 flex-col border-b border-[#e2e6df] lg:border-b-0 lg:border-r">
+    <div className="grid overflow-hidden xl:h-[calc(100vh-260px)] xl:min-h-[430px] xl:grid-cols-[320px_1fr_300px]">
+      <div className="flex max-h-[50vh] min-h-0 flex-col border-b border-[#e2e6df] xl:max-h-none xl:border-b-0 xl:border-r">
         <div className="grid shrink-0 grid-cols-3 gap-1 border-b border-[#e2e6df] bg-white p-2">
           <button
             className={`flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition ${
@@ -991,7 +989,7 @@ export function InboxPanel({
                     : "No hay conversaciones con IA activa"}
               </p>
               <p className="mt-1 text-xs text-[#7a847c]">
-                Esta vista se actualiza automaticamente.
+                Esta vista se actualiza automáticamente.
               </p>
             </div>
           </div>
@@ -999,16 +997,16 @@ export function InboxPanel({
         </div>
       </div>
 
-      <div className="flex min-h-0 min-w-0 flex-col bg-[#fafbf8]">
+      <div className="flex min-h-[70vh] min-w-0 flex-col bg-[#fafbf8] xl:min-h-0">
         <div className="border-b border-[#e2e6df] bg-white px-4 py-3">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <p className="font-semibold">
-                {selectedConversation?.name ?? "Selecciona una conversacion"}
+                {selectedConversation?.name ?? "Selecciona una conversación"}
               </p>
               <p className="mt-1 text-sm text-[#647067]">
                 {selectedConversation?.contactPhone ??
-                  "Cuando haya mensajes, apareceran aqui."}
+                  "Cuando haya mensajes, apareceran aquí."}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -1135,7 +1133,7 @@ export function InboxPanel({
               <div>
                 <MessageSquareText className="mx-auto mb-3 text-[#a8b0aa]" />
                 <p className="font-medium text-[#20231f]">
-                  No hay mensajes para esta conversacion.
+                  No hay mensajes para esta conversación.
                 </p>
                 <p className="mt-1">
                   Revisa que el seed haya insertado filas en `public.messages`.
@@ -1173,14 +1171,15 @@ export function InboxPanel({
               onChange={(event) => setDraft(event.target.value)}
               placeholder={
                 isBlocked
-                  ? "Toda atencion esta bloqueada"
+                  ? "Toda atención esta bloqueada"
                   : canSend
                   ? "Escribe una respuesta manual..."
-                  : "Selecciona una conversacion real"
+                  : "Selecciona una conversación real"
               }
               value={draft}
             />
             <button
+              aria-label="Enviar mensaje"
               className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#10231c] text-white disabled:cursor-not-allowed disabled:bg-[#9aa59e]"
               disabled={!canReply || draft.trim().length === 0}
               title="Enviar"
@@ -1224,18 +1223,18 @@ export function InboxPanel({
         </form>
       </div>
 
-      <aside className="min-h-0 overflow-y-auto border-t border-[#e2e6df] bg-white p-4 xl:border-l xl:border-t-0">
+      <aside className="min-h-0 border-t border-[#e2e6df] bg-white p-4 xl:overflow-y-auto xl:border-l xl:border-t-0">
         <div className="flex items-center gap-2">
           <UserRound className="text-[#35735b]" size={18} />
           <h3 className="text-sm font-semibold">Contacto</h3>
         </div>
         <div className="mt-4 rounded-lg border border-[#e2e6df] p-3">
           <p className="font-semibold">
-            {selectedConversation?.name ?? "Sin seleccion"}
+            {selectedConversation?.name ?? "Sin selección"}
           </p>
           <p className="mt-2 flex items-center gap-2 text-sm text-[#647067]">
             <Phone size={14} />
-            {selectedConversation?.contactPhone ?? "Sin telefono"}
+            {selectedConversation?.contactPhone ?? "Sin teléfono"}
           </p>
           <p className="mt-2 text-xs text-[#7a847c]">
             Workspace: {selectedConversation?.business ?? "-"}
@@ -1261,7 +1260,7 @@ export function InboxPanel({
           {selectedConversation?.contactMetadata?.pending_review ? (
             <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3">
               <p className="text-xs font-semibold uppercase text-amber-900">
-                Respuesta pendiente de revision
+                Respuesta pendiente de revisión
               </p>
               <p className="mt-2 text-sm font-medium">
                 {selectedConversation.contactMetadata.pending_review.question}
@@ -1298,7 +1297,7 @@ export function InboxPanel({
           {isBlocked ? (
             <div className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3">
               <p className="text-xs font-semibold uppercase text-red-800">
-                Toda atencion bloqueada
+                Toda atención bloqueada
               </p>
               <p className="mt-1 text-xs text-red-700">
                 El contacto agoto los intentos de respuestas validas. Los mensajes
@@ -1421,7 +1420,7 @@ export function InboxPanel({
             ))
           ) : (
             <p className="rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
-              Aun no hay eventos de IA para esta conversacion.
+              Aun no hay eventos de IA para esta conversación.
             </p>
           )}
         </div>

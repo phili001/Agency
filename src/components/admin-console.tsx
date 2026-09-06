@@ -55,7 +55,7 @@ export function AdminConsole({
     const payload = (await response.json()) as { error?: string };
 
     if (!response.ok) {
-      throw new Error(payload.error ?? "No se pudo completar la accion.");
+      throw new Error(payload.error ?? "No se pudo completar la acción.");
     }
   }
 
@@ -68,7 +68,7 @@ export function AdminConsole({
     const payload = (await response.json()) as { error?: string };
 
     if (!response.ok) {
-      throw new Error(payload.error ?? "No se pudo completar la accion.");
+      throw new Error(payload.error ?? "No se pudo completar la acción.");
     }
   }
 
@@ -102,7 +102,7 @@ export function AdminConsole({
         workspaceId: linkWorkspaceId,
       });
       setStatus(
-        "Owner vinculado a la empresa existente. Si el usuario no existia, ya puede entrar con la contrasena temporal.",
+        "Owner vinculado a la empresa existente. Si el usuario no existia, ya puede entrar con la contraseña temporal.",
       );
       window.location.reload();
     } catch (error) {
@@ -122,7 +122,7 @@ export function AdminConsole({
         temporaryPassword: newAdminPassword,
       });
       setStatus(
-        "Superadmin agregado. Si el usuario no existia, ya puede entrar con la contrasena temporal.",
+        "Superadmin agregado. Si el usuario no existia, ya puede entrar con la contraseña temporal.",
       );
       window.location.reload();
     } catch (error) {
@@ -199,7 +199,7 @@ export function AdminConsole({
               <input
                 className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
                 onChange={(event) => setTemporaryPassword(event.target.value)}
-                placeholder="Contrasena temporal"
+                placeholder="Contraseña temporal"
                 type="password"
                 value={temporaryPassword}
               />
@@ -242,7 +242,7 @@ export function AdminConsole({
               <input
                 className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
                 onChange={(event) => setLinkOwnerPassword(event.target.value)}
-                placeholder="Contrasena temporal si no existe"
+                placeholder="Contraseña temporal si no existe"
                 type="password"
                 value={linkOwnerPassword}
               />
@@ -298,7 +298,7 @@ export function AdminConsole({
               <input
                 className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
                 onChange={(event) => setNewAdminPassword(event.target.value)}
-                placeholder="Contrasena temporal si no existe"
+                placeholder="Contraseña temporal si no existe"
                 type="password"
                 value={newAdminPassword}
               />

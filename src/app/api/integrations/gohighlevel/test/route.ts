@@ -125,7 +125,7 @@ export async function POST(request: Request) {
     const calendars = await runStep(
       steps,
       "connection",
-      "Conexion y permisos",
+      "Conexión y permisos",
       () => listCalendars({ apiKey: apiKey!, locationId }),
       (items) => `${items.length} calendario(s) accesible(s).`,
     );
@@ -183,7 +183,7 @@ export async function POST(request: Request) {
         ensureGhlContact({
           apiKey: apiKey!,
           email: `calendar-test-${Date.now()}@example.com`,
-          fullName: "Prueba Tecnica LEVY",
+          fullName: "Prueba técnica Levy",
           locationId,
           phone: `+120255501${testNumber}`,
         }).then((id) => {
@@ -226,7 +226,7 @@ export async function POST(request: Request) {
             timezone,
           }).then((result) => {
             if (result.slots.length === 0) {
-              throw new Error("GHL no devolvio horarios libres en los proximos 30 dias.");
+              throw new Error("GHL no devolvio horarios libres en los próximos 30 días.");
             }
 
             return result.slots;
@@ -245,7 +245,7 @@ export async function POST(request: Request) {
             contactId: contactId!,
             locationId,
             startTime: slot.iso,
-            title: "[PRUEBA AUTOMATICA] LEVY",
+            title: "[PRUEBA AUTOMÁTICA] Levy",
           }),
         () => slot.label,
       );

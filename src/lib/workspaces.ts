@@ -52,7 +52,7 @@ export function incrementCompanyCode(code: string) {
     }
   }
 
-  throw new Error("Se agotaron los codigos de empresa disponibles.");
+  throw new Error("Se agotaron los códigos de empresa disponibles.");
 }
 
 export async function generateNextCompanyCode() {

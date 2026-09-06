@@ -101,7 +101,7 @@ export async function POST(request: Request) {
 
   if (conversationError || !conversation) {
     return NextResponse.json(
-      { error: conversationError?.message ?? "Conversacion no encontrada." },
+      { error: conversationError?.message ?? "Conversación no encontrada." },
       { status: 404 },
     );
   }
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
 
   if (!conversationRow.contact_id) {
     return NextResponse.json(
-      { error: "La conversacion no tiene contacto asociado." },
+      { error: "La conversación no tiene contacto asociado." },
       { status: 400 },
     );
   }
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
 
   if (contactStatus?.messaging_status === "blocked") {
     return NextResponse.json(
-      { error: "Toda atencion esta bloqueada para este contacto." },
+      { error: "Toda atención esta bloqueada para este contacto." },
       { status: 423 },
     );
   }
@@ -190,7 +190,7 @@ export async function POST(request: Request) {
     }
 
     if (!from) {
-      throw new Error("Falta phone_id o numero emisor en Integraciones > YCloud.");
+      throw new Error("Falta phone_id o número emisor en Integraciones > YCloud.");
     }
 
     const ycloudResult = await sendYCloudText({

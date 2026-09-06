@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { apiErrorResponse } from "@/lib/api-error";
 import { createCompanyWithOwner } from "@/lib/admin-companies";
 import { requirePlatformAdmin } from "@/lib/platform-admin";
 import { createClient } from "@/lib/supabase/server";
@@ -28,9 +29,6 @@ export async function POST(request: Request) {
       workspace: result.workspace,
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Error desconocido." },
-      { status: 403 },
-    );
+    return apiErrorResponse(error, "admin/companies");
   }
 }

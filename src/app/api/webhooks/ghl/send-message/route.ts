@@ -185,14 +185,14 @@ export async function POST(request: Request) {
 
   if (!conversationId) {
     return NextResponse.json(
-      { error: "No se pudo crear la conversacion." },
+      { error: "No se pudo crear la conversación." },
       { status: 500 },
     );
   }
 
   if (payload.messageBody && (existingContact?.messaging_status ?? "active") === "blocked") {
     return NextResponse.json(
-      { error: "Toda atencion esta bloqueada para este contacto." },
+      { error: "Toda atención esta bloqueada para este contacto." },
       { status: 423 },
     );
   }

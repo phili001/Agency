@@ -1,5 +1,6 @@
 import "server-only";
 
+import { forbidden } from "@/lib/api-error";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type UserLike = {
@@ -37,7 +38,7 @@ export async function isPlatformAdmin(user: UserLike | null | undefined) {
 
 export async function requirePlatformAdmin(user: UserLike | null | undefined) {
   if (!(await isPlatformAdmin(user))) {
-    throw new Error("No autorizado.");
+    throw forbidden("Necesitas permisos de superadmin para esta acción.");
   }
 }
 

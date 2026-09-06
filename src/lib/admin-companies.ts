@@ -1,5 +1,6 @@
 import "server-only";
 
+import { badRequest } from "@/lib/api-error";
 import {
   buildDefaultAgentConfig,
   buildDefaultAgentPrompt,
@@ -76,15 +77,15 @@ export async function createCompanyWithOwner({
   const cleanName = companyName.trim();
 
   if (!cleanName || !normalizedEmail) {
-    throw new Error("Nombre y correo son requeridos.");
+    throw badRequest("Nombre y correo son requeridos.");
   }
 
   let owner = await findAuthUserByEmail(admin, normalizedEmail);
 
   if (!owner) {
     if (temporaryPassword.trim().length < 8) {
-      throw new Error(
-        "Ese usuario no existe. La contrasena temporal debe tener minimo 8 caracteres.",
+      throw badRequest(
+        "Ese usuario no existe. La contraseña temporal debe tener mínimo 8 caracteres.",
       );
     }
 
@@ -151,7 +152,7 @@ export async function linkOwnerToWorkspace({
   const normalizedEmail = ownerEmail.trim().toLowerCase();
 
   if (!normalizedEmail || !workspaceId) {
-    throw new Error("Correo y empresa son requeridos.");
+    throw badRequest("Correo y empresa son requeridos.");
   }
 
   let owner = await findAuthUserByEmail(admin, normalizedEmail);
@@ -160,8 +161,8 @@ export async function linkOwnerToWorkspace({
     const password = temporaryPassword?.trim();
 
     if (!password || password.length < 8) {
-      throw new Error(
-        "Ese usuario no existe. Ingresa una contrasena temporal de minimo 8 caracteres para crearlo.",
+      throw badRequest(
+        "Ese usuario no existe. Ingresa una contraseña temporal de mínimo 8 caracteres para crearlo.",
       );
     }
 

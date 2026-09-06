@@ -2,6 +2,14 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     {
+      "path": "/api/cron/flows",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/deliver",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/ghl-sync",
       "schedule": "0 8 * * *"
     }

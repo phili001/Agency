@@ -483,7 +483,7 @@ export async function createAppointment({
     // trata como fallo, porque devolver "confirmada" sin id hacia que el agente
     // le dijera al cliente que estaba agendada cuando no aparecia en GHL.
     throw new Error(
-      "GoHighLevel no devolvio el id de la cita, asi que no se puede confirmar que se creo.",
+      "GoHighLevel no devolvio el id de la cita, así que no se puede confirmar que se creo.",
     );
   }
 
@@ -543,7 +543,7 @@ export async function ensureGhlContact({
       lastName: parts.slice(1).join(" ") || "Lead",
       locationId,
       phone,
-      source: "LEVY Agente de citas",
+      source: "Levy · Agente de citas",
     },
     method: "POST",
     path: "/contacts/upsert",

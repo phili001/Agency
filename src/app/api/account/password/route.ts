@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
   if (!user.email) {
     return NextResponse.json(
-      { error: "Tu usuario no tiene email para validar la contrasena actual." },
+      { error: "Tu usuario no tiene email para validar la contraseña actual." },
       { status: 400 },
     );
   }
@@ -28,21 +28,21 @@ export async function POST(request: Request) {
 
   if (!current || !next) {
     return NextResponse.json(
-      { error: "La contrasena actual y la nueva son requeridas." },
+      { error: "La contraseña actual y la nueva son requeridas." },
       { status: 400 },
     );
   }
 
   if (next.length < 8) {
     return NextResponse.json(
-      { error: "La nueva contrasena debe tener minimo 8 caracteres." },
+      { error: "La nueva contraseña debe tener mínimo 8 caracteres." },
       { status: 400 },
     );
   }
 
   if (current === next) {
     return NextResponse.json(
-      { error: "La nueva contrasena debe ser diferente a la actual." },
+      { error: "La nueva contraseña debe ser diferente a la actual." },
       { status: 400 },
     );
   }
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
 
   if (signInError) {
     return NextResponse.json(
-      { error: "La contrasena actual no es correcta." },
+      { error: "La contraseña actual no es correcta." },
       { status: 400 },
     );
   }
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
 
   if (updateError) {
     return NextResponse.json(
-      { error: updateError.message || "No se pudo actualizar la contrasena." },
+      { error: updateError.message || "No se pudo actualizar la contraseña." },
       { status: 400 },
     );
   }

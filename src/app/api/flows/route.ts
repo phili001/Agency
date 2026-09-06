@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { apiErrorResponse } from "@/lib/api-error";
 import { defaultLevyFlowStages, defaultLevyFlowSteps } from "@/lib/flow-definitions";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -72,8 +73,8 @@ export async function POST(request: Request) {
         .from("flows")
         .insert({
           description:
-            "Formulario conversacional para reunir informacion y enviar al contacto a la agenda.",
-          name: "LEVY - Diagnostico y agenda",
+            "Formulario conversacional para reunir información y enviar al contacto a la agenda.",
+          name: "Levy · Diagnóstico y agenda",
           status: "draft",
           steps: defaultLevyFlowSteps,
           trigger_config: {
@@ -206,9 +207,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ flow: data });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Error desconocido." },
-      { status: 500 },
-    );
+    return apiErrorResponse(error, "flows");
   }
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { apiErrorResponse } from "@/lib/api-error";
 import { findAuthUserByEmail } from "@/lib/admin-companies";
 import { getBootstrapSuperadminEmails, requirePlatformAdmin } from "@/lib/platform-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             error:
-              "Ese usuario no existe. Ingresa una contrasena temporal de minimo 8 caracteres para crearlo.",
+              "Ese usuario no existe. Ingresa una contraseña temporal de mínimo 8 caracteres para crearlo.",
           },
           { status: 400 },
         );
@@ -77,10 +78,7 @@ export async function POST(request: Request) {
       userCreated,
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Error desconocido." },
-      { status: 403 },
-    );
+    return apiErrorResponse(error, "admin/superadmins");
   }
 }
 
@@ -120,9 +118,6 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Error desconocido." },
-      { status: 403 },
-    );
+    return apiErrorResponse(error, "admin/superadmins");
   }
 }

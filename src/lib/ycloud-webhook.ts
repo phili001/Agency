@@ -9,7 +9,7 @@ import {
 } from "@/lib/conversation-default";
 import { handleInboundFlow } from "@/lib/flow-engine";
 import { syncContactToGoHighLevel } from "@/lib/integrations/gohighlevel";
-import { hashSecret } from "@/lib/integrations/secrets";
+import { secretMatchesHash } from "@/lib/integrations/secrets";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type WebhookPayload = Record<string, unknown>;
@@ -472,7 +472,7 @@ async function storeYCloudMessage({
   supabase: ReturnType<typeof createAdminClient>;
 }): Promise<{ contactId: string; conversationId: string; shouldStartAiBuffer: boolean }> {
   if (!event.contactPhone) {
-    throw new Error("El webhook no incluye telefono de contacto.");
+    throw new Error("El webhook no incluye teléfono de contacto.");
   }
 
   const { data: existingContact } = await supabase
@@ -570,7 +570,7 @@ async function storeYCloudMessage({
     ).data?.id;
 
   if (!conversationId) {
-    throw new Error("No se pudo crear la conversacion.");
+    throw new Error("No se pudo crear la conversación.");
   }
 
   const messageProviderId = event.providerMessageId ?? event.externalId;
@@ -727,7 +727,7 @@ export async function handleYCloudWebhook(
     );
   }
 
-  if (hashSecret(receivedSecret) !== expectedWebhookHash) {
+  if (!secretMatchesHash(receivedSecret, expectedWebhookHash)) {
     return NextResponse.json(
       { error: "Webhook no autorizado. El secreto no coincide con esta empresa." },
       { status: 401 },
@@ -745,7 +745,7 @@ export async function handleYCloudWebhook(
 
   try {
     if (!identifierMatches) {
-      errorMessage = "El webhook no coincide con el numero configurado para esta empresa.";
+      errorMessage = "El webhook no coincide con el número configurado para esta empresa.";
     } else if (event.isStatusUpdate) {
       const providerIds = [
         event.providerMessageId,
@@ -878,7 +878,7 @@ export async function handleYCloudWebhook(
         status = "stored";
       } else {
         status = "ignored";
-        errorMessage = "Actualizacion de estado sin mensaje saliente previo en Levy.";
+        errorMessage = "Actualización de estado sin mensaje saliente previo en Levy.";
       }
     } else if (event.contactPhone) {
       const storedMessage = await storeYCloudMessage({
@@ -914,7 +914,7 @@ export async function handleYCloudWebhook(
       }
       status = "stored";
     } else {
-      errorMessage = "El webhook no incluye telefono de contacto.";
+      errorMessage = "El webhook no incluye teléfono de contacto.";
     }
   } catch (error) {
     status = "error";

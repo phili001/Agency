@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { apiErrorResponse } from "@/lib/api-error";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { getWorkspaceOpenAIKey } from "@/lib/integrations/openai";
 
@@ -46,9 +47,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, sample: payload.output_text ?? "listo" });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Error desconocido." },
-      { status: 500 },
-    );
+    return apiErrorResponse(error, "integrations/openai/test");
   }
 }

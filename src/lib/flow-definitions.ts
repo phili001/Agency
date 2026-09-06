@@ -77,17 +77,17 @@ export const defaultFlowStages: FlowStage[] = [
   {
     description: "Preguntas para entender negocio, dolor y urgencia.",
     key: "diagnostico",
-    label: "Diagnostico",
+    label: "Diagnóstico",
   },
   {
-    description: "Prueba, video, metodologia o autoridad.",
+    description: "Prueba, vídeo, metodología o autoridad.",
     key: "nutricion",
-    label: "Nutricion",
+    label: "Nutrición",
   },
   {
-    description: "Calificacion, agenda y handoff.",
+    description: "Calificación, agenda y handoff.",
     key: "conversion",
-    label: "Conversion",
+    label: "Conversión",
   },
   {
     description: "Cierre del flujo o transferencia.",
@@ -105,10 +105,10 @@ export const defaultLevyFlowStages: FlowStage[] = [
   {
     description: "Cuello de botella, herramientas, tiempo y objetivo.",
     key: "diagnostico",
-    label: "Diagnostico",
+    label: "Diagnóstico",
   },
   {
-    description: "Sincronizacion con GHL y enlace de agenda.",
+    description: "Sincronización con GHL y enlace de agenda.",
     key: "conversion",
     label: "Agenda",
   },
@@ -140,15 +140,15 @@ export const flowStepTypes: Array<{
   label: string;
   value: FlowStepType;
 }> = [
-  { description: "Envia texto por WhatsApp desde YCloud.", label: "Mensaje", value: "message" },
+  { description: "Envía texto por WhatsApp desde YCloud.", label: "Mensaje", value: "message" },
   { description: "Pregunta y guarda la siguiente respuesta.", label: "Pregunta", value: "question" },
   { description: "Muestra opciones y ramifica.", label: "Opciones", value: "options" },
-  { description: "Evalua campos, tags o respuestas.", label: "Condicion", value: "condition" },
+  { description: "Evalúa campos, tags o respuestas.", label: "Condición", value: "condition" },
   { description: "Espera antes de avanzar.", label: "Espera", value: "wait" },
-  { description: "Ejecuta tags, campos, tareas u oportunidad.", label: "Accion GHL", value: "ghl_action" },
-  { description: "Llama una URL externa.", label: "Webhook", value: "webhook" },
+  { description: "Ejecuta tags, campos, tareas u oportunidad.", label: "Acción GHL", value: "ghl_action" },
+  { description: "Llama a una URL externa.", label: "Webhook", value: "webhook" },
   { description: "Transfiere al router de agentes IA.", label: "Agente IA", value: "agent" },
-  { description: "Pausa bot/IA para atencion humana.", label: "Humano", value: "human" },
+  { description: "Pausa bot/IA para atención humana.", label: "Humano", value: "human" },
   { description: "Marca el flujo como completado.", label: "Finalizar", value: "finish" },
 ];
 
@@ -157,13 +157,13 @@ export const defaultLevyFlowSteps: FlowStep[] = [
     fieldKey: "tipo_negocio",
     id: "tipo_negocio",
     message:
-      "Hola {{firstName}}. En menos de 2 minutos vamos a ponerle un numero al tiempo que hoy se esta escapando de tu negocio.\n\nPara empezar, que tipo de negocio tienes?",
+      "Hola {{firstName}}. En menos de 2 minutos vamos a ponerle un número al tiempo que hoy se está escapando de tu negocio.\n\nPara empezar, ¿qué tipo de negocio tienes?",
     name: "Bienvenida y tipo de negocio",
     nextStepId: "cuello_botella",
     options: [
-      { label: "Clinica", nextStepId: "cuello_botella", value: "clinica" },
+      { label: "Clínica", nextStepId: "cuello_botella", value: "clinica" },
       { label: "Agencia", nextStepId: "cuello_botella", value: "agencia" },
-      { label: "Asesorias", nextStepId: "cuello_botella", value: "asesorias" },
+      { label: "Asesorías", nextStepId: "cuello_botella", value: "asesorias" },
       { label: "Otros", nextStepId: "tipo_negocio_otro", value: "otros" },
     ],
     requiredForStage: true,
@@ -173,14 +173,14 @@ export const defaultLevyFlowSteps: FlowStep[] = [
   {
     fieldKey: "tipo_negocio",
     id: "tipo_negocio_otro",
-    message: "Cuentame brevemente que tipo de negocio tienes.",
+    message: "Cuéntame brevemente qué tipo de negocio tienes.",
     name: "Aclarar otro tipo de negocio",
     nextStepId: "cuello_botella",
     requiredForStage: false,
     stageKey: "inicio",
     type: "question",
     retryMessage:
-      "Necesito una respuesta un poco mas completa. Cuentame que servicio vendes y a quien.",
+      "Necesito una respuesta un poco más completa. Cuéntame qué servicio vendes y a quién.",
     validationCriteria:
       "Debe identificar un negocio o actividad de servicios real. No basta una palabra vaga sin contexto.",
     validationEnabled: true,
@@ -189,7 +189,7 @@ export const defaultLevyFlowSteps: FlowStep[] = [
   {
     fieldKey: "cuello_botella",
     id: "cuello_botella",
-    message: "Ahora vamos al punto importante: que tarea repetitiva te esta quitando mas tiempo cada semana?",
+    message: "Ahora vamos al punto importante: ¿qué tarea repetitiva te está quitando más tiempo cada semana?",
     name: "Preguntar cuello de botella",
     nextStepId: "herramientas",
     options: [
@@ -198,7 +198,7 @@ export const defaultLevyFlowSteps: FlowStep[] = [
         nextStepId: "herramientas",
         value: "contestar_correos_whatsapp",
       },
-      { label: "Facturacion", nextStepId: "herramientas", value: "facturacion" },
+      { label: "Facturación", nextStepId: "herramientas", value: "facturacion" },
       {
         label: "Planificar tareas",
         nextStepId: "herramientas",
@@ -213,14 +213,14 @@ export const defaultLevyFlowSteps: FlowStep[] = [
   {
     fieldKey: "cuello_botella",
     id: "cuello_botella_otro",
-    message: "Cuentame brevemente cual es esa otra tarea o problema.",
+    message: "Cuéntame brevemente cuál es esa otra tarea o problema.",
     name: "Aclarar otro cuello de botella",
     nextStepId: "herramientas",
     requiredForStage: false,
     stageKey: "diagnostico",
     type: "question",
     retryMessage:
-      "Ayudame con un ejemplo concreto: que tarea repetitiva te quita tiempo y que ocurre hoy cuando la haces?",
+      "Ayúdame con un ejemplo concreto: ¿qué tarea repetitiva te quita tiempo y qué ocurre hoy cuando la haces?",
     validationCriteria:
       "Debe describir una tarea, proceso o problema operativo concreto que consume tiempo.",
     validationEnabled: true,
@@ -229,23 +229,23 @@ export const defaultLevyFlowSteps: FlowStep[] = [
   {
     fieldKey: "herramientas_actuales",
     id: "herramientas",
-    message: "Con que herramientas intentas gestionarla hoy? Por ejemplo WhatsApp, agenda, Excel, email, Instagram o CRM.",
+    message: "¿Con qué herramientas intentas gestionarla hoy? Por ejemplo WhatsApp, agenda, Excel, email, Instagram o CRM.",
     name: "Preguntar herramientas actuales",
     nextStepId: "horas_perdidas",
     requiredForStage: true,
     stageKey: "diagnostico",
     type: "question",
     retryMessage:
-      "Dime al menos una herramienta que uses hoy, por ejemplo WhatsApp, Excel, agenda, email, Instagram o un CRM.",
+      "Dime al menos una herramienta que uses hoy: WhatsApp, Excel, agenda, email, Instagram o un CRM.",
     validationCriteria:
-      "Debe mencionar al menos una herramienta, canal o metodo actual de trabajo.",
+      "Debe mencionar al menos una herramienta, canal o método actual de trabajo.",
     validationEnabled: true,
     validationMinLength: 3,
   },
   {
     fieldKey: "horas_perdidas",
     id: "horas_perdidas",
-    message: "Hagamos visible esa fuga: cuantas horas a la semana te consume aproximadamente?",
+    message: "Hagamos visible esa fuga: ¿cuántas horas a la semana te consume aproximadamente?",
     name: "Preguntar horas perdidas",
     nextStepId: "objetivo_30_dias",
     options: [
@@ -261,16 +261,16 @@ export const defaultLevyFlowSteps: FlowStep[] = [
   {
     fieldKey: "objetivo_30_dias",
     id: "objetivo_30_dias",
-    message: "Si recuperaras parte de ese tiempo durante los proximos 30 dias, que cambiaria primero en tu negocio?",
-    name: "Guardar objetivo a 30 dias",
+    message: "Si recuperaras parte de ese tiempo durante los próximos 30 días, ¿qué cambiaría primero en tu negocio?",
+    name: "Guardar objetivo a 30 días",
     nextStepId: "valor_hora",
     requiredForStage: true,
     stageKey: "diagnostico",
     type: "question",
     retryMessage:
-      "Piensa en un cambio concreto dentro de 30 dias: que podrias hacer mejor con ese tiempo recuperado?",
+      "Piensa en un cambio concreto dentro de 30 días: ¿qué podrías hacer mejor con ese tiempo recuperado?",
     validationCriteria:
-      "Debe expresar un resultado operativo o personal concreto que espera lograr en 30 dias.",
+      "Debe expresar un resultado operativo o personal concreto que espera lograr en 30 días.",
     validationEnabled: true,
     validationMinLength: 12,
   },
@@ -278,23 +278,23 @@ export const defaultLevyFlowSteps: FlowStep[] = [
     fieldKey: "valor_hora",
     id: "valor_hora",
     message:
-      "Ultimo dato para calcular el costo oculto: cuanto vale aproximadamente una hora tuya o de la persona que hace esa tarea?\n\nResponde con importe y moneda. Ejemplos: 25 USD, 20 EUR o 50000 COP.",
+      "Último dato para calcular el costo oculto: ¿cuánto vale aproximadamente una hora tuya o de la persona que hace esa tarea?\n\nResponde con importe y moneda. Ejemplos: 25 USD, 20 EUR o 50000 COP.",
     name: "Calcular valor de la hora",
     nextStepId: "impacto_operativo",
     requiredForStage: true,
     retryMessage:
-      "Escribe un valor numerico y la moneda. Por ejemplo: 25 USD, 20 EUR o 50000 COP.",
+      "Escribe un valor numérico y la moneda. Por ejemplo: 25 USD, 20 EUR o 50000 COP.",
     stageKey: "diagnostico",
     type: "question",
     validationCriteria:
-      "Debe contener un valor numerico positivo y una moneda como USD, EUR, COP o MXN.",
+      "Debe contener un valor numérico positivo y una moneda como USD, EUR, COP o MXN.",
     validationEnabled: true,
     validationMinLength: 4,
   },
   {
     id: "impacto_operativo",
     message:
-      "*Aqui esta la fuga que hoy no se ve:*\n\nTiempo consumido: {{horas_mensuales_estimadas}} al mes.\nCosto mensual estimado: {{costo_mensual_estimado}}.\nCosto anual estimado: {{costo_anual_estimado}}.\n\nY eso sin contar errores, retrasos ni oportunidades que no puedes atender mientras repites la misma tarea.\n\nYa tienes una primera radiografia del problema. En la reunion revisaremos que conviene automatizar primero y si podemos convertir esta fuga en tiempo util para vender, atender o crecer.\n\nAgenda tu revision aqui:\nhttps://momentiacitas.ruralketing.com/agenda-tu-cita#row-g6WOTuqARq",
+      "*Aquí está la fuga que hoy no se ve:*\n\nTiempo consumido: {{horas_mensuales_estimadas}} al mes.\nCosto mensual estimado: {{costo_mensual_estimado}}.\nCosto anual estimado: {{costo_anual_estimado}}.\n\nY eso sin contar errores, retrasos ni oportunidades que no puedes atender mientras repites la misma tarea.\n\nYa tienes una primera radiografía del problema. En la reunión revisaremos qué conviene automatizar primero y si podemos convertir esta fuga en tiempo útil para vender, atender o crecer.\n\n{{booking_cta}}",
     name: "Mostrar costo oculto del proceso",
     nextStepId: "tag_diagnostico",
     requiredForStage: true,
@@ -305,13 +305,13 @@ export const defaultLevyFlowSteps: FlowStep[] = [
   {
     actions: [
       {
-        label: "Tag diagnostico completado",
+        label: "Tag diagnóstico completado",
         tag: "levy_diagnostico_iniciado",
         type: "add_tag",
       },
     ],
     id: "tag_diagnostico",
-    name: "GHL: diagnostico completado",
+    name: "GHL: diagnóstico completado",
     nextStepId: "transferir_citas",
     requiredForStage: true,
     stageKey: "conversion",
@@ -329,7 +329,7 @@ export const defaultLevyFlowSteps: FlowStep[] = [
 export function createBlankStep(index: number): FlowStep {
   return {
     id: `paso_${index + 1}_${crypto.randomUUID().slice(0, 8)}`,
-    message: "Escribe aqui el mensaje que vera el contacto.",
+    message: "Escribe aquí el mensaje que verá el contacto.",
     name: `Paso ${index + 1}`,
     requiredForStage: true,
     stageKey: "inicio",

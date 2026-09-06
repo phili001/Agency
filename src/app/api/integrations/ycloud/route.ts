@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { apiErrorResponse } from "@/lib/api-error";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { normalizeAppUrl } from "@/lib/app-url";
 import {
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
 
     if (!workspaceId || !cleanKey || !cleanPhone) {
       return NextResponse.json(
-        { error: "workspaceId, apiKey y numero son requeridos." },
+        { error: "workspaceId, apiKey y número son requeridos." },
         { status: 400 },
       );
     }
@@ -93,10 +94,7 @@ export async function POST(request: Request) {
       webhookUrl: `${appUrl}/api/webhooks/ycloud/${companyCode}/${encodeURIComponent(secret)}`,
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Error desconocido." },
-      { status: 500 },
-    );
+    return apiErrorResponse(error, "integrations/ycloud");
   }
 }
 
@@ -123,7 +121,7 @@ export async function GET(request: Request) {
 
     if (!webhookSecret) {
       return NextResponse.json(
-        { error: "Guarda YCloud para generar un secreto unico." },
+        { error: "Guarda YCloud para generar un secreto único." },
         { status: 404 },
       );
     }
@@ -139,9 +137,6 @@ export async function GET(request: Request) {
       webhookUrl: `${appUrl}/api/webhooks/ycloud/${companyCode}/${encodeURIComponent(webhookSecret)}`,
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Error desconocido." },
-      { status: 500 },
-    );
+    return apiErrorResponse(error, "integrations/ycloud");
   }
 }

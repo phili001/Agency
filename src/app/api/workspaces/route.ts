@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { apiErrorResponse } from "@/lib/api-error";
 import { requireUser, requireWorkspaceRole } from "@/lib/authz";
 import {
   type DefaultConversationMode,
@@ -79,7 +80,7 @@ export async function POST(request: Request) {
     if (action === "set_default_conversation_mode") {
       if (!workspaceId || !["ai", "handoff"].includes(defaultConversationMode ?? "")) {
         return NextResponse.json(
-          { error: "workspaceId y modo valido son requeridos." },
+          { error: "workspaceId y modo válido son requeridos." },
           { status: 400 },
         );
       }
@@ -113,11 +114,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ defaultConversationMode, ok: true });
     }
 
-    return NextResponse.json({ error: "Accion no soportada." }, { status: 400 });
+    return NextResponse.json({ error: "Acción no soportada." }, { status: 400 });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Error desconocido." },
-      { status: 500 },
-    );
+    return apiErrorResponse(error, "workspaces");
   }
 }

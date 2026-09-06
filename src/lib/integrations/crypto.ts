@@ -27,7 +27,7 @@ export function decryptSecret(value: string) {
   const [ivValue, tagValue, encryptedValue] = value.split(".");
 
   if (!ivValue || !tagValue || !encryptedValue) {
-    throw new Error("Secret cifrado invalido.");
+    throw new Error("Secret cifrado inválido.");
   }
 
   const decipher = createDecipheriv(

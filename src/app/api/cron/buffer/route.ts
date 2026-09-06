@@ -210,7 +210,7 @@ function buildCalendarToolDefinitions(calendars: CalendarTool[]) {
   const options = calendars
     .map(
       (calendar) =>
-        `- "${calendar.calendarName}": ${calendar.description || "sin descripcion"}`,
+        `- "${calendar.calendarName}": ${calendar.description || "sin descripción"}`,
     )
     .join("\n");
   const calendarProperty = multiple
@@ -235,7 +235,7 @@ function buildCalendarToolDefinitions(calendars: CalendarTool[]) {
           ...calendarProperty,
           dias: {
             description:
-              "Cuantos dias hacia adelante buscar desde la fecha de inicio. Entre 1 y 14.",
+              "Cuantos días hacia adelante buscar desde la fecha de inicio. Entre 1 y 14.",
             type: "integer",
           },
           fecha_inicio: {
@@ -252,7 +252,7 @@ function buildCalendarToolDefinitions(calendars: CalendarTool[]) {
     },
     {
       description:
-        "Crea la cita. Usala solo despues de consultar disponibilidad y de que el cliente haya elegido un horario concreto de los ofrecidos.",
+        "Crea la cita. Usala solo después de consultar disponibilidad y de que el cliente haya elegido un horario concreto de los ofrecidos.",
       name: "agendar_cita",
       parameters: {
         additionalProperties: false,
@@ -607,7 +607,7 @@ function buildTimeContext(timezone: string) {
 
   return `Fecha actual:
 - Hoy es ${weekday} ${today} (formato YYYY-MM-DD), zona horaria ${timezone}.
-- Calcula "hoy", "manana", "este viernes" o "la proxima semana" a partir de esa fecha.
+- Calcula "hoy", "manana", "este viernes" o "la próxima semana" a partir de esa fecha.
 - Nunca inventes una fecha ni cambies de mes. Si no puedes calcularla con certeza, preguntale al cliente.`;
 }
 
@@ -640,7 +640,7 @@ function buildCalendarContext(calendarRuntime: CalendarRuntime | null) {
           .map(
             (calendar) =>
               `  - "${calendar.calendarName}": ${
-                calendar.description || "sin descripcion"
+                calendar.description || "sin descripción"
               }`,
           )
           .join(
@@ -674,7 +674,7 @@ function buildInstructions(
 ) {
   const basePrompt =
     agent.system_prompt ||
-    "Eres un agente de WhatsApp claro, breve y orientado a resolver. Responde en espanol y evita sonar como robot.";
+    "Eres un agente de WhatsApp claro, breve y orientado a resolver. Responde en español y evita sonar como robot.";
   const identity = getAgentIdentity(agent);
   const businessVariables = {
     ...getBusinessVariables(businessProfile),
@@ -697,7 +697,7 @@ function buildInstructions(
 ${
   introduceAgent
     ? `- Acabas de tomar esta conversacion. Empieza esta respuesta identificandote como ${identity.agentName} y menciona brevemente tu trabajo.`
-    : "- Ya estas atendiendo esta conversacion. No repitas tu presentacion en cada mensaje."
+    : "- Ya estas atendiendo esta conversación. No repitas tu presentacion en cada mensaje."
 }
 - Habla siempre en primera persona como ${identity.agentName}. Nunca escribas "IA:" ni "assistant:" delante de tu respuesta.`;
 
@@ -728,11 +728,11 @@ ${ragContext}
 
 Reglas obligatorias sobre la base de conocimiento:
 - Usa estos documentos como fuente principal para el CONTENIDO del negocio:
-  precios, servicios, politicas, condiciones y forma de responder.
+  precios, servicios, políticas, condiciones y forma de responder.
 - Si la respuesta no esta en la base, dilo con claridad y pide que un humano lo confirme.
 - No inventes precios, horarios, politicas ni condiciones que no aparezcan aqui.
 
-Limites de la base de conocimiento -- NUNCA los sobreescribe:
+Límites de la base de conocimiento -- NUNCA los sobreescribe:
 - La fecha de hoy. Las fechas que aparezcan en los documentos son EJEMPLOS
   escritos en el pasado, nunca la fecha actual. Usa siempre la fecha del sistema.
 - Tu acceso al calendario y la disponibilidad real de horarios.
@@ -751,7 +751,7 @@ ${calendarContext}
 
 ${handoffContext}
 
-Recuerda: la fecha del sistema y los limites de arriba mandan sobre cualquier
+Recuerda: la fecha del sistema y los límites de arriba mandan sobre cualquier
 fecha, hora o ejemplo que aparezca en los documentos.`;
 }
 
@@ -813,7 +813,7 @@ async function buildCalendarRuntime({
 
   if (!contact?.phone_e164) {
     return {
-      reason: "El contacto no tiene telefono guardado, asi que no se puede crear en GHL.",
+      reason: "El contacto no tiene teléfono guardado, así que no se puede crear en GHL.",
       runtime: null,
     };
   }
@@ -972,7 +972,7 @@ async function runCalendarTool(
       const startDate = zonedStartOfDay(dateKey, timezone);
 
       if (!startDate) {
-        return { error: "fecha_inicio invalida. Usa formato YYYY-MM-DD." };
+        return { error: "fecha_inicio inválida. Usa formato YYYY-MM-DD." };
       }
 
       const days = requestContext.dateKey
@@ -1005,7 +1005,7 @@ async function runCalendarTool(
           horario_solicitado: null,
           horario_solicitado_disponible: requestContext.time ? false : null,
           mensaje:
-            "No hay horarios libres en la fecha consultada. Pregunta si desea buscar otro dia.",
+            "No hay horarios libres en la fecha consultada. Pregunta si desea buscar otro día.",
         };
       }
 
@@ -1076,7 +1076,7 @@ async function runCalendarTool(
         if (Number.isNaN(requested.getTime())) {
           return {
             error:
-              "horario_iso invalido. Copia exactamente el campo 'inicio' de consultar_disponibilidad.",
+              "horario_iso inválido. Copia exactamente el campo 'inicio' de consultar_disponibilidad.",
           };
         }
 
@@ -1243,7 +1243,7 @@ function buildDirectAvailabilityAnswer(
         dateStyle: "full",
         timeZone: timezone,
       }).format(dayStart)
-    : "ese dia";
+    : "ese día";
   const requestedTime =
     typeof result.hora_solicitada === "string" ? result.hora_solicitada : null;
   const requestedAvailable = result.horario_solicitado_disponible;
@@ -1262,7 +1262,7 @@ function buildDirectAvailabilityAnswer(
     : [];
 
   if (requestedTime && requestedAvailable === true) {
-    return `Si, ${requestedTime} esta disponible el ${dateLabel}. Quieres que reserve esa hora?`;
+    return `Sí, ${requestedTime} está disponible el ${dateLabel}. ¿Quieres que reserve esa hora?`;
   }
 
   if (requestedTime && requestedAvailable === false) {
@@ -1273,7 +1273,7 @@ function buildDirectAvailabilityAnswer(
 
   return slots.length > 0
     ? `Para el ${dateLabel}, los horarios libres reales son:\n${slots.map((time) => `- ${time}`).join("\n")}\nCual prefieres?`
-    : `GHL no devolvio horarios libres para el ${dateLabel}. Quieres que revise otro dia?`;
+    : `GHL no devolvió horarios libres para el ${dateLabel}. ¿Quieres que revise otro día?`;
 }
 
 async function callResponsesApi({
@@ -1387,7 +1387,7 @@ function sanitizeCalendarAnswer({
     if (!calendarRuntime) {
       return {
         answer:
-          "No tengo acceso a la agenda en este momento, asi que no puedo confirmar ni registrar esa cita desde aqui. Te ayudo dejando la solicitud lista para que el equipo revise la agenda.",
+          "No tengo acceso a la agenda en este momento, así que no puedo confirmar ni registrar esa cita desde aquí. Te ayudo dejando la solicitud lista para que el equipo revise la agenda.",
         blockedReason:
           "Respuesta bloqueada: intentaba confirmar una cita sin calendario conectado para el agente.",
       };
@@ -1395,7 +1395,7 @@ function sanitizeCalendarAnswer({
 
     return {
       answer:
-        "No puedo confirmar esa cita todavia porque no tengo una confirmacion real del calendario. Para ayudarte bien, voy a revisar disponibilidad y te confirmo solo cuando quede registrada.",
+        "No puedo confirmar esa cita todavia porque no tengo una confirmación real del calendario. Para ayudarte bien, voy a revisar disponibilidad y te confirmo solo cuando quede registrada.",
       blockedReason:
         "Respuesta bloqueada: intentaba confirmar una cita sin agendar_cita confirmada con cita_id.",
     };
@@ -1408,7 +1408,7 @@ function sanitizeCalendarAnswer({
   ) {
     return {
       answer:
-        "No pude consultar la agenda real en este momento, asi que no voy a inventarte un horario. Intenta de nuevo en un momento y lo reviso directamente en el calendario.",
+        "No pude consultar la agenda real en este momento, así que no voy a inventarte un horario. Intenta de nuevo en un momento y lo reviso directamente en el calendario.",
       blockedReason:
         "Respuesta bloqueada: mencionaba disponibilidad sin una consulta valida a GHL.",
     };
@@ -1417,7 +1417,7 @@ function sanitizeCalendarAnswer({
   if (!calendarRuntime && textLooksLikeAvailabilityClaim(answer)) {
     return {
       answer:
-        "No tengo acceso a la agenda en este momento, asi que no puedo confirmar disponibilidad ni reservar un horario desde aqui. Te ayudo dejando la solicitud lista para que el equipo revise la agenda.",
+        "No tengo acceso a la agenda en este momento, así que no puedo confirmar disponibilidad ni reservar un horario desde aquí. Te ayudo dejando la solicitud lista para que el equipo revise la agenda.",
       blockedReason:
         "Respuesta bloqueada: mencionaba disponibilidad sin calendario conectado para el agente.",
     };
@@ -1459,7 +1459,7 @@ async function generateReply(
   // Sin zona configurada, el agente habla en UTC y da horas corridas.
   const timezoneWarning =
     timezone === "UTC" && !calendarRuntime
-      ? "Falta la zona horaria en Negocio: el agente esta usando UTC y las horas que diga estaran corridas."
+      ? "Falta la zona horaria en Negocio: el agente esta usando UTC y las horas que diga estarán corridas."
       : null;
   const calendarRequest = calendarRuntime
     ? resolveCalendarRequestContext(messages, calendarRuntime.timezone)
@@ -1659,7 +1659,7 @@ async function generateContactInsights(agent: AgentRow, messages: MessageRow[]) 
 Conversacion:
 ${transcript}`,
       instructions:
-        "Eres un clasificador CRM. Usa tags cortos en snake_case, maximo 5 tags. No agregues markdown.",
+        "Eres un clasificador CRM. Usa tags cortos en snake_case, máximo 5 tags. No agregues markdown.",
       max_output_tokens: 220,
       model,
       temperature: 0.2,
@@ -1690,7 +1690,7 @@ ${transcript}`,
       summary:
         typeof parsed.summary === "string"
           ? parsed.summary.slice(0, 240)
-          : "Conversacion pendiente de revisar.",
+          : "Conversación pendiente de revisar.",
       tags: Array.isArray(parsed.tags)
         ? parsed.tags
             .filter((tag): tag is string => typeof tag === "string")
@@ -1907,7 +1907,7 @@ export async function POST(request: Request) {
       // mira lo que escribio, que es lo unico comprobable.
       const answerHandoff = detectAnswerHandoff(reply.answer);
       // El cliente tiene que enterarse de que cambia de interlocutor. Sin esto
-      // leia un "no tengo esa informacion" y parecia un callejon sin salida.
+      // leia un "no tengo esa información" y parecia un callejon sin salida.
       const answerBody = answerHandoff
         ? withHandoffNotice(reply.answer)
         : reply.answer;

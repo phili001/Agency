@@ -19,7 +19,7 @@ export async function getWorkspaceGoHighLevelKey(workspaceId: string) {
     if (
       message.includes("Unsupported state") ||
       message.includes("authenticate data") ||
-      message.includes("Secret cifrado invalido")
+      message.includes("Secret cifrado inválido")
     ) {
       throw new Error(
         "El token guardado de GoHighLevel fue cifrado con otra clave. Vuelve a pegar el Private Integration Token en Integraciones y pulsa Guardar.",
@@ -61,7 +61,7 @@ function splitName(fullName: string | null) {
 
 export async function syncContactToGoHighLevel({
   contactId,
-  source = "LEVY WhatsApp",
+  source = "Levy · WhatsApp",
   workspaceId,
 }: {
   contactId: string;
@@ -90,7 +90,7 @@ export async function syncContactToGoHighLevel({
   ]);
 
   if (!contact?.phone_e164) {
-    return { error: "El contacto no tiene telefono.", status: "failed" };
+    return { error: "El contacto no tiene teléfono.", status: "failed" };
   }
 
   const currentMetadata = getConfigRecord(contact.metadata);
@@ -193,7 +193,7 @@ async function ghlFetch<T>({
   };
 
   if (!response.ok) {
-    throw new Error(payload.message ?? "GoHighLevel rechazo la accion.");
+    throw new Error(payload.message ?? "GoHighLevel rechazo la acción.");
   }
 
   return payload;
@@ -264,7 +264,7 @@ export async function runGoHighLevelFlowActions({
       lastName,
       locationId,
       phone: contact.phone_e164,
-      source: "LEVY Flow",
+      source: "Levy · Flujo",
     },
     method: "POST",
     path: "/contacts/upsert",

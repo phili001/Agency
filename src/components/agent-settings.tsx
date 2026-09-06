@@ -60,7 +60,7 @@ type AgentConfig = {
 const agentTypeOptions: Array<{ label: string; value: AgentType }> = [
   { label: "Setter / Ventas", value: "setter" },
   { label: "Citas", value: "booking" },
-  { label: "Informacion", value: "support" },
+  { label: "Información", value: "support" },
 ];
 
 function isAgentType(value: unknown): value is AgentType {
@@ -337,7 +337,7 @@ export function AgentSettings({
     const payload = (await response.json()) as { error?: string };
 
     if (!response.ok) {
-      setStatus(payload.error ?? "No se pudo guardar el modo de conversacion.");
+      setStatus(payload.error ?? "No se pudo guardar el modo de conversación.");
       setIsSavingConversationMode(false);
       return;
     }
@@ -435,7 +435,7 @@ export function AgentSettings({
         model: "gpt-5.4-mini",
         name: localAgents.length === 0 ? "Mateo - Soporte" : "Mateo - Soporte",
         system_prompt:
-          "Eres un agente de WhatsApp claro, breve y orientado a agendar o resolver la necesidad del contacto. Responde en espanol, haz una pregunta a la vez y pide datos solo cuando hagan falta.",
+          "Eres un agente de WhatsApp claro, breve y orientado a agendar o resolver la necesidad del contacto. Responde en español, haz una pregunta a la vez y pide datos solo cuando hagan falta.",
         temperature: 0.4,
         type: "support",
         workspace_id: workspaceId,
@@ -447,7 +447,7 @@ export function AgentSettings({
           knowledge_asset_ids: [],
           onboarding_agent_configured: true,
           router_description:
-            "Usar para primeros mensajes, calificacion de leads, dudas generales y pasar a citas cuando el contacto quiera agendar.",
+            "Usar para primeros mensajes, calificación de leads, dudas generales y pasar a citas cuando el contacto quiera agendar.",
         },
       })
       .select(
@@ -572,7 +572,7 @@ export function AgentSettings({
       <section className="min-w-0 rounded-lg border border-[#d9ded3] bg-white p-4">
         <div className="flex items-center gap-2">
           <Bot className="text-[#35735b]" size={19} />
-          <h2 className="text-base font-semibold">Configuracion de agentes</h2>
+          <h2 className="text-base font-semibold">Configuración de agentes</h2>
         </div>
         <p className="mt-3 text-sm text-[#647067]">
           Crea un agente para configurar instrucciones, modelo y pruebas.
@@ -597,7 +597,7 @@ export function AgentSettings({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Bot className="text-[#35735b]" size={19} />
-          <h2 className="text-base font-semibold">Configuracion de agentes</h2>
+          <h2 className="text-base font-semibold">Configuración de agentes</h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-semibold text-[#647067]">Conversaciones nuevas</span>
@@ -784,7 +784,7 @@ export function AgentSettings({
           </div>
 
           <label className="grid gap-1.5 text-sm font-medium">
-            Descripcion para router
+            Descripción para router
             <textarea
               className="min-h-24 rounded-lg border border-[#cbd2c6] p-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
               onChange={(event) =>
@@ -793,11 +793,11 @@ export function AgentSettings({
                   router_description: event.target.value,
                 }))
               }
-              placeholder="Ej: Usar este agente cuando el contacto pregunte precios, ubicacion, servicios y dudas generales."
+              placeholder="Ej: Usar este agente cuando el contacto pregunte precios, ubicación, servicios y dudas generales."
               value={form.router_description}
             />
             <span className="text-xs font-normal text-[#647067]">
-              El router compara esta descripcion con el mensaje y decide que agente activo responde.
+              El router compara esta descripción con el mensaje y decide que agente activo responde.
             </span>
           </label>
 
@@ -835,7 +835,7 @@ export function AgentSettings({
                 value={form.rules}
               />
               <span className="text-xs font-normal text-[#647067]">
-                Una regla por linea. Se inyectan como obligaciones del agente.
+                Una regla por línea. Se inyectan como obligaciones del agente.
               </span>
             </label>
 
@@ -855,7 +855,7 @@ export function AgentSettings({
                 value={form.restrictions}
               />
               <span className="text-xs font-normal text-[#647067]">
-                Una restriccion por linea. Tiene prioridad sobre respuestas libres.
+                Una restriccion por línea. Tiene prioridad sobre respuestas libres.
               </span>
             </label>
           </div>
@@ -893,7 +893,7 @@ export function AgentSettings({
                 ))}
                 {tools.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
-                    Crea tools en la pestana Tools para asignarlas aqui.
+                    Crea tools en la pestana Tools para asignarlas aquí.
                   </p>
                 ) : null}
               </div>
@@ -932,7 +932,7 @@ export function AgentSettings({
                 ))}
                 {knowledgeAssets.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
-                    Agrega documentos en Knowledge Base para asignarlos aqui.
+                    Agrega documentos en Knowledge Base para asignarlos aquí.
                   </p>
                 ) : null}
               </div>
@@ -1005,7 +1005,7 @@ export function AgentSettings({
                 </h3>
                 <p className="mt-1 text-sm text-[#647067]">
                   Vas a borrar <span className="font-semibold">{selectedAgent.name}</span>.
-                  Esta accion no se puede deshacer.
+                  Esta acción no se puede deshacer.
                 </p>
               </div>
             </div>

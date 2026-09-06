@@ -1,6 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+
+import { normalizeAppUrl } from "@/lib/app-url";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -12,9 +14,42 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const appUrl = normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL);
+const description =
+  "Agentes de WhatsApp con IA para atender, calificar y agendar. Un panel por empresa, con handoff a personas cuando hace falta.";
+
 export const metadata: Metadata = {
-  title: "Levy",
-  description: "Dashboard multi-tenant de agentes de WhatsApp con IA.",
+  applicationName: "Levy",
+  description,
+  metadataBase: new URL(appUrl),
+  openGraph: {
+    description,
+    locale: "es_ES",
+    siteName: "Levy",
+    title: "Levy · Agentes de WhatsApp con IA",
+    type: "website",
+    url: appUrl,
+  },
+  robots: {
+    follow: false,
+    // Es una herramienta privada por cliente: no tiene nada que indexar.
+    index: false,
+  },
+  title: {
+    default: "Levy",
+    template: "%s · Levy",
+  },
+  twitter: {
+    card: "summary_large_image",
+    description,
+    title: "Levy · Agentes de WhatsApp con IA",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#10231c",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({

@@ -1,83 +1,115 @@
-# Deploy runbook
+# Runbook de despliegue
 
-## 1. Supabase
+## 1. Base de datos (Supabase)
 
-Run the incremental SQL in:
+Sobre un proyecto nuevo, ejecuta en el SQL editor y en este orden:
 
-`supabase/next_workspace_assets_and_webhooks.sql`
+1. `supabase/schema.sql`
+2. `supabase/next_workspace_assets_and_webhooks.sql`
+3. `supabase/flow_builder.sql`
+4. `supabase/self_service_onboarding.sql`
+5. `supabase/set_default_handoff.sql`
+6. Todo lo de `supabase/migrations/`, por orden de nombre
 
-This adds:
+En **Authentication > URL Configuration** pon `NEXT_PUBLIC_APP_URL` como Site URL
+y añade `{NEXT_PUBLIC_APP_URL}/auth/callback` a las Redirect URLs. Sin eso, el
+enlace de recuperación de contraseña no vuelve a la app.
 
-- `workspace_assets`
-- `webhook_events`
-- OpenAI provider defaults
-- RLS policies for the new tables
+## 2. Variables de entorno
 
-## 2. Environment variables
+Copia `.env.example` y rellénalo en local y en Vercel. Son seis variables y
+todas son obligatorias:
 
-Set these locally and in Vercel:
+| Variable | Para qué |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Proyecto de Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Cliente público con RLS |
+| `SUPABASE_SERVICE_ROLE_KEY` | Solo servidor. Nunca con prefijo `NEXT_PUBLIC_` |
+| `INTEGRATION_ENCRYPTION_KEY` | Cifra las API keys de cada empresa |
+| `CRON_SECRET` | Autoriza `/api/cron/*` y `/api/health/*` |
+| `NEXT_PUBLIC_APP_URL` | Dominio público, sin barra final |
+| `SUPERADMIN_EMAILS` | Correos con acceso a `/admin` |
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-NEXT_PUBLIC_APP_URL=
-SUPABASE_SERVICE_ROLE_KEY=
-OPENAI_API_KEY=
-YCLOUD_API_KEY=
-YCLOUD_API_BASE=https://api.ycloud.com/v2
-YCLOUD_WEBHOOK_SECRET=
-CRON_SECRET=
-GHL_API_KEY=
-GHL_API_BASE=https://services.leadconnectorhq.com
+Las claves de OpenAI, YCloud y GoHighLevel **no** son variables de entorno: se
+guardan cifradas por empresa desde *Integraciones*, así cada cliente usa las
+suyas.
+
+> Si cambias `INTEGRATION_ENCRYPTION_KEY`, los secretos ya guardados dejan de
+> poder descifrarse y hay que volver a introducirlos empresa por empresa.
+
+## 3. Comprobación previa
+
+Con el `CRON_SECRET` puesto:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" https://tudominio.com/api/health/readiness
 ```
 
-Do not expose server-only keys as `NEXT_PUBLIC_`.
+Devuelve 200 cuando todo está listo y 503 si falta algo. También responde a un
+superadmin con sesión abierta; para cualquier otro es 401 (expone qué variables
+existen, así que no puede ser público).
 
-## 3. Preflight
+## 4. Crons de Vercel
 
-Open:
+`vercel.json` declara tres:
 
-`/api/health/readiness`
+| Ruta | Frecuencia | Para qué |
+| --- | --- | --- |
+| `/api/cron/flows` | cada 5 min | Reanuda pasos de espera. **Sin esto los seguimientos programados no salen nunca.** |
+| `/api/cron/deliver` | cada 5 min | Red de seguridad: envía lo que quedó en cola si falló la entrega inmediata |
+| `/api/cron/ghl-sync` | diario 08:00 | Sincroniza contactos con GoHighLevel |
 
-Required checks must be green before testing production. Recommended checks
-cover YCloud and GoHighLevel.
+Vercel manda el `CRON_SECRET` como `Authorization: Bearer` automáticamente si la
+variable existe en el proyecto.
 
-## 4. YCloud
+> **Plan Hobby de Vercel: los crons solo corren una vez al día.** Con ese plan
+> los seguimientos programados llegan con retraso de horas. Para vender el
+> producto hace falta plan Pro, o mover estos dos crons a un programador externo
+> (QStash, Supabase Edge Functions, cron-job.org) apuntando a las mismas URLs con
+> `?secret={CRON_SECRET}`.
 
-Use this webhook URL:
+## 5. YCloud
 
-`{NEXT_PUBLIC_APP_URL}/api/webhooks/ycloud?secret={YCLOUD_WEBHOOK_SECRET}`
+URL del webhook, una por empresa (el código sale de *Integraciones*):
 
-Enable inbound/outbound WhatsApp message events. If a custom domain is added
-later, update the webhook URL in YCloud.
+```
+{NEXT_PUBLIC_APP_URL}/api/webhooks/ycloud/{CODIGO_EMPRESA}/{SECRETO}
+```
 
-## 5. Buffer IA sin cron
+Activa los eventos de mensaje entrante y de estado. El secreto se genera al
+conectar YCloud en el panel; si lo regeneras, actualiza la URL en YCloud.
 
-La IA no depende de Vercel Cron. Cuando entra el primer mensaje de una racha
-por WhatsApp, el webhook arranca un buffer por conversacion:
+## 6. Respuesta de la IA
 
-- Espera 20 segundos.
-- Agrupa los mensajes que lleguen en esa ventana para ese usuario.
-- Llama internamente a `/api/cron/buffer` para generar la respuesta.
-- Llama internamente a `/api/cron/deliver` para enviarla por YCloud.
+La IA no espera al cron. Cuando entra el primer mensaje de una racha, el webhook
+abre un buffer por conversación:
 
-These internal routes still require `CRON_SECRET`. Keep `CRON_SECRET`
-configured in Vercel so the delayed webhook task can authorize them.
+1. Espera 20 segundos y agrupa lo que llegue en esa ventana.
+2. Llama a `/api/cron/buffer` para generar la respuesta.
+3. Llama a `/api/cron/deliver` para enviarla por YCloud.
 
-Manual debug, only if you need to force a pending conversation:
+Ambas rutas exigen `CRON_SECRET`. El cron de `deliver` del punto 4 existe por si
+esa llamada inmediata falla.
 
-- `{NEXT_PUBLIC_APP_URL}/api/cron/buffer?secret={CRON_SECRET}&conversationId={CONVERSATION_ID}&workspaceId={WORKSPACE_ID}`
-- `{NEXT_PUBLIC_APP_URL}/api/cron/deliver?secret={CRON_SECRET}&conversationId={CONVERSATION_ID}&workspaceId={WORKSPACE_ID}`
-- `{NEXT_PUBLIC_APP_URL}/api/cron/ghl-sync?secret={CRON_SECRET}`
+Para forzar una conversación a mano:
 
-If Vercel ever stops allowing the delayed background task, move only the two
-internal calls above to QStash, Supabase Edge Functions, or another scheduler.
+```
+{NEXT_PUBLIC_APP_URL}/api/cron/buffer?secret={CRON_SECRET}&conversationId={ID}&workspaceId={ID}
+{NEXT_PUBLIC_APP_URL}/api/cron/deliver?secret={CRON_SECRET}&conversationId={ID}&workspaceId={ID}
+```
 
-## 6. GoHighLevel
+## 7. GoHighLevel
 
-In Workspace > Integraciones > GoHighLevel, save:
+En *Workspace > Integraciones > GoHighLevel* se guardan el `location_id` y el
+token de la empresa (cifrado). El botón de prueba crea un contacto y una cita
+temporales y los borra al terminar; si el test se corta a la mitad, revisa que
+no quede nada llamado `Prueba técnica Levy`.
 
-- `location_id`
-- `api_key_ref` as a reference label only
+## 8. Antes de dar acceso a un cliente
 
-The real token must live in `GHL_API_KEY`.
+- [ ] Preflight en verde
+- [ ] Webhook de YCloud recibiendo (mándate un mensaje de prueba)
+- [ ] Perfil de negocio completo, incluido el **Link de agenda**: la plantilla de
+      flujo lo usa para cerrar la conversación y sin él ese mensaje sale sin CTA
+- [ ] Crons visibles en Vercel > Cron Jobs
+- [ ] Contraseña temporal cambiada por el cliente

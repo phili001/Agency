@@ -4,6 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { FlowGhlAction, FlowStage, FlowStep } from "@/lib/flow-definitions";
 import { parseFlowSteps } from "@/lib/flow-definitions";
+import { badRequest, notFound } from "@/lib/api-error";
+import { getBusinessVariables } from "@/lib/business-profile";
 import { verifyFlowAnswer } from "@/lib/flow-answer-verifier";
 import { runGoHighLevelFlowActions } from "@/lib/integrations/gohighlevel";
 import type { Database, Json } from "@/lib/supabase/database.types";
@@ -192,11 +194,41 @@ async function syncContactFlowProgress({
     .eq("workspace_id", flow.workspace_id);
 }
 
-function renderTemplate(template: string, contact: ContactRow, answers: Record<string, Json>) {
+// Los datos del negocio viven en un asset por workspace. Sin esto las plantillas
+// tendrian que traer datos de una empresa concreta escritos a mano.
+async function getWorkspaceBusinessVariables(
+  supabase: AdminClient,
+  workspaceId: string,
+) {
+  const { data } = await supabase
+    .from("workspace_assets")
+    .select("title, content, metadata")
+    .eq("workspace_id", workspaceId)
+    .eq("kind", "business_profile")
+    .eq("status", "active")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return getBusinessVariables(data);
+}
+
+function renderTemplate(
+  template: string,
+  contact: ContactRow,
+  answers: Record<string, Json>,
+  businessVariables: Record<string, string> = {},
+) {
   const firstName = contact.full_name?.split(/\s+/)[0] ?? "";
   const impact = calculateProcessImpact(answers);
+  const bookingUrl = businessVariables.booking_url?.trim() ?? "";
   const values: Record<string, string> = {
+    ...businessVariables,
     ...impact,
+    // Bloque completo para que el mensaje no quede con un "Agenda aquí:" huerfano
+    // cuando la empresa todavia no configuro su link.
+    booking_cta: bookingUrl ? `Agenda tu revisión aquí:\n${bookingUrl}` : "",
+    booking_url: bookingUrl,
     email: contact.email ?? "",
     firstName,
     fullName: contact.full_name ?? "",
@@ -210,7 +242,9 @@ function renderTemplate(template: string, contact: ContactRow, answers: Record<s
   return template
     .replace(/\\r\\n/g, "\n")
     .replace(/\\n/g, "\n")
-    .replace(/\{\{(\w+)\}\}/g, (_match, key: string) => values[key] ?? "");
+    .replace(/\{\{(\w+)\}\}/g, (_match, key: string) => values[key] ?? "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function parsePositiveNumber(value: unknown) {
@@ -451,7 +485,7 @@ async function runStepActions({
     });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Error desconocido en accion GHL.";
+      error instanceof Error ? error.message : "Error desconocido en acción GHL.";
 
     await logFlowEvent({
       contactId: run.contact_id,
@@ -489,6 +523,10 @@ async function executeRun({
   supabase: AdminClient;
 }) {
   const steps = parseFlowSteps(flow.steps);
+  const businessVariables = await getWorkspaceBusinessVariables(
+    supabase,
+    flow.workspace_id,
+  );
   let currentStep = findStep(steps, startStepId ?? run.current_step_id);
   let answers = getAnswers(run.answers);
   let history = getHistory(run.history);
@@ -519,7 +557,12 @@ async function executeRun({
         step: currentStep,
         supabase,
       });
-      const body = renderTemplate(currentStep.message ?? "", contact, answers).trim();
+      const body = renderTemplate(
+        currentStep.message ?? "",
+        contact,
+        answers,
+        businessVariables,
+      );
 
       if (body) {
         await queueMessage({
@@ -566,7 +609,12 @@ async function executeRun({
     }
 
     if (currentStep.type === "question" || currentStep.type === "options") {
-      const body = renderTemplate(currentStep.message ?? "", contact, answers).trim();
+      const body = renderTemplate(
+        currentStep.message ?? "",
+        contact,
+        answers,
+        businessVariables,
+      );
 
       if (body) {
         await queueMessage({
@@ -810,6 +858,18 @@ async function getMatchingFlow(
     return null;
   }
 
+  // Antes se consultaba flow_runs una vez por flujo dentro del bucle: con N
+  // flujos activos eran N consultas en cada mensaje entrante.
+  const { data: finishedRuns } = await supabase
+    .from("flow_runs")
+    .select("flow_id")
+    .eq("workspace_id", context.workspaceId)
+    .eq("contact_id", context.contactId)
+    .in("status", TERMINAL_RUN_STATUSES);
+  const finishedFlowIds = new Set(
+    (finishedRuns ?? []).map((run) => run.flow_id as string),
+  );
+
   for (const flow of (flows ?? []) as FlowRow[]) {
     const config = getRecord(flow.trigger_config);
     const audience = String(config.audience ?? "all");
@@ -842,20 +902,8 @@ async function getMatchingFlow(
       continue;
     }
 
-    if (!allowRepeat) {
-      const { data: previousRun } = await supabase
-        .from("flow_runs")
-        .select("id")
-        .eq("workspace_id", context.workspaceId)
-        .eq("flow_id", flow.id)
-        .eq("contact_id", context.contactId)
-        .in("status", TERMINAL_RUN_STATUSES)
-        .limit(1)
-        .maybeSingle();
-
-      if (previousRun) {
-        continue;
-      }
+    if (!allowRepeat && finishedFlowIds.has(flow.id)) {
+      continue;
     }
 
     if (flow.trigger_type === "first_inbound") {
@@ -983,7 +1031,7 @@ export async function startManualContactFlow({
   ]);
 
   if (!conversation || conversation.contact_id !== contactId || !contact) {
-    throw new Error("El contacto o la conversacion no pertenecen a esta empresa.");
+    throw badRequest("El contacto o la conversación no pertenecen a esta empresa.");
   }
 
   let flowQuery = supabase
@@ -1006,7 +1054,7 @@ export async function startManualContactFlow({
   }
 
   if (!flow || parseFlowSteps(flow.steps).length === 0) {
-    throw new Error("No hay un flujo disponible con pasos para esta empresa.");
+    throw badRequest("No hay un flujo disponible con pasos para esta empresa.");
   }
 
   const now = new Date().toISOString();
@@ -1038,7 +1086,7 @@ export async function startManualContactFlow({
           .from("flow_runs")
           .update({
             completed_at: now,
-            last_error: "Ejecucion reemplazada por un inicio manual.",
+            last_error: "Ejecución reemplazada por un inicio manual.",
             status: "failed",
           })
           .in("id", previousRunIds)
@@ -1050,7 +1098,7 @@ export async function startManualContactFlow({
           .update({
             decided_at: now,
             decided_by: startedBy,
-            human_decision_reason: "Ejecucion reiniciada manualmente.",
+            human_decision_reason: "Ejecución reiniciada manualmente.",
             status: "rejected_by_human",
           })
           .in("flow_run_id", previousRunIds)
@@ -1234,7 +1282,7 @@ export async function handleInboundFlow({
             confidence: 1,
             model: null,
             normalizedAnswer: originalAnswer.trim(),
-            reason: "Validacion desactivada para esta pregunta.",
+            reason: "Validación desactivada para esta pregunta.",
             source: "local_fallback" as const,
             valid: true,
           };
@@ -1576,7 +1624,7 @@ export async function decideFlowAnswerReview({
     .maybeSingle();
 
   if (!review) {
-    throw new Error("La revision ya no esta pendiente.");
+    throw badRequest("La revisión ya no está pendiente.");
   }
 
   const [{ data: run }, { data: flow }, { data: contact }] = await Promise.all([
@@ -1601,14 +1649,14 @@ export async function decideFlowAnswerReview({
   ]);
 
   if (!run || !flow || !contact) {
-    throw new Error("No se encontro el contexto completo de la revision.");
+    throw badRequest("No se encontró el contexto completo de la revisión.");
   }
 
   const steps = parseFlowSteps(flow.steps);
   const step = steps.find((item) => item.id === review.step_id);
 
   if (!step || step.type !== "question" || !step.fieldKey) {
-    throw new Error("La pregunta de esta revision ya no existe en el flujo.");
+    throw badRequest("La pregunta de esta revisión ya no existe en el flujo.");
   }
 
   const decidedAt = new Date().toISOString();
@@ -1641,7 +1689,7 @@ export async function decideFlowAnswerReview({
 
     await queueMessage({
       body:
-        "La respuesta anterior no permite completar el diagnostico. Te quedan dos intentos serios antes de pausar toda la atencion.\n\n" +
+        "La respuesta anterior no permite completar el diagnóstico. Te quedan dos intentos serios antes de pausar toda la atención.\n\n" +
         (step.retryMessage || step.message || step.name),
       contactId: review.contact_id,
       conversationId: review.conversation_id!,
@@ -1748,7 +1796,7 @@ export async function stopContactFlow({
     .maybeSingle();
 
   if (!contact) {
-    throw new Error("El contacto no pertenece a esta empresa.");
+    throw badRequest("El contacto no pertenece a esta empresa.");
   }
 
   const now = new Date().toISOString();
@@ -1887,7 +1935,7 @@ export async function unblockFlowContact({
     .single();
 
   if (!contact) {
-    throw new Error("Contacto no encontrado.");
+    throw notFound("Contacto no encontrado.");
   }
 
   const labels = withLabel(

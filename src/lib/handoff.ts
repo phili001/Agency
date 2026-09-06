@@ -24,7 +24,7 @@ export type HandoffSource =
  */
 export function buildHandoffContext() {
   return `Cuando no sepas algo:
-- Si no tienes la respuesta, o el tema no es tuyo, o el cliente reporta un problema con algo que ya contrato, DILO EN CLARO: "no tengo esa informacion" o "eso no lo puedo resolver yo".
+- Si no tienes la respuesta, o el tema no es tuyo, o el cliente reporta un problema con algo que ya contrato, DILO EN CLARO: "no tengo esa información" o "eso no lo puedo resolver yo".
 - En cuanto lo digas, la conversacion pasa automaticamente a una persona del equipo, y el sistema se lo avisa al cliente por ti. No lo anuncies tu ni lo repitas.
 - PROHIBIDO inventarte la respuesta para salir del paso. Preferimos mil veces un "no lo se" que un dato falso.
 - No derives al cliente a un tercero ajeno al negocio. Si el problema es de un servicio del negocio, se resuelve aqui dentro.
@@ -33,11 +33,11 @@ export function buildHandoffContext() {
 
 /**
  * Lo que lee el cliente cuando la conversacion cambia de manos. Se anade desde
- * el servidor y no se deja a criterio del modelo: un "no tengo esa informacion"
+ * el servidor y no se deja a criterio del modelo: un "no tengo esa información"
  * a secas deja al cliente pensando que ahi se acabo la conversacion.
  */
 export const HANDOFF_CLIENT_NOTICE =
-  "Te paso con una persona del equipo para que lo revise y te responda por aqui mismo.";
+  "Te paso con una persona del equipo para que lo revise y te responda por aquí mismo.";
 
 export function normalizeHandoffText(value: string) {
   return value
@@ -88,11 +88,11 @@ const TEAM_NOUNS = "equipo|soporte|tecnic[oa]|companer[oa]|responsable|encargado
 const CASE_NOUNS = "solicitud|caso|consulta|peticion|mensaje|incidencia";
 
 const HANDOFF_PROMISE_PATTERNS = [
-  // "voy a avisar al equipo", "puedo escalarlo al area tecnica"
+  // "voy a avisar al equipo", "puedo escalarlo al area técnica"
   new RegExp(
     `\\b(voy a|vamos a|puedo|podemos|paso|pasare|pasaremos|traslado|trasladare|derivo|derivare|escalo|escalare|aviso|avisare)\\b[^.]{0,60}\\b(${TEAM_NOUNS})`,
   ),
-  // "te ayudare a contactar al equipo tecnico", "conectate con soporte".
+  // "te ayudare a contactar al equipo técnico", "conectate con soporte".
   // Tambien salta si manda al cliente con un tecnico de fuera: derivar hacia
   // afuera tambien merece que una persona lo mire.
   new RegExp(
@@ -113,7 +113,7 @@ const HANDOFF_PROMISE_PATTERNS = [
 
 /**
  * El aviso solo se anade si el agente no lo dijo ya por su cuenta. Los patrones
- * de promesa son justo la senal de "aqui ya se anuncia un humano", asi que se
+ * de promesa son justo la senal de "aquí ya se anuncia un humano", asi que se
  * reutilizan: sin esto el cliente leia lo mismo tres veces seguidas.
  */
 export function withHandoffNotice(answer: string | null | undefined) {
@@ -162,14 +162,14 @@ export function detectAnswerHandoff(answer: string | null | undefined) {
 
   if (UNKNOWN_ANSWER_PATTERNS.some((pattern) => pattern.test(normalized))) {
     return {
-      reason: "El agente respondio que no sabe o no puede resolverlo.",
+      reason: "El agente respondió que no sabe o no puede resolverlo.",
       source: "unknown_answer" as HandoffSource,
     };
   }
 
   if (HANDOFF_PROMISE_PATTERNS.some((pattern) => pattern.test(normalized))) {
     return {
-      reason: "El agente prometio que una persona continuaria la conversacion.",
+      reason: "El agente prometio que una persona continuaria la conversación.",
       source: "promise_guard" as HandoffSource,
     };
   }
@@ -235,7 +235,7 @@ function buildHandoffNote(reason: string, summary: string | null, source: Handof
       : source === "promise_guard"
         ? "La IA prometio intervencion humana"
         : source === "flow_review"
-          ? "Una respuesta del onboarding necesita revision"
+          ? "Una respuesta del onboarding necesita revisión"
           : "La IA no supo responder";
 
   return [`Handoff: ${origin}.`, `Motivo: ${reason}`, summary ? `Resumen: ${summary}` : null]
