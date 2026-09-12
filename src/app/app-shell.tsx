@@ -940,7 +940,7 @@ export async function AppShell({ section }: { section: AppSection }) {
 
           <div
             className={`grid min-w-0 gap-5 p-5 ${
-              section === "dashboard" ? "xl:grid-cols-[1fr_360px]" : ""
+              section === "dashboard" ? "xl:grid-cols-[1fr_280px]" : ""
             }`}
           >
             <div className="grid min-w-0 content-start gap-5">
@@ -1124,18 +1124,24 @@ export async function AppShell({ section }: { section: AppSection }) {
 
             {section === "dashboard" ? (
             <aside className="grid content-start gap-5">
-              <section className="grid content-start gap-3 sm:w-1/2">
+              {/* Una tarjeta por fila: en columna estrecha la cifra va al lado
+                  del texto, no debajo, para no dejar la mitad derecha vacia. */}
+              <section className="grid content-start gap-2">
                 {dashboardMetrics.map((item) => (
                   <div
-                    className="min-h-28 self-start rounded-lg border border-[#d9ded3] bg-white p-4"
+                    className="flex items-center gap-3 rounded-lg border border-[#d9ded3] bg-white px-4 py-3"
                     key={item.label}
                   >
-                    <div className="flex items-center justify-between">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#eef2eb] text-[#35735b]">
+                      <item.icon size={18} />
+                    </span>
+                    <div className="min-w-0 flex-1">
                       <p className="text-sm text-[#647067]">{item.label}</p>
-                      <item.icon className="text-[#35735b]" size={18} />
+                      <p className="truncate text-xs text-[#7a847c]">{item.detail}</p>
                     </div>
-                    <p className="mt-3 text-2xl font-semibold">{item.value}</p>
-                    <p className="mt-1 text-xs text-[#7a847c]">{item.detail}</p>
+                    <p className="shrink-0 text-2xl font-semibold tabular-nums">
+                      {item.value}
+                    </p>
                   </div>
                 ))}
               </section>

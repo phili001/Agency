@@ -824,7 +824,7 @@ export function InboxPanel({
   }
 
   return (
-    <div className="grid overflow-hidden xl:h-[calc(100vh-260px)] xl:min-h-[430px] xl:grid-cols-[320px_1fr_300px]">
+    <div className="grid overflow-hidden xl:h-[calc(100vh-260px)] xl:min-h-[430px] xl:grid-cols-[280px_1fr_240px]">
       <div className="flex max-h-[50vh] min-h-0 flex-col border-b border-[#e2e6df] xl:max-h-none xl:border-b-0 xl:border-r">
         <div className="grid shrink-0 grid-cols-3 gap-1 border-b border-[#e2e6df] bg-white p-2">
           <button
