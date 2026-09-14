@@ -15,6 +15,45 @@ function isAuthorized(request: Request) {
   );
 }
 
+async function deliverQueuedMessages(
+  request: Request,
+  results: Array<{ conversationId?: string | null; workspaceId?: string }>,
+) {
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (!cronSecret) {
+    return 0;
+  }
+
+  const origin = new URL(request.url).origin;
+  const targets = new Map<string, { conversationId: string; workspaceId: string }>();
+
+  for (const result of results) {
+    if (result.conversationId && result.workspaceId) {
+      targets.set(result.conversationId, {
+        conversationId: result.conversationId,
+        workspaceId: result.workspaceId,
+      });
+    }
+  }
+
+  let delivered = 0;
+
+  for (const target of targets.values()) {
+    const query = new URLSearchParams(target);
+    const response = await fetch(`${origin}/api/cron/deliver?${query}`, {
+      headers: { Authorization: `Bearer ${cronSecret}` },
+      method: "POST",
+    }).catch(() => null);
+
+    if (response?.ok) {
+      delivered += 1;
+    }
+  }
+
+  return delivered;
+}
+
 export async function POST(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Cron no autorizado." }, { status: 401 });
@@ -29,7 +68,11 @@ export async function POST(request: Request) {
       workspaceId,
     });
 
-    return NextResponse.json({ processed: results.length, results });
+    // Los pasos reanudados dejan mensajes en cola. Se entregan aqui mismo:
+    // esperar al cron de deliver los retrasaria hasta un dia en plan Hobby.
+    const delivered = await deliverQueuedMessages(request, results);
+
+    return NextResponse.json({ delivered, processed: results.length, results });
   } catch (error) {
     return apiErrorResponse(error, "cron/flows");
   }

@@ -203,10 +203,8 @@ export function OnboardingWizard(props: WizardProps) {
             </div>
             <ol className="grid grid-cols-7 gap-1.5">
               {numberedSteps.map((item) => {
-                const done =
-                  item.checklistKey && checklist[item.checklistKey]
-                    ? true
-                    : item.index < step;
+                // Verde solo si el checklist lo confirma: pasar de largo no cuenta.
+                const done = Boolean(item.checklistKey && checklist[item.checklistKey]);
                 const active = item.index === step;
 
                 return (

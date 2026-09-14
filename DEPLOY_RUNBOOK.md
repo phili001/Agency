@@ -51,22 +51,30 @@ existen, así que no puede ser público).
 
 ## 4. Crons de Vercel
 
-`vercel.json` declara tres:
+`vercel.json` declara tres. **Van una vez al día a propósito**: el plan Hobby
+de Vercel rechaza el despliegue completo si cualquier cron corre más de una
+vez al día (el build falla con "Hobby accounts are limited to daily cron
+jobs"). Eso dejó producción congelada varios commits sin que se notara.
 
 | Ruta | Frecuencia | Para qué |
 | --- | --- | --- |
-| `/api/cron/flows` | cada 5 min | Reanuda pasos de espera. **Sin esto los seguimientos programados no salen nunca.** |
-| `/api/cron/deliver` | cada 5 min | Red de seguridad: envía lo que quedó en cola si falló la entrega inmediata |
+| `/api/cron/flows` | diario 07:00 | Reanuda pasos de espera de los flujos |
+| `/api/cron/deliver` | diario 07:30 | Red de seguridad: envía lo que quedó en cola |
 | `/api/cron/ghl-sync` | diario 08:00 | Sincroniza contactos con GoHighLevel |
 
 Vercel manda el `CRON_SECRET` como `Authorization: Bearer` automáticamente si la
 variable existe en el proyecto.
 
-> **Plan Hobby de Vercel: los crons solo corren una vez al día.** Con ese plan
-> los seguimientos programados llegan con retraso de horas. Para vender el
-> producto hace falta plan Pro, o mover estos dos crons a un programador externo
-> (QStash, Supabase Edge Functions, cron-job.org) apuntando a las mismas URLs con
-> `?secret={CRON_SECRET}`.
+> **Una vez al día no sirve para vender seguimientos automáticos**: un paso
+> "espera 2 horas" saldría al día siguiente. Dos formas de tener cadencia real:
+>
+> 1. **Plan Pro de Vercel** y cambiar los dos primeros a `*/5 * * * *`.
+> 2. **Programador externo gratuito** (cron-job.org, QStash) que llame cada
+>    5 minutos a estas dos URLs, sin tocar Vercel:
+>    - `{NEXT_PUBLIC_APP_URL}/api/cron/flows?secret={CRON_SECRET}`
+>    - `{NEXT_PUBLIC_APP_URL}/api/cron/deliver?secret={CRON_SECRET}`
+>
+> La respuesta de la IA no depende de esto: el webhook la dispara al momento.
 
 ## 5. YCloud
 

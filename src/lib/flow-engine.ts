@@ -2054,7 +2054,12 @@ export async function resumeDueFlowRuns({
       supabase,
     });
 
-    results.push({ runId: run.id, status: result.status });
+    results.push({
+      conversationId: run.conversation_id,
+      runId: run.id,
+      status: result.status,
+      workspaceId: run.workspace_id,
+    });
   }
 
   return results;
