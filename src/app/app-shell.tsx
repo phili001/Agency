@@ -10,7 +10,6 @@ import {
   MessageSquareText,
   PlugZap,
   BriefcaseBusiness,
-  ShieldCheck,
   UsersRound,
   WalletCards,
   LogOut,
@@ -21,8 +20,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { signOut } from "./actions";
+import { GuidedTour, TourLauncher } from "@/components/guided-tour";
 import { InboxPanel } from "@/components/inbox-panel";
 import { FlowBuilder } from "@/components/flow-builder";
+import { OnboardingProgressCard } from "@/components/onboarding-progress-card";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { WorkspaceSettings } from "@/components/workspace-settings";
 import { normalizeAppUrl } from "@/lib/app-url";
@@ -37,7 +38,8 @@ import { getConversationHandoffInfo } from "@/lib/handoff";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlatformAdmin } from "@/lib/platform-admin";
-import { getActiveWorkspaceId } from "@/lib/workspaces";
+import { type TourKey, getSeenTours } from "@/lib/tours";
+import { getActiveWorkspaceId, getOnboardingChecklist } from "@/lib/workspaces";
 
 const deployChecks = [
   {
@@ -855,6 +857,20 @@ export async function AppShell({ section }: { section: AppSection }) {
   const workspaceTab = isWorkspaceSection
     ? (section as (typeof workspaceTabs)[number])
     : "agents";
+  // Recordatorio de configuracion pendiente: solo en la bandeja, solo para
+  // quien puede configurar y solo hasta que el wizard se cierre.
+  const canConfigure = ["owner", "admin"].includes(activeRole);
+  const onboardingPending =
+    isDashboard &&
+    canConfigure &&
+    workspace &&
+    "onboarding_completed_at" in workspace &&
+    !workspace.onboarding_completed_at;
+  const onboardingChecklist =
+    onboardingPending && workspaceId ? await getOnboardingChecklist(workspaceId) : null;
+  const sectionTour: TourKey | null =
+    section === "dashboard" ? "inbox" : section === "agents" ? "agents" : null;
+  const seenTours = getSeenTours(user.user_metadata);
 
   return (
     <main className="min-h-screen bg-[#f6f7f3] text-[#20231f]">
@@ -920,14 +936,7 @@ export async function AppShell({ section }: { section: AppSection }) {
                 </h1>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm font-medium">
-                  <GitBranch size={16} />
-                  Sistema listo
-                </button>
-                <button className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white">
-                  <ShieldCheck size={16} />
-                  Datos protegidos
-                </button>
+                {sectionTour ? <TourLauncher tourKey={sectionTour} /> : null}
                 <form action={signOut}>
                   <button className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm font-medium">
                     <LogOut size={16} />
@@ -955,6 +964,10 @@ export async function AppShell({ section }: { section: AppSection }) {
                     </p>
                   </div>
                 </section>
+              ) : null}
+
+              {onboardingChecklist ? (
+                <OnboardingProgressCard checklist={onboardingChecklist} />
               ) : null}
 
               {section === "dashboard" ? (
@@ -1283,6 +1296,9 @@ export async function AppShell({ section }: { section: AppSection }) {
           </div>
         </section>
       </div>
+      {sectionTour ? (
+        <GuidedTour autoStart seenTours={seenTours} tourKey={sectionTour} />
+      ) : null}
     </main>
   );
 }

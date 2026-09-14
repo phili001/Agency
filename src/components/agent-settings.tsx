@@ -657,7 +657,7 @@ export function AgentSettings({
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[220px_1fr]">
-        <div className="grid content-start gap-2">
+        <div className="grid content-start gap-2" data-tour="agent-list">
           {localAgents.map((agent) => (
             <button
               className={`rounded-lg border px-3 py-2 text-left text-sm transition ${
@@ -686,7 +686,7 @@ export function AgentSettings({
         </div>
 
         <div className="grid min-w-0 gap-4 [&>*]:min-w-0 [&_input]:min-w-0 [&_label]:min-w-0 [&_select]:min-w-0 [&_select]:w-full [&_textarea]:min-w-0 [&_textarea]:w-full">
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-3" data-tour="agent-identity">
             <label className="grid gap-1.5 text-sm font-medium">
               Nombre
               <input
@@ -818,7 +818,7 @@ export function AgentSettings({
             </span>
           </label>
 
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2" data-tour="agent-rules">
             <label className="grid gap-1.5 text-sm font-medium">
               Reglas -- que SI debe hacer
               <textarea
@@ -939,7 +939,10 @@ export function AgentSettings({
             </div>
           </div>
 
-          <div className="grid gap-3 rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3">
+          <div
+            className="grid gap-3 rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3"
+            data-tour="agent-test"
+          >
             <label className="grid gap-1.5 text-sm font-medium">
               Probar prompt
               <textarea

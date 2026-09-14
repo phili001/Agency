@@ -34,6 +34,7 @@ import {
 import type { Json } from "@/lib/supabase/database.types";
 import type { DefaultConversationMode } from "@/lib/conversation-default";
 import { createClient } from "@/lib/supabase/client";
+import { getTimeZoneOptions } from "@/lib/timezones";
 
 type IntegrationItem = {
   config: Json;
@@ -229,19 +230,6 @@ function stableDate(value: string) {
     2,
     "0",
   )}-${String(date.getUTCDate()).padStart(2, "0")}`;
-}
-
-/**
- * Zonas horarias IANA reales del navegador. La zona del negocio decide a que
- * hora se agenda, asi que no puede ser texto libre: "Colombia" o "GMT-5" no son
- * zonas validas y se descartarian en silencio al consultar el calendario.
- */
-function getTimeZoneOptions() {
-  try {
-    return Intl.supportedValuesOf("timeZone");
-  } catch {
-    return [];
-  }
 }
 
 const statusLabels: Record<IntegrationItem["status"], string> = {

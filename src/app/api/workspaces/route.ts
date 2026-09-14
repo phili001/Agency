@@ -13,10 +13,48 @@ import {
 } from "@/lib/workspaces";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+function asStateRecord(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+/** Mezcla campos sobre workspaces.onboarding_state sin pisar lo demas. */
+async function patchOnboardingState(
+  workspaceId: string,
+  patch: Record<string, unknown>,
+) {
+  const admin = createAdminClient();
+  const { data: workspace, error: workspaceError } = await admin
+    .from("workspaces")
+    .select("onboarding_state")
+    .eq("id", workspaceId)
+    .single();
+
+  if (workspaceError) {
+    throw workspaceError;
+  }
+
+  const current = asStateRecord(workspace.onboarding_state);
+  const { error } = await admin
+    .from("workspaces")
+    .update({ onboarding_state: { ...current, ...patch } })
+    .eq("id", workspaceId);
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const { action, defaultConversationMode, workspaceId } = (await request.json()) as {
-      action?: "complete_onboarding" | "select" | "set_default_conversation_mode";
+      action?:
+        | "complete_onboarding"
+        | "confirm_agents"
+        | "select"
+        | "set_default_conversation_mode"
+        | "skip_onboarding";
       defaultConversationMode?: DefaultConversationMode;
       workspaceId?: string;
     };
@@ -112,6 +150,19 @@ export async function POST(request: Request) {
       }
 
       return NextResponse.json({ defaultConversationMode, ok: true });
+    }
+
+    if (action === "confirm_agents" || action === "skip_onboarding") {
+      if (!workspaceId) {
+        return NextResponse.json({ error: "workspaceId requerido." }, { status: 400 });
+      }
+
+      await requireWorkspaceRole(workspaceId, ["owner", "admin"]);
+      const field =
+        action === "confirm_agents" ? "agents_confirmed_at" : "wizard_skipped_at";
+      await patchOnboardingState(workspaceId, { [field]: new Date().toISOString() });
+
+      return NextResponse.json({ ok: true });
     }
 
     return NextResponse.json({ error: "Acción no soportada." }, { status: 400 });

@@ -7,6 +7,10 @@ import {
   buildDefaultAgentPrompt,
   defaultAgentPresets,
 } from "@/lib/default-agents";
+import {
+  type OnboardingChecklist,
+  getOnboardingState,
+} from "@/lib/onboarding-steps";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const ACTIVE_WORKSPACE_COOKIE = "active_workspace_id";
@@ -17,14 +21,7 @@ type UserLike = {
   user_metadata?: Record<string, unknown>;
 };
 
-export type OnboardingChecklist = {
-  agentReady: boolean;
-  businessReady: boolean;
-  firstSignalReady: boolean;
-  openaiReady: boolean;
-  teamReady: boolean;
-  ycloudReady: boolean;
-};
+export type { OnboardingChecklist };
 
 export const COMPANY_CODE_PATTERN = /^[A-Z]{3}[0-9]{3}$/;
 
@@ -193,6 +190,7 @@ export async function getOnboardingChecklist(workspaceId: string) {
     { data: members },
     { data: webhooks },
     { data: sentMessages },
+    { data: workspace },
   ] = await Promise.all([
     admin
       .from("integrations")
@@ -228,6 +226,11 @@ export async function getOnboardingChecklist(workspaceId: string) {
       .eq("direction", "outbound")
       .in("status", ["queued", "sent"])
       .limit(1),
+    admin
+      .from("workspaces")
+      .select("onboarding_state")
+      .eq("id", workspaceId)
+      .maybeSingle(),
   ]);
   const activeProviders = new Set(
     (integrations ?? [])
@@ -235,8 +238,16 @@ export async function getOnboardingChecklist(workspaceId: string) {
       .map((integration) => integration.provider),
   );
 
+  // El wizard deja "confirmar" los agentes por defecto sin editarlos: si se
+  // marcaran como personalizados dejarian de recibir mejoras del prompt base.
+  const agentsConfirmed = Boolean(
+    getOnboardingState(workspace?.onboarding_state).agents_confirmed_at,
+  );
+
   return {
-    agentReady: Boolean(agents?.some((agent) => isAgentConfiguredForOnboarding(agent.config))),
+    agentReady:
+      agentsConfirmed ||
+      Boolean(agents?.some((agent) => isAgentConfiguredForOnboarding(agent.config))),
     businessReady: Boolean(businessProfile?.length),
     firstSignalReady: Boolean(webhooks?.length || sentMessages?.length),
     openaiReady: activeProviders.has("openai"),

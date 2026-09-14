@@ -6,6 +6,7 @@ import { normalizeAppUrl } from "@/lib/app-url";
 import { translateAuthError } from "@/lib/auth-messages";
 import { isPlatformAdmin } from "@/lib/platform-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getOnboardingState } from "@/lib/onboarding-steps";
 import { createClient } from "@/lib/supabase/server";
 import { setActiveWorkspaceId } from "@/lib/workspaces";
 
@@ -57,6 +58,11 @@ export async function signIn(formData: FormData) {
     (workspace) =>
       "onboarding_completed_at" in workspace && Boolean(workspace.onboarding_completed_at),
   );
+  // Quien pulso "Continuar despues" en el wizard entra directo al panel; alli
+  // la tarjeta de pendientes le recuerda lo que falta.
+  const hasSkippedWizard = (workspaces ?? []).some(
+    (workspace) => Boolean(getOnboardingState(workspace.onboarding_state).wizard_skipped_at),
+  );
   const preferredWorkspaceId =
     (workspaces ?? []).find(
       (workspace) =>
@@ -65,7 +71,7 @@ export async function signIn(formData: FormData) {
 
   await setActiveWorkspaceId(preferredWorkspaceId);
 
-  if (!hasCompletedWorkspace && canConfigureOnboarding) {
+  if (!hasCompletedWorkspace && !hasSkippedWizard && canConfigureOnboarding) {
     redirect("/onboarding");
   }
 

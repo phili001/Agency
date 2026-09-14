@@ -826,7 +826,10 @@ export function InboxPanel({
   return (
     <div className="grid overflow-hidden xl:h-[calc(100vh-260px)] xl:min-h-[430px] xl:grid-cols-[280px_1fr_240px]">
       <div className="flex max-h-[50vh] min-h-0 flex-col border-b border-[#e2e6df] xl:max-h-none xl:border-b-0 xl:border-r">
-        <div className="grid shrink-0 grid-cols-3 gap-1 border-b border-[#e2e6df] bg-white p-2">
+        <div
+          className="grid shrink-0 grid-cols-3 gap-1 border-b border-[#e2e6df] bg-white p-2"
+          data-tour="inbox-tabs"
+        >
           <button
             className={`flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition ${
               inboxView === "ai"
@@ -887,7 +890,10 @@ export function InboxPanel({
             </span>
           </button>
         </div>
-        <div className="min-h-0 flex-1 divide-y divide-[#edf0ea] overflow-y-auto">
+        <div
+          className="min-h-0 flex-1 divide-y divide-[#edf0ea] overflow-y-auto"
+          data-tour="conversation-list"
+        >
         {visibleConversations.map((conversation) => {
           const pendingOnboarding = isPendingOnboarding(conversation);
           const optedOutOfFlow =
@@ -1054,6 +1060,7 @@ export function InboxPanel({
                     ? "bg-[#e7f6ce] text-[#31521d]"
                     : "bg-[#eef2eb] text-[#4d5a51]"
                 }`}
+                data-tour="ai-toggle"
                 disabled={!canReply}
                 onClick={() =>
                   updateConversation({
@@ -1073,6 +1080,7 @@ export function InboxPanel({
               </button>
               <button
                 className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm font-medium"
+                data-tour="handoff-button"
                 disabled={!canReply}
                 onClick={() =>
                   updateConversation({
@@ -1146,6 +1154,7 @@ export function InboxPanel({
         <form
           action={handleSend}
           className="border-t border-[#e2e6df] bg-white p-3"
+          data-tour="composer"
         >
           {error ? (
             <p className="mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -1197,6 +1206,7 @@ export function InboxPanel({
         <form
           action={handleInternalNote}
           className="border-t border-[#edf0ea] bg-[#fbfcf8] p-3"
+          data-tour="internal-note"
         >
           <div className="flex gap-2">
             <input
@@ -1223,7 +1233,10 @@ export function InboxPanel({
         </form>
       </div>
 
-      <aside className="min-h-0 border-t border-[#e2e6df] bg-white p-4 xl:overflow-y-auto xl:border-l xl:border-t-0">
+      <aside
+        className="min-h-0 border-t border-[#e2e6df] bg-white p-4 xl:overflow-y-auto xl:border-l xl:border-t-0"
+        data-tour="contact-panel"
+      >
         <div className="flex items-center gap-2">
           <UserRound className="text-[#35735b]" size={18} />
           <h3 className="text-sm font-semibold">Contacto</h3>
