@@ -1182,13 +1182,13 @@ export async function AppShell({ section }: { section: AppSection }) {
             </div>
 
             {section === "dashboard" ? (
-            <aside className="grid content-start gap-5">
+            <aside className="grid min-w-0 content-start gap-5">
               {/* Una tarjeta por fila: en columna estrecha la cifra va al lado
                   del texto, no debajo, para no dejar la mitad derecha vacía. */}
-              <section className="grid content-start gap-2">
+              <section className="grid min-w-0 content-start gap-2">
                 {dashboardMetrics.map((item) => (
                   <div
-                    className="flex items-center gap-3 rounded-lg border border-[#d9ded3] bg-white px-4 py-3"
+                    className="flex min-w-0 items-center gap-3 rounded-lg border border-[#d9ded3] bg-white px-4 py-3"
                     key={item.label}
                   >
                     <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#eef2eb] text-[#35735b]">
@@ -1198,7 +1198,7 @@ export async function AppShell({ section }: { section: AppSection }) {
                       <p className="text-sm text-[#647067]">{item.label}</p>
                       <p className="truncate text-xs text-[#7a847c]">{item.detail}</p>
                     </div>
-                    <p className="shrink-0 text-2xl font-semibold tabular-nums">
+                    <p className="shrink-0 text-xl font-semibold tabular-nums">
                       {item.value}
                     </p>
                   </div>
