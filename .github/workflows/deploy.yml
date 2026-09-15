@@ -1,0 +1,65 @@
+# Despliegue a Vercel desde GitHub Actions.
+#
+# Por que existe: la integracion Git de Vercel en plan Hobby solo acepta commits
+# de la cuenta duena del proyecto. Con un GitHub y varias cuentas de Vercel
+# (una por cliente) eso bloquea todos los pushes. Desplegando con la CLI y un
+# token de la cuenta duena no hay autor que revisar, y el push vuelve a
+# desplegar solo.
+#
+# Necesita tres secretos en GitHub (Settings > Secrets and variables > Actions):
+#   VERCEL_TOKEN       Vercel > Settings > Tokens (de la cuenta duena)
+#   VERCEL_ORG_ID      Vercel > Settings > General > Team ID
+#   VERCEL_PROJECT_ID  Vercel > proyecto > Settings > General > Project ID
+#
+# Sin los secretos el workflow no falla: avisa y termina.
+
+name: Deploy a Vercel
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-produccion
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+    steps:
+      - name: Avisar si faltan secretos
+        if: env.VERCEL_TOKEN == '' || env.VERCEL_ORG_ID == '' || env.VERCEL_PROJECT_ID == ''
+        run: |
+          echo "::warning::Faltan VERCEL_TOKEN, VERCEL_ORG_ID o VERCEL_PROJECT_ID. No se despliega."
+          echo "Configuralos en Settings > Secrets and variables > Actions."
+
+      - name: Descargar el codigo
+        if: env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && env.VERCEL_PROJECT_ID != ''
+        uses: actions/checkout@v4
+
+      - name: Preparar Node
+        if: env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && env.VERCEL_PROJECT_ID != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Instalar Vercel CLI
+        if: env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && env.VERCEL_PROJECT_ID != ''
+        run: npm install --global vercel@latest
+
+      # Vincula la carpeta al proyecto usando los IDs; no hace falta .vercel/.
+      - name: Vincular con el proyecto de Vercel
+        if: env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && env.VERCEL_PROJECT_ID != ''
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      # El build lo hace Vercel con las variables de entorno del proyecto.
+      - name: Desplegar a produccion
+        if: env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && env.VERCEL_PROJECT_ID != ''
+        run: vercel deploy --prod --yes --token="$VERCEL_TOKEN"
