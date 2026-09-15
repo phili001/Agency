@@ -192,7 +192,7 @@ export async function POST(request: Request) {
 
   if (payload.messageBody && (existingContact?.messaging_status ?? "active") === "blocked") {
     return NextResponse.json(
-      { error: "Toda atención esta bloqueada para este contacto." },
+      { error: "Toda atención está bloqueada para este contacto." },
       { status: 423 },
     );
   }

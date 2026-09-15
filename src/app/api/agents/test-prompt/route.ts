@@ -133,7 +133,7 @@ Reglas obligatorias sobre la base de conocimiento:
 - La base de conocimiento tiene prioridad sobre el prompt del agente.
 - Si la base contiene una instruccion directa sobre como responder, obedecela literalmente.
 - Usa estos documentos como fuente principal para responder.
-- Si la respuesta no esta en la base, dilo con claridad y pide que un humano lo confirme.
+- Si la respuesta no está en la base, dilo con claridad y pide que un humano lo confirme.
 - No inventes precios, horarios, politicas ni condiciones que no aparezcan aqui.
 
 Prompt del agente:

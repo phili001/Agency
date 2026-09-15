@@ -11,6 +11,12 @@ import { handleInboundFlow } from "@/lib/flow-engine";
 import { syncContactToGoHighLevel } from "@/lib/integrations/gohighlevel";
 import { secretMatchesHash } from "@/lib/integrations/secrets";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  type YCloudMessageType,
+  normalizeMessageType,
+  readMediaFields,
+  readPath,
+} from "@/lib/ycloud-payload";
 
 type WebhookPayload = Record<string, unknown>;
 
@@ -25,7 +31,11 @@ type NormalizedYCloudEvent = {
   providerMessageId: string | null;
   fromPhone: string | null;
   isStatusUpdate: boolean;
-  messageType: "text" | "audio" | "image" | "file" | "event";
+  messageType: YCloudMessageType;
+  mediaCaption: string | null;
+  mediaFilename: string | null;
+  mediaMimeType: string | null;
+  mediaUrl: string | null;
   status: string | null;
   messageText: string | null;
   phoneId: string | null;
@@ -105,41 +115,6 @@ async function runConversationDelivery({
     });
   } catch (error) {
     console.error("No se pudo ejecutar entrega de mensajes.", error);
-  }
-}
-
-function readPath(value: unknown, paths: string[][]) {
-  for (const path of paths) {
-    let current = value;
-
-    for (const key of path) {
-      if (!current || typeof current !== "object" || !(key in current)) {
-        current = undefined;
-        break;
-      }
-
-      current = (current as Record<string, unknown>)[key];
-    }
-
-    if (current !== undefined && current !== null && current !== "") {
-      return String(current);
-    }
-  }
-
-  return null;
-}
-
-function normalizeMessageType(value: string | null): NormalizedYCloudEvent["messageType"] {
-  switch (value?.toLowerCase()) {
-    case "audio":
-    case "image":
-    case "file":
-    case "text":
-      return value.toLowerCase() as NormalizedYCloudEvent["messageType"];
-    case "document":
-      return "file";
-    default:
-      return "event";
   }
 }
 
@@ -357,6 +332,7 @@ function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
       ["data", "whatsappMessage", "text", "body"],
       ["data", "object", "messages", "0", "text", "body"],
     ]),
+    ...readMediaFields(payload),
     status: statusValue,
     phoneId: readPath(payload, [
       ["phoneId"],
@@ -628,12 +604,15 @@ async function storeYCloudMessage({
   const { data: message, error: messageError } = await supabase
     .from("messages")
     .insert({
-      body: event.messageText,
+      body: event.messageText ?? event.mediaCaption,
       contact_id: contact.id,
       conversation_id: conversationId,
       direction: event.direction,
+      media_url: event.mediaUrl,
       message_type: event.messageText ? "text" : event.messageType,
       metadata: {
+        media_filename: event.mediaFilename,
+        media_mime_type: event.mediaMimeType,
         raw_event_type: event.eventType,
         ycloud_message_type: event.messageType,
         ycloud_status: event.status,
@@ -642,7 +621,7 @@ async function storeYCloudMessage({
       role:
         event.direction === "outbound"
           ? "human"
-          : event.messageText
+          : event.messageText || event.mediaUrl
             ? "user"
             : "system",
       status:
@@ -670,7 +649,7 @@ async function storeYCloudMessage({
     shouldStartAiBuffer:
       event.direction === "inbound" &&
       (existingConversation?.ai_enabled ?? newConversationUsesAi) &&
-      Boolean(event.messageText?.trim()) &&
+      Boolean((event.messageText ?? event.mediaCaption)?.trim()) &&
       (existingContact?.messaging_status ?? "active") !== "blocked",
   };
 }
@@ -715,7 +694,7 @@ export async function handleYCloudWebhook(
 
   if (!integration || !expectedWebhookHash) {
     return NextResponse.json(
-      { error: "Webhook no autorizado. YCloud no esta conectado para esta empresa." },
+      { error: "Webhook no autorizado. YCloud no está conectado para esta empresa." },
       { status: 401 },
     );
   }
@@ -855,7 +834,7 @@ export async function handleYCloudWebhook(
             context: {
               contactId: storedMessage.contactId,
               conversationId: storedMessage.conversationId,
-              inboundText: event.messageText,
+              inboundText: event.messageText ?? event.mediaCaption,
               workspaceId: resolvedWorkspaceId,
             },
             supabase,
@@ -892,7 +871,7 @@ export async function handleYCloudWebhook(
           context: {
             contactId: storedMessage.contactId,
             conversationId: storedMessage.conversationId,
-            inboundText: event.messageText,
+            inboundText: event.messageText ?? event.mediaCaption,
             workspaceId: resolvedWorkspaceId,
           },
           supabase,

@@ -310,10 +310,10 @@ function calculateProcessImpact(answers: Record<string, Json>): Record<string, s
 
   const monthlyCostLow = monthlyLow * hourlyValue;
   const yearlyCostLow = monthlyCostLow * 12;
-  const prefix = weeklyHigh === null ? "mas de " : "";
+  const prefix = weeklyHigh === null ? "más de " : "";
   const hoursMonthly =
     monthlyHigh === null
-      ? `mas de ${Math.round(monthlyLow)} horas`
+      ? `más de ${Math.round(monthlyLow)} horas`
       : `entre ${Math.round(monthlyLow)} y ${Math.round(monthlyHigh)} horas`;
   const monthlyCost =
     monthlyHigh === null
@@ -336,7 +336,7 @@ function calculateProcessImpact(answers: Record<string, Json>): Record<string, s
     horas_mensuales_estimadas: hoursMonthly,
     horas_semanales_estimadas:
       weeklyHigh === null
-        ? `mas de ${weeklyLow} horas`
+        ? `más de ${weeklyLow} horas`
         : `entre ${weeklyLow} y ${weeklyHigh} horas`,
   };
 }
@@ -1408,7 +1408,7 @@ export async function handleInboundFlow({
 
         const retryBody =
           currentStep.retryMessage?.trim() ||
-          `Necesito una respuesta mas completa para continuar. ${verification.reason}`;
+          `Necesito una respuesta más completa para continuar. ${verification.reason}`;
         await queueMessage({
           body: retryBody,
           contactId: context.contactId,

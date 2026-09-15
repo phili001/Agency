@@ -434,7 +434,7 @@ export async function getFreeSlots({
 
   return {
     // Claves crudas de la respuesta: si no se parsea ningun hueco, es lo unico
-    // que permite saber si GHL devolvio vacio o con otra forma.
+    // que permite saber si GHL devolvió vacio o con otra forma.
     debug: { responseKeys: Object.keys(payload).slice(0, 12) },
     slots: slots.sort((left, right) => left.iso.localeCompare(right.iso)),
   };
@@ -483,7 +483,7 @@ export async function createAppointment({
     // trata como fallo, porque devolver "confirmada" sin id hacia que el agente
     // le dijera al cliente que estaba agendada cuando no aparecia en GHL.
     throw new Error(
-      "GoHighLevel no devolvio el id de la cita, así que no se puede confirmar que se creo.",
+      "GoHighLevel no devolvió el id de la cita, así que no se puede confirmar que se creo.",
     );
   }
 

@@ -145,7 +145,7 @@ export async function POST(request: Request) {
       const calendar = calendars.find((item) => item.id === calendarId);
 
       if (!calendar) {
-        throw new Error(`GHL no devolvio el calendario configurado ${calendarId}.`);
+        throw new Error(`GHL no devolvió el calendario configurado ${calendarId}.`);
       }
 
       return calendar;
@@ -188,7 +188,7 @@ export async function POST(request: Request) {
           phone: `+120255501${testNumber}`,
         }).then((id) => {
           if (!id) {
-            throw new Error("GHL no devolvio el ID del contacto temporal.");
+            throw new Error("GHL no devolvió el ID del contacto temporal.");
           }
 
           return id;
@@ -226,7 +226,7 @@ export async function POST(request: Request) {
             timezone,
           }).then((result) => {
             if (result.slots.length === 0) {
-              throw new Error("GHL no devolvio horarios libres en los próximos 30 días.");
+              throw new Error("GHL no devolvió horarios libres en los próximos 30 días.");
             }
 
             return result.slots;
@@ -260,7 +260,7 @@ export async function POST(request: Request) {
 
           if (!actualStart) {
             throw new Error(
-              "GHL devolvio la cita, pero no incluyo la fecha/hora para verificarla.",
+              "GHL devolvió la cita, pero no incluyo la fecha/hora para verificarla.",
             );
           }
 

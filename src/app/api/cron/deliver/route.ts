@@ -138,7 +138,7 @@ async function sendYCloudMessage({
 
   if (!response.ok) {
     throw new Error(
-      payload.error?.message ?? payload.message ?? "YCloud rechazo el envio.",
+      payload.error?.message ?? payload.message ?? "YCloud rechazó el envío.",
     );
   }
 
@@ -220,7 +220,7 @@ export async function POST(request: Request) {
       }
 
       if (!integration) {
-        throw new Error("YCloud no esta activo para este workspace.");
+        throw new Error("YCloud no está activo para este workspace.");
       }
 
       const config = (integration as IntegrationRow).config ?? {};

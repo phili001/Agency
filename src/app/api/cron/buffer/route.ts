@@ -65,8 +65,29 @@ type MessageRow = {
   body: string | null;
   created_at: string;
   direction: string;
+  media_url?: string | null;
+  message_type?: string | null;
   role: string;
 };
+
+// Sin esto, una foto o una nota de voz aparecia como "Cliente: " vacio y el
+// modelo no sabia que el contacto habia mandado algo.
+function describeMedia(message: MessageRow) {
+  if (!message.media_url) {
+    return "";
+  }
+
+  switch (message.message_type) {
+    case "image":
+      return "[envió una imagen]";
+    case "audio":
+      return "[envió una nota de voz; no se puede escuchar por aquí]";
+    case "file":
+      return "[envió un documento]";
+    default:
+      return "[envió un archivo]";
+  }
+}
 
 type ContactMetadata = {
   ai_summary?: string;
@@ -195,7 +216,9 @@ function buildTranscript(messages: MessageRow[]) {
           : message.role === "assistant"
           ? "IA"
           : "Humano";
-      return `${speaker}: ${message.body ?? ""}`;
+      const media = describeMedia(message);
+      const text = [media, message.body ?? ""].filter(Boolean).join(" ");
+      return `${speaker}: ${text}`;
     })
     .join("\n");
 }
@@ -260,7 +283,7 @@ function buildCalendarToolDefinitions(calendars: CalendarTool[]) {
           ...calendarProperty,
           horario_iso: {
             description:
-              "El horario exacto elegido, copiado tal cual del campo 'inicio' que devolvio consultar_disponibilidad.",
+              "El horario exacto elegido, copiado tal cual del campo 'inicio' que devolvió consultar_disponibilidad.",
             type: "string",
           },
           motivo: {
@@ -653,7 +676,7 @@ function buildCalendarContext(calendarRuntime: CalendarRuntime | null) {
 - Tienes acceso real al calendario mediante tools. Los horarios que devuelven son reales.${calendarList}
 - Antes de mencionar cualquier horario, llama a consultar_disponibilidad. Nunca inventes huecos.
 - En el resultado de consultar_disponibilidad, fecha_consultada y horario_solicitado_disponible son autoritativos.
-- Si horario_solicitado_disponible es true, confirma esa hora. Si es false, indica que no esta libre y ofrece solamente horarios devueltos para fecha_consultada.
+- Si horario_solicitado_disponible es true, confirma esa hora. Si es false, indica que no está libre y ofrece solamente horarios devueltos para fecha_consultada.
 - No cambies a otro dia ni ofrezcas fechas distintas de fecha_consultada salvo que el cliente lo pida expresamente.
 - Ofrece como maximo 3 opciones por mensaje, en lenguaje natural, sin mostrar fechas ISO ni IDs.
 - Solo llama a agendar_cita cuando el cliente haya elegido explicitamente uno de los horarios que le ofreciste, y ya tengas su nombre.
@@ -729,7 +752,7 @@ ${ragContext}
 Reglas obligatorias sobre la base de conocimiento:
 - Usa estos documentos como fuente principal para el CONTENIDO del negocio:
   precios, servicios, políticas, condiciones y forma de responder.
-- Si la respuesta no esta en la base, dilo con claridad y pide que un humano lo confirme.
+- Si la respuesta no está en la base, dilo con claridad y pide que un humano lo confirme.
 - No inventes precios, horarios, politicas ni condiciones que no aparezcan aqui.
 
 Límites de la base de conocimiento -- NUNCA los sobreescribe:
@@ -798,7 +821,7 @@ async function buildCalendarRuntime({
   if (!context) {
     return {
       reason:
-        "GoHighLevel no esta activo para esta empresa, falta la API key o falta el Location ID en Integraciones.",
+        "GoHighLevel no está activo para esta empresa, falta la API key o falta el Location ID en Integraciones.",
       runtime: null,
     };
   }
@@ -1060,7 +1083,7 @@ async function runCalendarTool(
 
         if (!contextualSlot) {
           return {
-            error: "El horario solicitado ya no esta libre.",
+            error: "El horario solicitado ya no está libre.",
             fecha_consultada: requestContext.dateKey,
             hora_solicitada: requestContext.time.label,
             horarios_libres: freeSlots.map(formatSlot),
@@ -1105,8 +1128,8 @@ async function runCalendarTool(
         return {
           error:
             alternativas.length > 0
-              ? "Ese horario ya no esta libre. Ofrece al cliente una de las alternativas y vuelve a intentarlo con la que elija."
-              : "Ese horario no esta libre y no quedan huecos cerca. Ofrece buscar en otra fecha.",
+              ? "Ese horario ya no está libre. Ofrece al cliente una de las alternativas y vuelve a intentarlo con la que elija."
+              : "Ese horario no está libre y no quedan huecos cerca. Ofrece buscar en otra fecha.",
           horarios_libres: alternativas,
         };
       }
@@ -1215,7 +1238,7 @@ function buildDirectBookingAnswer(
     : [];
 
   if (alternatives.length > 0) {
-    return `Ese horario ya no esta libre. Para ese mismo dia tengo:\n${alternatives.map((time) => `- ${time}`).join("\n")}\nCual prefieres?`;
+    return `Ese horario ya no está libre. Para ese mismo dia tengo:\n${alternatives.map((time) => `- ${time}`).join("\n")}\nCual prefieres?`;
   }
 
   return "No pude registrar la cita en GHL en este momento y no quedo agendada. Intenta de nuevo en un momento para volver a validarla.";
@@ -1267,8 +1290,8 @@ function buildDirectAvailabilityAnswer(
 
   if (requestedTime && requestedAvailable === false) {
     return slots.length > 0
-      ? `${requestedTime} no esta disponible el ${dateLabel}. Los horarios libres reales son:\n${slots.map((time) => `- ${time}`).join("\n")}\nCual prefieres?`
-      : `${requestedTime} no esta disponible el ${dateLabel} y GHL no devolvio otros horarios libres para ese dia.`;
+      ? `${requestedTime} no está disponible el ${dateLabel}. Los horarios libres reales son:\n${slots.map((time) => `- ${time}`).join("\n")}\nCual prefieres?`
+      : `${requestedTime} no está disponible el ${dateLabel} y GHL no devolvió otros horarios libres para ese dia.`;
   }
 
   return slots.length > 0
@@ -1309,7 +1332,7 @@ async function callResponsesApi({
   const payload = (await response.json()) as OpenAIResponsePayload;
 
   if (!response.ok) {
-    throw new Error(payload.error?.message ?? "OpenAI rechazo el buffer.");
+    throw new Error(payload.error?.message ?? "OpenAI rechazó el buffer.");
   }
 
   return payload;
@@ -1395,7 +1418,7 @@ function sanitizeCalendarAnswer({
 
     return {
       answer:
-        "No puedo confirmar esa cita todavia porque no tengo una confirmación real del calendario. Para ayudarte bien, voy a revisar disponibilidad y te confirmo solo cuando quede registrada.",
+        "No puedo confirmar esa cita todavía porque no tengo una confirmación real del calendario. Para ayudarte bien, voy a revisar disponibilidad y te confirmo solo cuando quede registrada.",
       blockedReason:
         "Respuesta bloqueada: intentaba confirmar una cita sin agendar_cita confirmada con cita_id.",
     };
@@ -1437,7 +1460,7 @@ async function generateReply(
   const apiKey = await getWorkspaceOpenAIKey(agent.workspace_id);
 
   if (!apiKey) {
-    throw new Error("OpenAI no esta conectado para este workspace.");
+    throw new Error("OpenAI no está conectado para este workspace.");
   }
 
   const model = normalizeModel(agent.model);
@@ -1643,7 +1666,7 @@ async function generateContactInsights(agent: AgentRow, messages: MessageRow[]) 
   const apiKey = await getWorkspaceOpenAIKey(agent.workspace_id);
 
   if (!apiKey) {
-    throw new Error("OpenAI no esta conectado para este workspace.");
+    throw new Error("OpenAI no está conectado para este workspace.");
   }
 
   const model = normalizeModel(agent.model);
@@ -1673,7 +1696,7 @@ ${transcript}`,
   const payload = (await response.json()) as OpenAIResponsePayload;
 
   if (!response.ok) {
-    throw new Error(payload.error?.message ?? "OpenAI rechazo el resumen.");
+    throw new Error(payload.error?.message ?? "OpenAI rechazó el resumen.");
   }
 
   const rawText = getResponseText(payload);
@@ -1779,7 +1802,7 @@ export async function POST(request: Request) {
 
     const { data: messages } = await supabase
       .from("messages")
-      .select("body, created_at, direction, role")
+      .select("body, created_at, direction, role, media_url, message_type")
       .eq("workspace_id", conversation.workspace_id)
       .eq("conversation_id", conversation.id)
       .order("created_at", { ascending: false })

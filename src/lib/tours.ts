@@ -1,6 +1,6 @@
 /**
  * Guias de la primera vez en cada pantalla. Cada paso apunta a un elemento con
- * `data-tour="<target>"`; si no existe (p. ej. la bandeja esta vacia) se salta.
+ * `data-tour="<target>"`; si no existe (p. ej. la bandeja está vacía) se salta.
  * Texto para dueños de negocio: sin jerga, una idea por paso.
  */
 export type TourStep = {

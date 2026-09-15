@@ -63,7 +63,7 @@ async function sendYCloudText({
 
   if (!response.ok) {
     throw new Error(
-      payload.error?.message ?? payload.message ?? "YCloud rechazo el envio.",
+      payload.error?.message ?? payload.message ?? "YCloud rechazó el envío.",
     );
   }
 
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
 
   if (contactStatus?.messaging_status === "blocked") {
     return NextResponse.json(
-      { error: "Toda atención esta bloqueada para este contacto." },
+      { error: "Toda atención está bloqueada para este contacto." },
       { status: 423 },
     );
   }
@@ -175,7 +175,7 @@ export async function POST(request: Request) {
     }
 
     if (!integration) {
-      throw new Error("YCloud no esta activo para este workspace.");
+      throw new Error("YCloud no está activo para este workspace.");
     }
 
     const config = (integration as IntegrationRow).config ?? {};

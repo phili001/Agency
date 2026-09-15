@@ -131,7 +131,7 @@ export async function syncContactToGoHighLevel({
     const ghlContactId = payload.contact?.id ?? payload.id ?? null;
 
     if (!ghlContactId) {
-      throw new Error("GoHighLevel no devolvio contact id.");
+      throw new Error("GoHighLevel no devolvió contact id.");
     }
 
     await admin
@@ -241,7 +241,7 @@ export async function runGoHighLevelFlowActions({
   ]);
 
   if (!integration || !apiKey) {
-    throw new Error("GoHighLevel no esta activo para este workspace.");
+    throw new Error("GoHighLevel no está activo para este workspace.");
   }
 
   const config = getConfigRecord(integration.config);
@@ -277,7 +277,7 @@ export async function runGoHighLevelFlowActions({
       : null);
 
   if (!ghlContactId) {
-    throw new Error("GoHighLevel no devolvio contact id.");
+    throw new Error("GoHighLevel no devolvió contact id.");
   }
 
   const results: Array<Record<string, unknown>> = [];

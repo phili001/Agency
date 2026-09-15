@@ -45,7 +45,7 @@ export function validateAnswerLocally(answer: string, minimumLength = 3) {
   const meaningful = normalized.replace(/[\p{P}\p{S}\s]/gu, "");
 
   if (!normalized) {
-    return { normalized, reason: "La respuesta esta vacia.", valid: false };
+    return { normalized, reason: "La respuesta está vacía.", valid: false };
   }
 
   if (!meaningful) {

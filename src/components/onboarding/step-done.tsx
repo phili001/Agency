@@ -103,7 +103,7 @@ export function StepDone({ ctx }: { ctx: StepContext }) {
         </button>
         <button className={primaryButton} disabled={busy} onClick={enter} type="button">
           {busy ? <Loader2 className="animate-spin" size={18} /> : null}
-          {complete ? "Entrar a Levy" : "Entrar igual, termino después"}
+          {complete ? "Entrar a Levy" : "Entrar igual, terminó después"}
           {!busy ? <ArrowRight size={18} /> : null}
         </button>
       </div>

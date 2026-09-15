@@ -62,7 +62,7 @@ export async function GET(request: Request) {
     ]);
     const contactIds = [...new Set((conversations ?? []).map((item) => item.contact_id))];
     const conversationIds = (conversations ?? []).map((item) => item.id);
-    // Si la pedida ya no esta entre las visibles, se cae a la mas reciente.
+    // Si la pedida ya no esta entre las visibles, se cae a la más reciente.
     const targetConversationId =
       requestedConversationId && conversationIds.includes(requestedConversationId)
         ? requestedConversationId
@@ -82,7 +82,7 @@ export async function GET(request: Request) {
       targetConversationId
         ? admin
             .from("messages")
-            .select("id, conversation_id, body, direction, role, message_type, created_at, metadata")
+            .select("id, conversation_id, body, direction, role, message_type, media_url, created_at, metadata")
             .eq("workspace_id", workspaceId)
             .eq("conversation_id", targetConversationId)
             .order("created_at", { ascending: false })

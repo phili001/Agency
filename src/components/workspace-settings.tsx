@@ -255,7 +255,7 @@ function fieldHelp(provider: string, key: string) {
         placeholder: "Opcional: phone_... o el ID técnico si YCloud lo muestra",
       },
       webhook_secret: {
-        help: "Se usara solo para generar y validar la URL del webhook de esta empresa.",
+        help: "Se usará solo para generar y validar la URL del webhook de esta empresa.",
         placeholder: "Dejalo vacio para generar uno automáticamente",
       },
       api_key: {
@@ -362,7 +362,7 @@ export function WorkspaceSettings({
     ? `${appUrl}/api/webhooks/ycloud/${workspaceCode ?? workspaceId}/${webhookSecretParam}`
     : "";
   // El secreto de GHL viaja en la cabecera Authorization, no en la URL, y solo
-  // esta disponible en claro justo despues de generarlo.
+  // está disponible en claro justo despues de generarlo.
   const ghlWebhookUrl = `${appUrl}/api/webhooks/ghl/send-message`;
   const ghlSecretValue = integrationDrafts.gohighlevel.config.ghl_webhook_secret?.trim();
   const ghlSecretMask = asRecord(
@@ -664,7 +664,7 @@ export function WorkspaceSettings({
     }
 
     const successMessages: Record<IntegrationItem["provider"], string> = {
-      gohighlevel: "GoHighLevel respondió correctamente. La conexión esta lista.",
+      gohighlevel: "GoHighLevel respondió correctamente. La conexión está lista.",
       openai: "OpenAI respondió correctamente.",
       ycloud: "YCloud respondió correctamente.",
     };
@@ -1937,7 +1937,7 @@ export function WorkspaceSettings({
                             />
                           ) : (
                             <p className="mt-0.5 text-xs text-[#647067]">
-                              Todavia no esta habilitado.
+                              Todavía no está habilitado.
                             </p>
                           )}
                         </div>
@@ -2016,7 +2016,7 @@ export function WorkspaceSettings({
               ))}
             </div>
             {assetEditor({
-              helper: "Crea una tool personalizada si necesitas un flujo que no esta en el catalogo.",
+              helper: "Crea una tool personalizada si necesitas un flujo que no está en el catálogo.",
               kind: "tool",
               placeholder:
                 "Tool: agendar_cita\nCuando usarla: si el contacto pide fecha/hora\nInputs: nombre, teléfono, fecha...",
@@ -2024,7 +2024,7 @@ export function WorkspaceSettings({
             })}
             <div>
               <h3 className="mb-3 text-sm font-semibold">Tools disponibles</h3>
-              {assetList("tool", "Todavia no hay tools creadas.")}
+              {assetList("tool", "Todavía no hay tools creadas.")}
             </div>
           </div>
         ) : null}

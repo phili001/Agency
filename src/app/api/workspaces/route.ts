@@ -82,7 +82,7 @@ export async function POST(request: Request) {
 
       if (!isChecklistComplete(checklist)) {
         return NextResponse.json(
-          { checklist, error: "Todavia faltan pasos obligatorios." },
+          { checklist, error: "Todavía faltan pasos obligatorios." },
           { status: 400 },
         );
       }

@@ -7,6 +7,7 @@ import {
   Check,
   ClipboardList,
   GitBranch,
+  Hand,
   MessageSquareText,
   PlugZap,
   BriefcaseBusiness,
@@ -27,6 +28,10 @@ import { OnboardingProgressCard } from "@/components/onboarding-progress-card";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { WorkspaceSettings } from "@/components/workspace-settings";
 import { normalizeAppUrl } from "@/lib/app-url";
+import {
+  BUSINESS_METRICS_WINDOW_DAYS,
+  getBusinessMetrics,
+} from "@/lib/business-metrics";
 import {
   DEFAULT_AGENT_PROMPT_VERSION,
   buildDefaultAgentConfig,
@@ -425,7 +430,7 @@ export async function AppShell({ section }: { section: AppSection }) {
   );
   const needsContacts = isDashboard || isClients;
   const needsConversations = isDashboard;
-  const needsUsage = isDashboard;
+  const needsUsage = isDashboard || isObservability;
   const needsIntegrations = isWorkspaceSection || isDashboard || isFlows;
   const needsMembers = section === "team" || isDashboard;
   const needsAssets = isWorkspaceSection;
@@ -667,7 +672,7 @@ export async function AppShell({ section }: { section: AppSection }) {
     workspaceId && conversationIds.length > 0
       ? await supabase
           .from("messages")
-          .select("id, conversation_id, body, direction, role, message_type, created_at, metadata")
+          .select("id, conversation_id, body, direction, role, message_type, media_url, created_at, metadata")
           .eq("workspace_id", workspaceId)
           .eq("conversation_id", conversationIds[0])
           .order("created_at", { ascending: false })
@@ -819,30 +824,35 @@ export async function AppShell({ section }: { section: AppSection }) {
   const activeRole = workspaceId
     ? membershipRoleByWorkspaceId.get(workspaceId) ?? "viewer"
     : "sin acceso";
+  const businessMetrics =
+    isDashboard && workspaceId
+      ? await getBusinessMetrics(supabase, workspaceId)
+      : null;
+  // Lo que mira el dueño del negocio. Tokens y coste están en Observabilidad.
   const dashboardMetrics = [
     {
-      label: "Empresas",
-      value: String(workspaceOptions.length),
-      detail: `rol activo ${activeRole}`,
-      icon: UsersRound,
-    },
-    {
-      label: "Conversaciones",
-      value: String(realConversations.length),
-      detail: "chats del número conectado",
+      label: "Conversaciones activas",
+      value: stableNumber(businessMetrics?.activeConversations ?? 0),
+      detail: `con mensajes en ${BUSINESS_METRICS_WINDOW_DAYS} días`,
       icon: MessageSquareText,
     },
     {
-      label: "Contactos",
-      value: String(contacts.length),
-      detail: "leads cargados",
-      icon: CalendarCheck,
+      label: "Respuestas de la IA",
+      value: stableNumber(businessMetrics?.aiReplies ?? 0),
+      detail: `enviadas sin una persona, ${BUSINESS_METRICS_WINDOW_DAYS} días`,
+      icon: Bot,
     },
     {
-      label: "Costo IA",
-      value: `$${totalCost.toFixed(2)}`,
-      detail: "usage_events",
-      icon: WalletCards,
+      label: "Esperando a una persona",
+      value: stableNumber(businessMetrics?.pendingHandoffs ?? 0),
+      detail: "conversaciones en handoff ahora",
+      icon: Hand,
+    },
+    {
+      label: "Contactos con cita",
+      value: stableNumber(businessMetrics?.contactsWithAppointment ?? 0),
+      detail: "agendadas en el calendario",
+      icon: CalendarCheck,
     },
   ];
   const deployReadiness = deployChecks.map((check) => ({
@@ -1082,6 +1092,42 @@ export async function AppShell({ section }: { section: AppSection }) {
 
               {section === "observability" ? (
                 <>
+                  <section className="rounded-lg border border-[#d9ded3] bg-white p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h2 className="text-base font-semibold">Consumo de IA</h2>
+                        <p className="mt-1 text-sm text-[#647067]">
+                          Últimos {stableNumber(usageEvents.length)} eventos registrados.
+                        </p>
+                      </div>
+                      <WalletCards className="text-[#35735b]" size={20} />
+                    </div>
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      <div className="rounded-lg border border-[#e2e6df] p-3">
+                        <p className="text-xs text-[#647067]">Coste acumulado</p>
+                        <p className="mt-1 text-2xl font-semibold tabular-nums">
+                          ${totalCost.toFixed(2)}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-[#e2e6df] p-3">
+                        <p className="text-xs text-[#647067]">Tokens</p>
+                        <p className="mt-1 text-2xl font-semibold tabular-nums">
+                          {stableNumber(
+                            usageEvents.reduce(
+                              (sum, event) =>
+                                sum +
+                                Number(
+                                  event.total_tokens ??
+                                    event.input_tokens + event.output_tokens,
+                                ),
+                              0,
+                            ),
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </section>
+
                   <section
                     className="rounded-lg border border-[#d9ded3] bg-white p-4"
                     id="observability"
@@ -1138,7 +1184,7 @@ export async function AppShell({ section }: { section: AppSection }) {
             {section === "dashboard" ? (
             <aside className="grid content-start gap-5">
               {/* Una tarjeta por fila: en columna estrecha la cifra va al lado
-                  del texto, no debajo, para no dejar la mitad derecha vacia. */}
+                  del texto, no debajo, para no dejar la mitad derecha vacía. */}
               <section className="grid content-start gap-2">
                 {dashboardMetrics.map((item) => (
                   <div
@@ -1285,7 +1331,7 @@ export async function AppShell({ section }: { section: AppSection }) {
                     ))
                   ) : (
                     <p className="rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
-                      No hay workspaces visibles todavia.
+                      No hay workspaces visibles todavía.
                     </p>
                   )}
                 </div>

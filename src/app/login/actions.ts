@@ -58,7 +58,7 @@ export async function signIn(formData: FormData) {
     (workspace) =>
       "onboarding_completed_at" in workspace && Boolean(workspace.onboarding_completed_at),
   );
-  // Quien pulso "Continuar despues" en el wizard entra directo al panel; alli
+  // Quien pulso "Continuar después" en el wizard entra directo al panel; alli
   // la tarjeta de pendientes le recuerda lo que falta.
   const hasSkippedWizard = (workspaces ?? []).some(
     (workspace) => Boolean(getOnboardingState(workspace.onboarding_state).wizard_skipped_at),

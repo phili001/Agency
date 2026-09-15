@@ -64,7 +64,7 @@ export function isStepDone(step: OnboardingStep, checklist: OnboardingChecklist)
   return step.checklistKey ? checklist[step.checklistKey] : false;
 }
 
-/** Pasos obligatorios que todavia no estan marcados en el checklist. */
+/** Pasos obligatorios que todavia no están marcados en el checklist. */
 export function getPendingSteps(checklist: OnboardingChecklist) {
   return onboardingSteps.filter(
     (step) => !step.optional && step.checklistKey && !checklist[step.checklistKey],

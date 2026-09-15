@@ -11,10 +11,14 @@ import {
   ListX,
   Loader2,
   MessageSquareText,
+  Mic,
   NotebookPen,
+  Paperclip,
   Phone,
+  Search,
   SendHorizonal,
   UserRound,
+  X,
 } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/client";
@@ -98,6 +102,82 @@ const pendingOnboardingStatuses = new Set([
   "waiting",
 ]);
 
+function normalizeSearchText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\s+\-().]/g, "");
+}
+
+function messageTypeLabel(type: string) {
+  switch (type) {
+    case "audio":
+      return "Nota de voz sin archivo";
+    case "image":
+      return "Imagen sin archivo";
+    case "file":
+      return "Documento sin archivo";
+    case "event":
+      return "Evento de WhatsApp";
+    default:
+      return "Mensaje sin texto";
+  }
+}
+
+/**
+ * Foto, nota de voz o documento del mensaje. Se sirve por /api/media porque el
+ * link de YCloud caduca en minutos si no va con la API key.
+ */
+function MessageAttachment({ message }: { message: MessageItem }) {
+  if (!message.media_url) {
+    return null;
+  }
+
+  const src = `/api/media/${message.id}`;
+  const filename = message.metadata?.media_filename ?? null;
+
+  if (message.message_type === "image") {
+    return (
+      <a className="mb-2 block" href={src} rel="noreferrer" target="_blank">
+        {/* eslint-disable-next-line @next/next/no-img-element -- origen dinamico y privado, no pasa por el optimizador */}
+        <img
+          alt={message.body ?? "Imagen enviada por WhatsApp"}
+          className="max-h-72 w-auto max-w-full rounded-md border border-[#d9ded3] object-contain"
+          loading="lazy"
+          src={src}
+        />
+      </a>
+    );
+  }
+
+  if (message.message_type === "audio") {
+    return (
+      <div className="mb-2 flex items-center gap-2 rounded-md border border-[#d9ded3] bg-[#f6f7f3] px-3 py-2">
+        <Mic className="shrink-0 text-[#35735b]" size={16} />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-[#20231f]">Nota de voz</p>
+          <audio className="mt-1 h-8 w-full max-w-xs" controls preload="none" src={src}>
+            <a href={src}>Escuchar</a>
+          </audio>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <a
+      className="mb-2 flex items-center gap-2 rounded-md border border-[#d9ded3] bg-[#f6f7f3] px-3 py-2 text-[#20231f] hover:bg-[#eef2eb]"
+      href={src}
+      rel="noreferrer"
+      target="_blank"
+    >
+      <Paperclip className="shrink-0 text-[#35735b]" size={16} />
+      <span className="truncate text-xs font-semibold">{filename ?? "Documento adjunto"}</span>
+    </a>
+  );
+}
+
 function isPendingOnboarding(conversation: ConversationItem) {
   return Boolean(
     conversation.onboarding &&
@@ -129,8 +209,13 @@ type MessageItem = {
   direction: string;
   displayTime?: string;
   id: string;
+  media_url?: string | null;
   message_type: string;
-  metadata?: { calendar_unavailable_reason?: string | null } | null;
+  metadata?: {
+    calendar_unavailable_reason?: string | null;
+    media_filename?: string | null;
+    media_mime_type?: string | null;
+  } | null;
   role: string;
 };
 
@@ -215,7 +300,22 @@ export function InboxPanel({
     }),
     [aiConversations, handoffConversations, onboardingConversations],
   );
-  const visibleConversations = conversationsByView[inboxView];
+  const [searchQuery, setSearchQuery] = useState("");
+  const normalizedQuery = normalizeSearchText(searchQuery);
+  // El buscador filtra dentro de la pestaña activa; sin texto no cambia nada.
+  const visibleConversations = useMemo(() => {
+    const list = conversationsByView[inboxView];
+
+    if (!normalizedQuery) {
+      return list;
+    }
+
+    return list.filter((conversation) =>
+      normalizeSearchText(
+        `${conversation.name} ${conversation.contactPhone ?? ""} ${conversation.business}`,
+      ).includes(normalizedQuery),
+    );
+  }, [conversationsByView, inboxView, normalizedQuery]);
   const selectedConversation =
     visibleConversations.find(
       (conversation) => conversation.id === selectedConversationId,
@@ -457,7 +557,7 @@ export function InboxPanel({
         setLocalMessages((current) =>
           current.filter((message) => message.id !== optimisticMessage.id),
         );
-        return { errorMessage: "El mensaje se envio pero la respuesta vino vacia." };
+        return { errorMessage: "El mensaje se envió pero la respuesta vino vacía." };
       }
 
       return { errorMessage: "" };
@@ -475,7 +575,7 @@ export function InboxPanel({
         status: "stored",
         workspace_id: selectedConversation.workspaceId,
       })
-      .select("id, conversation_id, body, direction, role, message_type, created_at")
+      .select("id, conversation_id, body, direction, role, message_type, media_url, metadata, created_at")
       .single();
 
     if (insertError) {
@@ -583,7 +683,7 @@ export function InboxPanel({
     if (
       selectedConversation.onboarding &&
       pendingOnboardingStatuses.has(selectedConversation.onboarding.status) &&
-      !window.confirm("Este contacto ya esta en onboarding. Reiniciar desde el primer paso?")
+      !window.confirm("Este contacto ya está en onboarding. Reiniciar desde el primer paso?")
     ) {
       return;
     }
@@ -890,6 +990,30 @@ export function InboxPanel({
             </span>
           </button>
         </div>
+        <label className="relative block shrink-0 border-b border-[#e2e6df] bg-white px-2 py-2">
+          <span className="sr-only">Buscar conversación</span>
+          <Search
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#7a847c]"
+            size={14}
+          />
+          <input
+            className="h-9 w-full rounded-lg border border-[#e2e6df] bg-[#fafbf8] pl-8 pr-8 text-sm outline-none transition placeholder:text-[#9aa59e] focus:border-[#35735b] focus:bg-white"
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Buscar por nombre o teléfono"
+            type="search"
+            value={searchQuery}
+          />
+          {searchQuery ? (
+            <button
+              aria-label="Limpiar búsqueda"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-[#7a847c] hover:text-[#20231f]"
+              onClick={() => setSearchQuery("")}
+              type="button"
+            >
+              <X size={14} />
+            </button>
+          ) : null}
+        </label>
         <div
           className="min-h-0 flex-1 divide-y divide-[#edf0ea] overflow-y-auto"
           data-tour="conversation-list"
@@ -988,14 +1112,18 @@ export function InboxPanel({
                 <Bot className="mx-auto text-[#a8b0aa]" size={22} />
               )}
               <p className="mt-2 text-sm font-semibold text-[#4d5a51]">
-                {inboxView === "onboarding"
-                  ? "No hay contactos en onboarding"
-                  : inboxView === "handoff"
-                    ? "No hay conversaciones esperando a una persona"
-                    : "No hay conversaciones con IA activa"}
+                {searchQuery
+                  ? `Nada coincide con «${searchQuery}»`
+                  : inboxView === "onboarding"
+                    ? "No hay contactos en onboarding"
+                    : inboxView === "handoff"
+                      ? "No hay conversaciones esperando a una persona"
+                      : "No hay conversaciones con IA activa"}
               </p>
               <p className="mt-1 text-xs text-[#7a847c]">
-                Esta vista se actualiza automáticamente.
+                {searchQuery
+                  ? "Prueba con otro nombre o con el teléfono."
+                  : "Esta vista se actualiza automáticamente."}
               </p>
             </div>
           </div>
@@ -1012,7 +1140,7 @@ export function InboxPanel({
               </p>
               <p className="mt-1 text-sm text-[#647067]">
                 {selectedConversation?.contactPhone ??
-                  "Cuando haya mensajes, apareceran aquí."}
+                  "Cuando haya mensajes, aparecerán aquí."}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -1123,9 +1251,14 @@ export function InboxPanel({
                         : "border-[#d9ded3] bg-white"
                     }`}
                   >
-                    <p className="whitespace-pre-wrap">
-                      {message.body ?? `[${message.message_type}] mensaje sin texto`}
-                    </p>
+                    <MessageAttachment message={message} />
+                    {message.body ? (
+                      <p className="whitespace-pre-wrap">{message.body}</p>
+                    ) : message.media_url ? null : (
+                      <p className="italic text-[#647067]">
+                        {messageTypeLabel(message.message_type)}
+                      </p>
+                    )}
                     <div className="mt-2 flex items-center justify-between gap-4 text-[11px] text-[#647067]">
                                   <span>{isInternal ? "nota interna" : message.role}</span>
                       <span>
@@ -1180,7 +1313,7 @@ export function InboxPanel({
               onChange={(event) => setDraft(event.target.value)}
               placeholder={
                 isBlocked
-                  ? "Toda atención esta bloqueada"
+                  ? "Toda atención está bloqueada"
                   : canSend
                   ? "Escribe una respuesta manual..."
                   : "Selecciona una conversación real"

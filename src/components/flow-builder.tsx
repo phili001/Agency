@@ -252,7 +252,7 @@ function TriggerConfigEditor({
           <option value="new_contacts">Solo contactos nuevos</option>
           <option value="labels">Contactos con etiquetas</option>
           <option value="all">Todos los contactos</option>
-          <option value="manual">Activacion manual</option>
+          <option value="manual">Activación manual</option>
         </select>
       </label>
       {audience === "labels" ? (

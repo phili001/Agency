@@ -9,7 +9,7 @@ type AdminClient = SupabaseClient;
 /** Marca que llevan los mensajes internos generados por un handoff. */
 export const HANDOFF_EVENT_KIND = "handoff";
 
-/** De donde salio la escalada. Sirve para auditar en el inbox. */
+/** De donde salió la escalada. Sirve para auditar en el inbox. */
 export type HandoffSource =
   | "flow_review"
   | "keyword"

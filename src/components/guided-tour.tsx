@@ -33,7 +33,7 @@ function findTarget(target: string) {
   }
 
   const rect = element.getBoundingClientRect();
-  // Sin tamaño = oculto (pestaña colapsada, bandeja vacia): se salta el paso.
+  // Sin tamaño = oculto (pestaña colapsada, bandeja vacía): se salta el paso.
   return rect.width > 0 && rect.height > 0 ? element : null;
 }
 

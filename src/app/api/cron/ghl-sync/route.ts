@@ -95,7 +95,7 @@ async function upsertHighLevelContact({
   };
 
   if (!response.ok) {
-    throw new Error(payload.message ?? "HighLevel rechazo el upsert.");
+    throw new Error(payload.message ?? "HighLevel rechazó el upsert.");
   }
 
   return {
@@ -170,7 +170,7 @@ export async function POST(request: Request) {
         });
 
         if (!highLevel.contactId) {
-          throw new Error("GoHighLevel no devolvio contact id.");
+          throw new Error("GoHighLevel no devolvió contact id.");
         }
 
         await supabase
