@@ -10,6 +10,7 @@ import {
 import { handleInboundFlow } from "@/lib/flow-engine";
 import { syncContactToGoHighLevel } from "@/lib/integrations/gohighlevel";
 import { secretMatchesHash } from "@/lib/integrations/secrets";
+import { findOrCreateOpenConversation } from "@/lib/conversations";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   type YCloudMessageType,
@@ -509,37 +510,19 @@ async function storeYCloudMessage({
     });
   }
 
-  const { data: existingConversation } = await supabase
-    .from("conversations")
-    .select("id, ai_enabled")
-    .eq("workspace_id", resolvedWorkspaceId)
-    .eq("contact_id", contact.id)
-    .neq("status", "closed")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
   const newConversationUsesAi =
     event.direction === "inbound" && defaultConversationMode === "ai";
-  const conversationId =
-    existingConversation?.id ??
-    (
-      await supabase
-        .from("conversations")
-        .insert({
-          contact_id: contact.id,
-          external_conversation_id: event.externalId,
-          last_message_at: new Date().toISOString(),
-          ai_enabled: newConversationUsesAi,
-          status: newConversationUsesAi ? "open" : "pending_handoff",
-          workspace_id: resolvedWorkspaceId,
-        })
-        .select("id")
-        .single()
-    ).data?.id;
-
-  if (!conversationId) {
-    throw new Error("No se pudo crear la conversación.");
-  }
+  const { conversation: openConversation, created: conversationCreated } =
+    await findOrCreateOpenConversation(supabase, {
+      aiEnabled: newConversationUsesAi,
+      contactId: contact.id,
+      externalConversationId: event.externalId,
+      workspaceId: resolvedWorkspaceId,
+    });
+  const conversationId = openConversation.id;
+  // Solo es "existente" si no la acabamos de crear: asi el resto del flujo
+  // (modo IA por defecto, etc.) sigue viendo lo mismo que antes.
+  const existingConversation = conversationCreated ? null : openConversation;
 
   const messageProviderId = event.providerMessageId ?? event.externalId;
   let { data: existingMessage } = messageProviderId

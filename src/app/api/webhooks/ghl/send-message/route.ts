@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { normalizeAppUrl } from "@/lib/app-url";
 import { startWebhookFlow } from "@/lib/flow-engine";
 import { hashSecret } from "@/lib/integrations/secrets";
+import { findOrCreateOpenConversation } from "@/lib/conversations";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type GhlWebhookPayload = {
@@ -159,36 +160,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: existingConversation } = await supabase
-    .from("conversations")
-    .select("id")
-    .eq("workspace_id", workspace.id)
-    .eq("contact_id", contact.id)
-    .neq("status", "closed")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const conversationId =
-    existingConversation?.id ??
-    (
-      await supabase
-        .from("conversations")
-        .insert({
-          ai_enabled: false,
-          contact_id: contact.id,
-          status: "pending_handoff",
-          workspace_id: workspace.id,
-        })
-        .select("id")
-        .single()
-    ).data?.id;
-
-  if (!conversationId) {
-    return NextResponse.json(
-      { error: "No se pudo crear la conversación." },
-      { status: 500 },
-    );
-  }
+  const { conversation } = await findOrCreateOpenConversation(supabase, {
+    aiEnabled: false,
+    contactId: contact.id,
+    workspaceId: workspace.id,
+  });
+  const conversationId = conversation.id;
 
   if (payload.messageBody && (existingContact?.messaging_status ?? "active") === "blocked") {
     return NextResponse.json(
