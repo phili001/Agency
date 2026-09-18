@@ -94,7 +94,7 @@ export function StepTest({ ctx }: { ctx: StepContext }) {
       {!arrived ? (
         <HowTo
           items={[
-            <>Coge tu celular y abre WhatsApp (o pulsa el botón "Abrir WhatsApp con este número").</>,
+            <>Coge tu celular y abre WhatsApp (o pulsa el botón &quot;Abrir WhatsApp con este número&quot;).</>,
             <>Escribe <span className="font-medium">Hola</span> al número que ves abajo y envíalo.</>,
             <>Espera unos 15 segundos: esta pantalla cambia sola cuando el mensaje llega y verás la respuesta de la IA.</>,
             <>Pulsa <span className="font-medium">Siguiente</span>. Si no llega nada en un minuto, aquí mismo te decimos qué revisar.</>,

@@ -129,6 +129,29 @@ function messageTypeLabel(type: string) {
  * Foto, nota de voz o documento del mensaje. Se sirve por /api/media porque el
  * link de YCloud caduca en minutos si no va con la API key.
  */
+/**
+ * Que pintar: foto, audio o documento. Se mira el tipo guardado y, si no
+ * ayuda, el MIME del archivo: las fotos recibidas antes del arreglo del webhook
+ * quedaron con tipo "event" y sin esto seguirian saliendo como documento.
+ */
+function resolveAttachmentKind(message: MessageItem): "audio" | "file" | "image" {
+  if (message.message_type === "image" || message.message_type === "audio") {
+    return message.message_type;
+  }
+
+  const mime = message.metadata?.media_mime_type ?? "";
+
+  if (mime.startsWith("image/")) {
+    return "image";
+  }
+
+  if (mime.startsWith("audio/")) {
+    return "audio";
+  }
+
+  return "file";
+}
+
 function MessageAttachment({ message }: { message: MessageItem }) {
   if (!message.media_url) {
     return null;
@@ -136,17 +159,18 @@ function MessageAttachment({ message }: { message: MessageItem }) {
 
   const src = `/api/media/${message.id}`;
   const filename = message.metadata?.media_filename ?? null;
+  const kind = resolveAttachmentKind(message);
   const downloadName =
     filename ??
-    (message.message_type === "image"
+    (kind === "image"
       ? `foto-${message.id.slice(0, 8)}.jpg`
-      : message.message_type === "audio"
+      : kind === "audio"
         ? `nota-de-voz-${message.id.slice(0, 8)}.ogg`
         : `archivo-${message.id.slice(0, 8)}`);
 
   let attachment;
 
-  if (message.message_type === "image") {
+  if (kind === "image") {
     attachment = (
       <a className="block" href={src} rel="noreferrer" target="_blank">
         {/* eslint-disable-next-line @next/next/no-img-element -- origen dinamico y privado, no pasa por el optimizador */}
@@ -158,7 +182,7 @@ function MessageAttachment({ message }: { message: MessageItem }) {
         />
       </a>
     );
-  } else if (message.message_type === "audio") {
+  } else if (kind === "audio") {
     attachment = (
       <div className="flex items-center gap-2 rounded-md border border-[#d9ded3] bg-[#f6f7f3] px-3 py-2">
         <Mic className="shrink-0 text-[#35735b]" size={16} />

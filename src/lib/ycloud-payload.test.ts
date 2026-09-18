@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   normalizeMessageType,
   readMediaFields,
+  readMessageType,
   readPath,
 } from "./ycloud-payload.ts";
 
@@ -35,6 +36,7 @@ describe("readMediaFields", () => {
     assert.equal(fields.mediaCaption, "¿cuánto cuesta esto?");
     assert.equal(fields.mediaMimeType, "image/jpeg");
     assert.equal(fields.mediaFilename, null);
+    assert.equal(fields.mediaKind, "image");
   });
 
   it("lee una nota de voz", () => {
@@ -72,9 +74,44 @@ describe("readMediaFields", () => {
     assert.deepEqual(fields, {
       mediaCaption: null,
       mediaFilename: null,
+      mediaKind: null,
       mediaMimeType: null,
       mediaUrl: null,
     });
+  });
+});
+
+describe("readMessageType", () => {
+  // El bug real: `type` en la raiz es el nombre del EVENTO. Mirarlo primero
+  // convertia todas las fotos en "event" y el inbox las pintaba como documento.
+  it("no confunde el tipo del evento con el tipo del mensaje", () => {
+    const payload = inbound({
+      image: { link: "https://media.ycloud.test/m1.jpg", mime_type: "image/jpeg" },
+      type: "image",
+    });
+    assert.equal(payload.type, "whatsapp.inbound_message.received");
+    assert.equal(readMessageType(payload), "image");
+  });
+
+  it("clasifica cada tipo de archivo aunque la raiz diga otra cosa", () => {
+    for (const [block, expected] of [
+      ["audio", "audio"],
+      ["document", "file"],
+      ["video", "file"],
+      ["sticker", "image"],
+    ] as const) {
+      const payload = inbound({ [block]: { link: "https://x/y" }, type: block });
+      assert.equal(readMessageType(payload), expected, block);
+    }
+  });
+
+  it("para texto usa el tipo anidado", () => {
+    assert.equal(readMessageType(inbound({ text: { body: "hola" }, type: "text" })), "text");
+  });
+
+  it("solo cae en la raiz si no hay nada anidado", () => {
+    assert.equal(readMessageType({ type: "text" }), "text");
+    assert.equal(readMessageType({}), "event");
   });
 });
 

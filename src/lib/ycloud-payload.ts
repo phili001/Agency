@@ -5,9 +5,13 @@
 
 export type YCloudMessageType = "text" | "audio" | "image" | "file" | "event";
 
+export type YCloudMediaKind = "audio" | "document" | "image" | "sticker" | "video";
+
 export type YCloudMediaFields = {
   mediaCaption: string | null;
   mediaFilename: string | null;
+  /** Bloque de WhatsApp donde venia el archivo (image, audio, document...). */
+  mediaKind: YCloudMediaKind | null;
   mediaMimeType: string | null;
   mediaUrl: string | null;
 };
@@ -84,6 +88,7 @@ export function readMediaFields(payload: Record<string, unknown>): YCloudMediaFi
     return {
       mediaCaption: field("caption"),
       mediaFilename: field("filename"),
+      mediaKind: kind,
       mediaMimeType: field("mime_type") ?? field("mimeType"),
       mediaUrl: link,
     };
@@ -92,7 +97,34 @@ export function readMediaFields(payload: Record<string, unknown>): YCloudMediaFi
   return {
     mediaCaption: null,
     mediaFilename: null,
+    mediaKind: null,
     mediaMimeType: null,
     mediaUrl: null,
   };
+}
+
+/**
+ * Tipo del MENSAJE, no del evento. YCloud pone `type: "whatsapp.inbound_message.received"`
+ * en la raiz y el tipo real dentro (`whatsappInboundMessage.type: "image"`).
+ * Mirar la raiz primero convertia todas las fotos y audios en "event".
+ * Si hay archivo, su bloque manda; la raiz solo se consulta al final.
+ */
+export function readMessageType(
+  payload: Record<string, unknown>,
+  media: YCloudMediaFields = readMediaFields(payload),
+): YCloudMessageType {
+  if (media.mediaKind) {
+    return normalizeMessageType(media.mediaKind);
+  }
+
+  return normalizeMessageType(
+    readPath(payload, [
+      ...MESSAGE_WRAPPERS.filter((wrapper) => wrapper.length > 0).map((wrapper) => [
+        ...wrapper,
+        "type",
+      ]),
+      ["data", "object", "messages", "0", "type"],
+      ["type"],
+    ]),
+  );
 }

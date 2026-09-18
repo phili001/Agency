@@ -13,8 +13,8 @@ import { secretMatchesHash } from "@/lib/integrations/secrets";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   type YCloudMessageType,
-  normalizeMessageType,
   readMediaFields,
+  readMessageType,
   readPath,
 } from "@/lib/ycloud-payload";
 
@@ -188,6 +188,7 @@ function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
   );
   const businessPhone = isOutboundEcho ? inboundFromPhone : toPhone;
   const contactPhone = isOutboundEcho ? toPhone : inboundFromPhone;
+  const media = readMediaFields(payload);
 
   return {
     businessPhone,
@@ -296,19 +297,7 @@ function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
     ]),
     fromPhone: inboundFromPhone,
     isStatusUpdate,
-    messageType: normalizeMessageType(
-      readPath(payload, [
-        ["type"],
-        ["whatsappInboundMessage", "type"],
-        ["whatsappMessage", "type"],
-        ["message", "type"],
-        ["data", "type"],
-        ["data", "message", "type"],
-        ["data", "whatsappInboundMessage", "type"],
-        ["data", "whatsappMessage", "type"],
-        ["data", "object", "messages", "0", "type"],
-      ]),
-    ),
+    messageType: readMessageType(payload, media),
     messageText: readPath(payload, [
       ["whatsappInboundMessage", "interactive", "list_reply", "id"],
       ["whatsappInboundMessage", "interactive", "button_reply", "id"],
@@ -332,7 +321,10 @@ function normalizeEvent(payload: WebhookPayload): NormalizedYCloudEvent {
       ["data", "whatsappMessage", "text", "body"],
       ["data", "object", "messages", "0", "text", "body"],
     ]),
-    ...readMediaFields(payload),
+    mediaCaption: media.mediaCaption,
+    mediaFilename: media.mediaFilename,
+    mediaMimeType: media.mediaMimeType,
+    mediaUrl: media.mediaUrl,
     status: statusValue,
     phoneId: readPath(payload, [
       ["phoneId"],
