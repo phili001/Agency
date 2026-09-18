@@ -6,12 +6,23 @@ import {
   getPendingSteps,
   onboardingSteps,
 } from "@/lib/onboarding-steps";
+import {
+  SUPPORT_PHONE_DISPLAY,
+  buildSupportLink,
+  buildSupportMessage,
+} from "@/lib/support";
 
 /**
  * Recordatorio en la bandeja para quien entro al panel sin terminar el
  * onboarding. Desaparece solo cuando el wizard se completa.
  */
-export function OnboardingProgressCard({ checklist }: { checklist: OnboardingChecklist }) {
+export function OnboardingProgressCard({
+  checklist,
+  companyName,
+}: {
+  checklist: OnboardingChecklist;
+  companyName: string;
+}) {
   const pending = getPendingSteps(checklist);
   const required = onboardingSteps.filter((step) => !step.optional && step.checklistKey);
   const doneCount = required.length - pending.length;
@@ -72,6 +83,24 @@ export function OnboardingProgressCard({ checklist }: { checklist: OnboardingChe
           );
         })}
       </ul>
+      <p className="mt-3 text-sm text-[#4d5a51]">
+        ¿Te atascaste? Escríbenos al WhatsApp{" "}
+        <a
+          className="font-semibold text-[#20231f] underline-offset-4 hover:underline"
+          href={buildSupportLink(
+            buildSupportMessage({
+              companyName,
+              stepIndex: next?.index ?? null,
+              stepTitle: next?.shortTitle ?? "Configuración",
+            }),
+          )}
+          rel="noreferrer"
+          target="_blank"
+        >
+          {SUPPORT_PHONE_DISPLAY}
+        </a>
+        . Di que quieres hablar con una persona y en qué paso vas.
+      </p>
     </section>
   );
 }

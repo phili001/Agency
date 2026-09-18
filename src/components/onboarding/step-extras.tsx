@@ -7,6 +7,7 @@ import {
   ConnectedBanner,
   Field,
   HelpBox,
+  HowTo,
   Notice,
   NumberedSteps,
   StepFooter,
@@ -167,6 +168,14 @@ export function StepExtras({ ctx }: { ctx: StepContext }) {
         description="Ninguna es obligatoria para que Levy funcione. Si no aplican a tu negocio, pasa al siguiente paso."
       />
 
+      <HowTo
+        items={[
+          <>Abre la caja que te interese: <span className="font-medium">Invitar a tu equipo</span> o <span className="font-medium">Conectar GoHighLevel</span>.</>,
+          <>Rellena lo que pide y pulsa su botón (Invitar / Conectar y probar citas). Puedes repetirlo para varias personas.</>,
+          <>Si ninguna aplica, pulsa <span className="font-medium">Siguiente</span> sin más.</>,
+        ]}
+      />
+
       <HelpBox
         defaultOpen={ctx.memberCount <= 1}
         title={`Invitar a tu equipo${ctx.memberCount > 1 ? ` (ya hay ${ctx.memberCount} personas)` : ""}`}
@@ -175,6 +184,13 @@ export function StepExtras({ ctx }: { ctx: StepContext }) {
           Cada persona entra con su propio correo y ve la misma bandeja de chats. Le
           creas una contraseña temporal y ella la cambia al entrar.
         </p>
+        <NumberedSteps
+          items={[
+            <>Escribe su <span className="font-medium">correo</span>.</>,
+            <>Inventa una <span className="font-medium">contraseña temporal</span> (mínimo 8 caracteres) y dísela después.</>,
+            <>Elige qué puede hacer y pulsa <span className="font-medium">Invitar</span>.</>,
+          ]}
+        />
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Correo">
             <input

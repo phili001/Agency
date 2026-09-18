@@ -8,6 +8,7 @@ import {
   CopyButton,
   Field,
   HelpBox,
+  HowTo,
   Notice,
   NumberedSteps,
   StepFooter,
@@ -135,6 +136,16 @@ export function StepWhatsApp({ ctx }: { ctx: StepContext }) {
             que lo une con WhatsApp. Aquí le decimos a Levy cuál es y cómo hablar con él.
           </>
         }
+      />
+
+      <HowTo
+        items={[
+          <>Pega la <span className="font-medium">llave de YCloud</span> (abre "¿Dónde consigo la llave?" si no sabes sacarla).</>,
+          <>Escribe tu <span className="font-medium">número de WhatsApp</span> con + y código de país.</>,
+          <>Pulsa <span className="font-medium">Guardar y conectar</span>.</>,
+          <>Aparecerá una dirección: cópiala y pégala en YCloud siguiendo los 4 pasos que se muestran. Sin esto los mensajes no llegan.</>,
+          <>Pulsa <span className="font-medium">Siguiente</span> para comprobarlo con un mensaje real.</>,
+        ]}
       />
 
       {connected && !editing ? (

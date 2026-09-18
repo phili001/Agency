@@ -7,6 +7,7 @@ import {
   ConnectedBanner,
   Field,
   HelpBox,
+  HowTo,
   Notice,
   NumberedSteps,
   StepFooter,
@@ -133,6 +134,14 @@ export function StepOpenAI({ ctx }: { ctx: StepContext }) {
             Levy. Solo necesitas pegar una llave.
           </>
         }
+      />
+
+      <HowTo
+        items={[
+          <>Consigue tu llave en OpenAI (abre <span className="font-medium">¿Dónde consigo la llave?</span> más abajo: te lleva de la mano).</>,
+          <>Pégala en la casilla <span className="font-medium">Llave de OpenAI</span>.</>,
+          <>Pulsa <span className="font-medium">Conectar y probar</span>. Si sale "Conectado", pulsa <span className="font-medium">Siguiente</span>.</>,
+        ]}
       />
 
       {connected && !editing ? (

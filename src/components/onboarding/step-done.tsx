@@ -6,6 +6,7 @@ import { useState } from "react";
 import { getPendingSteps } from "@/lib/onboarding-steps";
 
 import {
+  HowTo,
   Notice,
   StepHeading,
   primaryButton,
@@ -66,6 +67,14 @@ export function StepDone({ ctx }: { ctx: StepContext }) {
         }
       />
 
+      <HowTo
+        items={[
+          <>Revisa la lista: lo que tiene ✓ ya está hecho.</>,
+          <>Si algo obligatorio está sin marcar, pulsa <span className="font-medium">Completar</span> a su lado y vuelve aquí.</>,
+          <>Pulsa <span className="font-medium">{complete ? "Entrar a Levy" : "Entrar igual, lo termino después"}</span>. En el panel te recordaremos lo que falte.</>,
+        ]}
+      />
+
       <ul className="grid gap-2">
         {items.map((item) => (
           <li
@@ -103,7 +112,7 @@ export function StepDone({ ctx }: { ctx: StepContext }) {
         </button>
         <button className={primaryButton} disabled={busy} onClick={enter} type="button">
           {busy ? <Loader2 className="animate-spin" size={18} /> : null}
-          {complete ? "Entrar a Levy" : "Entrar igual, terminó después"}
+          {complete ? "Entrar a Levy" : "Entrar igual, lo termino después"}
           {!busy ? <ArrowRight size={18} /> : null}
         </button>
       </div>

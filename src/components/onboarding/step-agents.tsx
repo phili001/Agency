@@ -6,7 +6,7 @@ import { useState } from "react";
 import type { DefaultConversationMode } from "@/lib/conversation-default";
 import { createClient } from "@/lib/supabase/client";
 
-import { Field, Notice, StepFooter, StepHeading, inputClass, readApiError } from "./shared";
+import { Field, HowTo, Notice, StepFooter, StepHeading, inputClass, readApiError } from "./shared";
 import type { StepContext, WizardAgent } from "./wizard";
 
 const roleCopy: Record<string, { label: string; what: string }> = {
@@ -163,6 +163,14 @@ export function StepAgents({ ctx }: { ctx: StepContext }) {
         eyebrow="Paso 2 · Tus agentes"
         title="Conoce a tus agentes"
         description="Ya vienen listos y entrenados con lo que escribiste de tu negocio. Puedes cambiarles el nombre para que suene como tu equipo."
+      />
+
+      <HowTo
+        items={[
+          <>Lee qué hace cada agente. Si quieres, cámbiale el <span className="font-medium">nombre</span> en la casilla de la derecha.</>,
+          <>Elige abajo <span className="font-medium">quién responde los chats nuevos</span>: la IA sola o una persona primero.</>,
+          <>Pulsa <span className="font-medium">Confirmar mis agentes</span>. No hace falta tocar nada más para que funcionen.</>,
+        ]}
       />
 
       {ctx.agents.length === 0 ? (

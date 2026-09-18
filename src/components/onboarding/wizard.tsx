@@ -12,6 +12,7 @@ import {
 } from "@/lib/onboarding-steps";
 import type { Json } from "@/lib/supabase/database.types";
 
+import { SupportContact } from "./shared";
 import { StepAgents } from "./step-agents";
 import { StepBusiness } from "./step-business";
 import { StepDone } from "./step-done";
@@ -240,6 +241,12 @@ export function OnboardingWizard(props: WizardProps) {
           {current.id === "extras" ? <StepExtras ctx={context} /> : null}
           {current.id === "done" ? <StepDone ctx={context} /> : null}
         </section>
+
+        <SupportContact
+          companyName={props.workspace.name}
+          stepIndex={isFirst || isLast ? null : step}
+          stepTitle={current.shortTitle}
+        />
 
         {!isFirst && !isLast ? (
           <p className="flex items-center justify-center gap-2 text-center text-sm text-[#7a847c]">

@@ -136,10 +136,19 @@ function MessageAttachment({ message }: { message: MessageItem }) {
 
   const src = `/api/media/${message.id}`;
   const filename = message.metadata?.media_filename ?? null;
+  const downloadName =
+    filename ??
+    (message.message_type === "image"
+      ? `foto-${message.id.slice(0, 8)}.jpg`
+      : message.message_type === "audio"
+        ? `nota-de-voz-${message.id.slice(0, 8)}.ogg`
+        : `archivo-${message.id.slice(0, 8)}`);
+
+  let attachment;
 
   if (message.message_type === "image") {
-    return (
-      <a className="mb-2 block" href={src} rel="noreferrer" target="_blank">
+    attachment = (
+      <a className="block" href={src} rel="noreferrer" target="_blank">
         {/* eslint-disable-next-line @next/next/no-img-element -- origen dinamico y privado, no pasa por el optimizador */}
         <img
           alt={message.body ?? "Imagen enviada por WhatsApp"}
@@ -149,11 +158,9 @@ function MessageAttachment({ message }: { message: MessageItem }) {
         />
       </a>
     );
-  }
-
-  if (message.message_type === "audio") {
-    return (
-      <div className="mb-2 flex items-center gap-2 rounded-md border border-[#d9ded3] bg-[#f6f7f3] px-3 py-2">
+  } else if (message.message_type === "audio") {
+    attachment = (
+      <div className="flex items-center gap-2 rounded-md border border-[#d9ded3] bg-[#f6f7f3] px-3 py-2">
         <Mic className="shrink-0 text-[#35735b]" size={16} />
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold text-[#20231f]">Nota de voz</p>
@@ -163,18 +170,39 @@ function MessageAttachment({ message }: { message: MessageItem }) {
         </div>
       </div>
     );
+  } else {
+    attachment = (
+      <a
+        className="flex items-center gap-2 rounded-md border border-[#d9ded3] bg-[#f6f7f3] px-3 py-2 text-[#20231f] hover:bg-[#eef2eb]"
+        href={src}
+        rel="noreferrer"
+        target="_blank"
+      >
+        <Paperclip className="shrink-0 text-[#35735b]" size={16} />
+        <span className="truncate text-xs font-semibold">{filename ?? "Documento adjunto"}</span>
+      </a>
+    );
   }
 
   return (
-    <a
-      className="mb-2 flex items-center gap-2 rounded-md border border-[#d9ded3] bg-[#f6f7f3] px-3 py-2 text-[#20231f] hover:bg-[#eef2eb]"
-      href={src}
-      rel="noreferrer"
-      target="_blank"
-    >
-      <Paperclip className="shrink-0 text-[#35735b]" size={16} />
-      <span className="truncate text-xs font-semibold">{filename ?? "Documento adjunto"}</span>
-    </a>
+    <div className="mb-2 grid gap-1">
+      {attachment}
+      {/* WhatsApp conserva el archivo 30 dias; despues el enlace deja de servir. */}
+      <p className="flex items-center gap-1 text-[11px] text-[#7a847c]">
+        <Clock3 className="shrink-0" size={11} />
+        <span>
+          Disponible 30 días ·{" "}
+          <a
+            className="font-medium text-[#35735b] underline-offset-2 hover:underline"
+            download={downloadName}
+            href={src}
+          >
+            Guardar en tu dispositivo
+          </a>{" "}
+          si es importante
+        </span>
+      </p>
+    </div>
   );
 }
 

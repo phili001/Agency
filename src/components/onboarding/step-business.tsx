@@ -10,7 +10,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { getBrowserTimeZone, getTimeZoneOptions } from "@/lib/timezones";
 
-import { Field, Notice, StepFooter, StepHeading, inputClass } from "./shared";
+import { Field, HowTo, Notice, StepFooter, StepHeading, inputClass } from "./shared";
 import type { StepContext } from "./wizard";
 
 type FieldKey = (typeof businessProfileFields)[number]["key"];
@@ -195,6 +195,24 @@ export function StepBusiness({ ctx }: { ctx: StepContext }) {
           eyebrow="Paso 1 · Tu negocio"
           title="Unos detalles más (puedes saltarlos)"
           description="Cuanto más sepa Levy, mejor responde. Todo esto se puede completar después desde la sección Negocio."
+        />
+      )}
+
+      {part === 0 ? (
+        <HowTo
+          items={[
+            <>Escribe el <span className="font-medium">nombre</span> de tu negocio tal como quieres que lo diga el agente.</>,
+            <>Cuenta <span className="font-medium">qué vendes</span> y tu <span className="font-medium">horario</span>: son los dos datos que más preguntan los clientes.</>,
+            <>Pon la ciudad o zona (opcional) y pulsa <span className="font-medium">Guardar y seguir</span>.</>,
+          ]}
+        />
+      ) : (
+        <HowTo
+          items={[
+            <>Rellena solo lo que aplique a tu negocio; lo demás déjalo vacío.</>,
+            <>Elige tu <span className="font-medium">zona horaria</span> en la lista: es la que usa el agente para hablar de fechas y citas.</>,
+            <>Pulsa <span className="font-medium">Guardar y seguir</span>. Podrás cambiar todo esto después en la sección Negocio.</>,
+          ]}
         />
       )}
 

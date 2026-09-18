@@ -4,7 +4,7 @@ import { CalendarCheck, Clock3, Info, Sparkles } from "lucide-react";
 
 import { defaultAgentPresets } from "@/lib/default-agents";
 
-import { HelpBox, NumberedSteps, StepFooter, StepHeading } from "./shared";
+import { HelpBox, HowTo, NumberedSteps, StepFooter, StepHeading } from "./shared";
 import type { StepContext } from "./wizard";
 
 const roleCopy: Record<string, { icon: typeof Info; what: string }> = {
@@ -40,6 +40,15 @@ export function StepWelcome({ ctx }: { ctx: StepContext }) {
             </p>
           </>
         }
+      />
+
+      <HowTo
+        title="Cómo funciona esta configuración"
+        items={[
+          <>Son 7 pasos cortos. En cada uno lees qué hacer, rellenas lo que se pide y pulsas el botón verde oscuro de abajo.</>,
+          <>Todo se guarda al pulsar ese botón: puedes cerrar y volver otro día donde lo dejaste.</>,
+          <>Si te atascas, escríbenos por WhatsApp (el contacto está al pie de cada pantalla) y te ayudamos a completarlo.</>,
+        ]}
       />
 
       <div>

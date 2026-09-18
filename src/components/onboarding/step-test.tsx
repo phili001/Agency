@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import type { OnboardingChecklist } from "@/lib/onboarding-steps";
 
-import { HelpBox, Notice, NumberedSteps, StepFooter, StepHeading, secondaryButton } from "./shared";
+import { HelpBox, HowTo, Notice, NumberedSteps, StepFooter, StepHeading, secondaryButton } from "./shared";
 import { type StepContext, getIntegrationConfig } from "./wizard";
 
 type StatusPayload = {
@@ -90,6 +90,17 @@ export function StepTest({ ctx }: { ctx: StepContext }) {
             : "Usa tu propio celular como si fueras un cliente. Así comprobamos que todo el camino funciona de verdad."
         }
       />
+
+      {!arrived ? (
+        <HowTo
+          items={[
+            <>Coge tu celular y abre WhatsApp (o pulsa el botón "Abrir WhatsApp con este número").</>,
+            <>Escribe <span className="font-medium">Hola</span> al número que ves abajo y envíalo.</>,
+            <>Espera unos 15 segundos: esta pantalla cambia sola cuando el mensaje llega y verás la respuesta de la IA.</>,
+            <>Pulsa <span className="font-medium">Siguiente</span>. Si no llega nada en un minuto, aquí mismo te decimos qué revisar.</>,
+          ]}
+        />
+      ) : null}
 
       {!arrived ? (
         <div className="grid gap-4 rounded-xl border-2 border-[#10231c] bg-[#fafbf8] p-5 text-center">

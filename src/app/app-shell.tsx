@@ -977,7 +977,10 @@ export async function AppShell({ section }: { section: AppSection }) {
               ) : null}
 
               {onboardingChecklist ? (
-                <OnboardingProgressCard checklist={onboardingChecklist} />
+                <OnboardingProgressCard
+                  checklist={onboardingChecklist}
+                  companyName={workspace?.name ?? "tu empresa"}
+                />
               ) : null}
 
               {section === "dashboard" ? (

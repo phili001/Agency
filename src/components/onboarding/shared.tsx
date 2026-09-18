@@ -6,9 +6,17 @@ import {
   Check,
   ChevronDown,
   Copy,
+  ListChecks,
   Loader2,
+  MessageCircleQuestion,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
+
+import {
+  SUPPORT_PHONE_DISPLAY,
+  buildSupportLink,
+  buildSupportMessage,
+} from "@/lib/support";
 
 /*
  * Piezas que comparten todos los pasos del wizard. Estan pensadas para gente
@@ -127,6 +135,66 @@ export function NumberedSteps({ items }: { items: ReactNode[] }) {
         </li>
       ))}
     </ol>
+  );
+}
+
+/** "Cómo completar este paso": la misma caja, siempre abierta, en cada pantalla. */
+export function HowTo({ items, title = "Cómo completar este paso" }: { items: ReactNode[]; title?: string }) {
+  return (
+    <div className="grid gap-3 rounded-xl border border-[#b9dc9c] bg-[#f4faec] p-4">
+      <p className="flex items-center gap-2 text-base font-semibold text-[#20231f]">
+        <ListChecks className="text-[#35735b]" size={18} />
+        {title}
+      </p>
+      <div className="text-sm leading-relaxed text-[#334139]">
+        <NumberedSteps items={items} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Salida humana en cada paso. El mensaje de WhatsApp va preescrito pidiendo
+ * una persona y con el paso actual, para que quede en el resumen del handoff.
+ */
+export function SupportContact({
+  companyName,
+  stepIndex,
+  stepTitle,
+}: {
+  companyName: string;
+  stepIndex: number | null;
+  stepTitle: string;
+}) {
+  const message = buildSupportMessage({ companyName, stepIndex, stepTitle });
+
+  return (
+    <aside className="flex flex-col gap-3 rounded-2xl border border-[#d9ded3] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#eef6df] text-[#35735b]">
+          <MessageCircleQuestion size={20} />
+        </span>
+        <div className="text-sm leading-relaxed text-[#4d5a51]">
+          <p className="text-base font-semibold text-[#20231f]">
+            ¿Te confundiste en este paso? Escríbenos, sin pena.
+          </p>
+          <p className="mt-1">
+            WhatsApp <span className="font-semibold text-[#20231f]">{SUPPORT_PHONE_DISPLAY}</span>.
+            Para que te atienda una persona, di en el mensaje que{" "}
+            <span className="font-medium">quieres hablar con una persona</span> y en qué paso
+            estás; así le queda en el resumen a quien te atienda.
+          </p>
+        </div>
+      </div>
+      <a
+        className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-[#35735b] px-4 text-sm font-semibold text-[#35735b] transition hover:bg-[#eef6df]"
+        href={buildSupportLink(message)}
+        rel="noreferrer"
+        target="_blank"
+      >
+        Escribir por WhatsApp
+      </a>
+    </aside>
   );
 }
 
