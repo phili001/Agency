@@ -125,4 +125,9 @@ describe("secreto del webhook", () => {
     const secrets = readWebhookSecrets(new Headers(), { email: "a@b.com", secret: "r1" });
     assert.equal(secrets.body, "r1");
   });
+
+  it("acepta un encabezado llamado secret, con o sin Bearer", () => {
+    assert.equal(readWebhookSecrets(new Headers({ secret: "s1" }), null).header, "s1");
+    assert.equal(readWebhookSecrets(new Headers({ secret: "Bearer s2" }), null).header, "s2");
+  });
 });
