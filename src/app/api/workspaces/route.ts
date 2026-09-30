@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { apiErrorResponse } from "@/lib/api-error";
 import { requireUser, requireWorkspaceRole } from "@/lib/authz";
@@ -11,6 +11,7 @@ import {
   isChecklistComplete,
   setActiveWorkspaceId,
 } from "@/lib/workspaces";
+import { markAgencyContactActive } from "@/lib/integrations/ghl-agency";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 function asStateRecord(value: unknown) {
@@ -90,7 +91,7 @@ export async function POST(request: Request) {
       const admin = createAdminClient();
       const { data: workspace } = await admin
         .from("workspaces")
-        .select("onboarding_state")
+        .select("onboarding_state, owner_id")
         .eq("id", workspaceId)
         .single();
       const { error } = await admin
@@ -110,6 +111,17 @@ export async function POST(request: Request) {
 
       if (error) {
         throw error;
+      }
+
+      // Avisa al CRM de la agencia (etiqueta levy-activo) para cortar los
+      // recordatorios de activación. Fuera de la respuesta: si GHL falla, el
+      // cliente entra igual.
+      const ownerId = workspace?.owner_id;
+      if (ownerId) {
+        after(async () => {
+          const { data: owner } = await admin.auth.admin.getUserById(ownerId);
+          await markAgencyContactActive(owner.user?.email);
+        });
       }
 
       return NextResponse.json({ checklist, ok: true });

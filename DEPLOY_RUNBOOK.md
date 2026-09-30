@@ -113,6 +113,29 @@ token de la empresa (cifrado). El botón de prueba crea un contacto y una cita
 temporales y los borra al terminar; si el test se corta a la mitad, revisa que
 no quede nada llamado `Prueba técnica Levy`.
 
+### Alta automática tras el pago
+
+Quien paga Levy en el funnel de la agencia recibe la cuenta solo:
+
+1. El workflow **Crear cuenta** de GHL (formulario de bienvenida enviado) hace
+   `POST {NEXT_PUBLIC_APP_URL}/api/webhooks/ghl/purchase` con
+   `Authorization: Bearer {LEVY_PURCHASE_WEBHOOK_SECRET}` y, en *customData*,
+   `ghlContactId`, `email`, `companyName`, `firstName` y `phone`.
+2. La ruta lee el contacto en GHL y **solo sigue si tiene la etiqueta
+   `cliente-levy`** (la pone el workflow de pago). Si el correo ya tiene
+   empresa, no crea otra: solo genera un acceso nuevo.
+3. Crea usuario (contraseña aleatoria que nadie conoce), empresa y agentes, y
+   escribe en el contacto `levy_link_acceso` y `levy_workspace_id` y la
+   etiqueta `levy-acceso-listo`, que dispara el correo de acceso en GHL.
+4. El enlace pasa por `/auth/confirm` y abre **Crea tu contraseña**; al
+   guardarla, el cliente entra directo a la configuración guiada.
+5. Al terminar la configuración, Levy pone `levy-activo` en el contacto.
+
+Requisitos: las tres variables de la sección *Alta automática* de
+`.env.example`, los campos `levy_link_acceso`, `levy_workspace_id` y
+`nombre_del_negocio` creados en GHL, y en Supabase *Auth > Email OTP
+Expiration* a 86400 (24 h): el enlace de acceso usa esa caducidad.
+
 ## 8. Antes de dar acceso a un cliente
 
 - [ ] Preflight en verde
@@ -120,4 +143,5 @@ no quede nada llamado `Prueba técnica Levy`.
 - [ ] Perfil de negocio completo, incluido el **Link de agenda**: la plantilla de
       flujo lo usa para cerrar la conversación y sin él ese mensaje sale sin CTA
 - [ ] Crons visibles en Vercel > Cron Jobs
-- [ ] Contraseña temporal cambiada por el cliente
+- [ ] Contraseña temporal cambiada por el cliente (las altas automáticas no
+      tienen: el cliente crea la suya con el enlace de acceso)

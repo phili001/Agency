@@ -1,5 +1,6 @@
 "use server";
 
+import type { User } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 
 import { normalizeAppUrl } from "@/lib/app-url";
@@ -24,7 +25,17 @@ export async function signIn(formData: FormData) {
     redirect(`/login?error=${encodeURIComponent(translateAuthError(error.message))}`);
   }
 
-  const user = data.user;
+  await redirectAfterAuth(data.user);
+}
+
+/**
+ * A donde va alguien que acaba de tener sesion: al entrar con contraseña y
+ * tambien al crearla desde un enlace, para no pedirle que inicie sesion otra
+ * vez justo despues de ponerla.
+ */
+async function redirectAfterAuth(user: User): Promise<never> {
+  const supabase = await createClient();
+
   if (await isPlatformAdmin(user)) {
     redirect("/admin");
   }
@@ -115,19 +126,21 @@ export async function requestPasswordReset(formData: FormData) {
 export async function updatePassword(formData: FormData) {
   const password = String(formData.get("password") ?? "");
   const confirmation = String(formData.get("confirmation") ?? "");
+  // Cliente nuevo que llega desde el correo de acceso: se conserva en los
+  // errores para que la pantalla siga diciendo "Crea tu contraseña".
+  const resetPath =
+    formData.get("bienvenida") === "1" ? "/reset-password?bienvenida=1&" : "/reset-password?";
 
   if (password.length < 8) {
     redirect(
-      `/reset-password?error=${encodeURIComponent(
+      `${resetPath}error=${encodeURIComponent(
         "La contraseña debe tener mínimo 8 caracteres.",
       )}`,
     );
   }
 
   if (password !== confirmation) {
-    redirect(
-      `/reset-password?error=${encodeURIComponent("Las dos contraseñas no coinciden.")}`,
-    );
+    redirect(`${resetPath}error=${encodeURIComponent("Las dos contraseñas no coinciden.")}`);
   }
 
   const supabase = await createClient();
@@ -146,10 +159,8 @@ export async function updatePassword(formData: FormData) {
   const { error } = await supabase.auth.updateUser({ password });
 
   if (error) {
-    redirect(
-      `/reset-password?error=${encodeURIComponent(translateAuthError(error.message))}`,
-    );
+    redirect(`${resetPath}error=${encodeURIComponent(translateAuthError(error.message))}`);
   }
 
-  redirect("/login?updated=1");
+  await redirectAfterAuth(user);
 }
