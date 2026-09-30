@@ -120,4 +120,9 @@ describe("secreto del webhook", () => {
     const secrets = readWebhookSecrets(new Headers({ Authorization: "abc" }), null);
     assert.deepEqual(secrets, { authorization: null, body: null, header: null });
   });
+
+  it("acepta el secreto en la raíz del cuerpo", () => {
+    const secrets = readWebhookSecrets(new Headers(), { email: "a@b.com", secret: "r1" });
+    assert.equal(secrets.body, "r1");
+  });
 });

@@ -59,6 +59,12 @@ export async function POST(request: Request) {
       authorization: Boolean(candidates.authorization),
       body: Boolean(candidates.body),
       header: Boolean(candidates.header),
+      bodyKeys: Object.keys(body && typeof body === "object" ? body : {}),
+      customDataKeys: Object.keys(
+        body && typeof body === "object" && "customData" in body && body.customData
+          ? (body.customData as object)
+          : {},
+      ),
       rawAuthorizationHeader: request.headers.has("authorization"),
     });
     return fail(401, "Secreto inválido.");
