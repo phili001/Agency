@@ -33,6 +33,17 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * devuelve a GHL el enlace de primer acceso con la etiqueta que dispara el
  * correo. Nada de contraseñas por correo: el cliente la crea con ese enlace.
  */
+/** JSON normalmente; si GHL lo manda como formulario, se lee igual. */
+async function readBody(request: Request): Promise<unknown> {
+  const text = await request.text().catch(() => "");
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text ? Object.fromEntries(new URLSearchParams(text)) : null;
+  }
+}
+
 function fail(status: number, error: string) {
   return NextResponse.json({ error, ok: false }, { status });
 }
@@ -45,7 +56,7 @@ export async function POST(request: Request) {
     return fail(500, "El alta automática no está configurada.");
   }
 
-  const body = await request.json().catch(() => null);
+  const body = await readBody(request);
   const candidates = readWebhookSecrets(request.headers, body);
   const expectedHash = hashSecret(expectedSecret);
   const authorized = Object.values(candidates).some(
@@ -64,6 +75,10 @@ export async function POST(request: Request) {
         body && typeof body === "object" && "customData" in body && body.customData
           ? (body.customData as object)
           : {},
+      ),
+      contentType: request.headers.get("content-type"),
+      headerNames: [...request.headers.keys()].filter(
+        (name) => !name.startsWith("x-vercel") && !name.startsWith("x-forwarded"),
       ),
       rawAuthorizationHeader: request.headers.has("authorization"),
     });
