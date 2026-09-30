@@ -5,6 +5,7 @@ import {
   buildWelcomeLink,
   hasPaidTag,
   parsePurchasePayload,
+  readWebhookSecrets,
   resolveCompanyName,
 } from "./levy-purchase.ts";
 
@@ -97,5 +98,26 @@ describe("enlace de bienvenida", () => {
     assert.equal(link.searchParams.get("token_hash"), "hash123");
     assert.equal(link.searchParams.get("type"), "recovery");
     assert.equal(link.searchParams.get("next"), "/reset-password?bienvenida=1");
+  });
+});
+
+describe("secreto del webhook", () => {
+  it("lo lee del encabezado Authorization con Bearer", () => {
+    const secrets = readWebhookSecrets(new Headers({ Authorization: "Bearer  abc " }), {});
+    assert.equal(secrets.authorization, "abc");
+  });
+
+  it("también de x-levy-secret y de customData.secret", () => {
+    const secrets = readWebhookSecrets(new Headers({ "x-levy-secret": "h1" }), {
+      customData: { secret: " b1 " },
+    });
+    assert.equal(secrets.header, "h1");
+    assert.equal(secrets.body, "b1");
+    assert.equal(secrets.authorization, null);
+  });
+
+  it("sin Bearer no toma el encabezado", () => {
+    const secrets = readWebhookSecrets(new Headers({ Authorization: "abc" }), null);
+    assert.deepEqual(secrets, { authorization: null, body: null, header: null });
   });
 });

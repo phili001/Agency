@@ -101,3 +101,21 @@ export function buildWelcomeLink(appUrl: string, hashedToken: string) {
 
   return `${appUrl.replace(/\/$/, "")}/auth/confirm?${params.toString()}`;
 }
+
+/**
+ * El webhook normal de GHL no siempre respeta un encabezado Authorization
+ * propio, asi que el secreto tambien se acepta en `x-levy-secret` o como par
+ * `secret` de customData. Quien llama compara cada fuente con el esperado.
+ */
+export function readWebhookSecrets(headers: Headers, body: unknown) {
+  const authorization = headers.get("authorization")?.trim() ?? "";
+  const bodySecret = asRecord(asRecord(body).customData).secret;
+
+  return {
+    authorization: /^bearer\s+/i.test(authorization)
+      ? authorization.replace(/^bearer\s+/i, "").trim() || null
+      : null,
+    body: typeof bodySecret === "string" && bodySecret.trim() ? bodySecret.trim() : null,
+    header: headers.get("x-levy-secret")?.trim() || null,
+  };
+}

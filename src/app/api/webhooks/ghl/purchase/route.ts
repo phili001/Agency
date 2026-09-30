@@ -20,6 +20,7 @@ import {
   GHL_FIELD_WORKSPACE_ID,
   hasPaidTag,
   parsePurchasePayload,
+  readWebhookSecrets,
   resolveCompanyName,
 } from "@/lib/levy-purchase";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -32,13 +33,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * devuelve a GHL el enlace de primer acceso con la etiqueta que dispara el
  * correo. Nada de contraseñas por correo: el cliente la crea con ese enlace.
  */
-function bearerToken(request: Request) {
-  const header = request.headers.get("authorization") ?? "";
-  return header.toLowerCase().startsWith("bearer ")
-    ? header.slice("bearer ".length).trim()
-    : null;
-}
-
 function fail(status: number, error: string) {
   return NextResponse.json({ error, ok: false }, { status });
 }
@@ -51,13 +45,26 @@ export async function POST(request: Request) {
     return fail(500, "El alta automática no está configurada.");
   }
 
-  const token = bearerToken(request);
+  const body = await request.json().catch(() => null);
+  const candidates = readWebhookSecrets(request.headers, body);
+  const expectedHash = hashSecret(expectedSecret);
+  const authorized = Object.values(candidates).some(
+    (value) => value && secretMatchesHash(value, expectedHash),
+  );
 
-  if (!token || !secretMatchesHash(token, hashSecret(expectedSecret))) {
+  if (!authorized) {
+    // Solo que fuentes llegaron, nunca los valores: sirve para ver si GHL
+    // esta quitando el encabezado sin dejar el secreto en los logs.
+    console.warn("[ghl-purchase] Secreto inválido. Fuentes recibidas:", {
+      authorization: Boolean(candidates.authorization),
+      body: Boolean(candidates.body),
+      header: Boolean(candidates.header),
+      rawAuthorizationHeader: request.headers.has("authorization"),
+    });
     return fail(401, "Secreto inválido.");
   }
 
-  const payload = parsePurchasePayload(await request.json().catch(() => null));
+  const payload = parsePurchasePayload(body);
 
   if (!payload.ghlContactId) {
     return fail(400, "Falta ghlContactId.");
