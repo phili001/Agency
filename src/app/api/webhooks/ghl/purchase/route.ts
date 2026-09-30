@@ -66,22 +66,25 @@ export async function POST(request: Request) {
   if (!authorized) {
     // Solo que fuentes llegaron, nunca los valores: sirve para ver si GHL
     // esta quitando el encabezado sin dejar el secreto en los logs.
-    console.warn("[ghl-purchase] Secreto inválido. Fuentes recibidas:", {
-      authorization: Boolean(candidates.authorization),
-      body: Boolean(candidates.body),
-      header: Boolean(candidates.header),
-      bodyKeys: Object.keys(body && typeof body === "object" ? body : {}),
-      customDataKeys: Object.keys(
-        body && typeof body === "object" && "customData" in body && body.customData
-          ? (body.customData as object)
-          : {},
-      ),
-      contentType: request.headers.get("content-type"),
-      headerNames: [...request.headers.keys()].filter(
-        (name) => !name.startsWith("x-vercel") && !name.startsWith("x-forwarded"),
-      ),
-      rawAuthorizationHeader: request.headers.has("authorization"),
-    });
+    const customData =
+      body && typeof body === "object" && "customData" in body && body.customData
+        ? (body.customData as object)
+        : {};
+    console.warn(
+      `[ghl-purchase] Secreto inválido. ${JSON.stringify({
+        bodyKeys: Object.keys(body && typeof body === "object" ? body : {}).join(","),
+        contentType: request.headers.get("content-type"),
+        customDataKeys: Object.keys(customData).join(","),
+        fuentes:
+          Object.entries(candidates)
+            .filter(([, value]) => value)
+            .map(([name]) => name)
+            .join(",") || "ninguna",
+        headerNames: [...request.headers.keys()]
+          .filter((name) => !name.startsWith("x-vercel") && !name.startsWith("x-forwarded"))
+          .join(","),
+      })}`,
+    );
     return fail(401, "Secreto inválido.");
   }
 
