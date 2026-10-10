@@ -23,6 +23,10 @@ import {
 
 import { createClient } from "@/lib/supabase/client";
 
+/** Ritmo del polling del inbox: rapido mientras hay movimiento, lento en reposo. */
+const SNAPSHOT_POLL_MIN_MS = 3500;
+const SNAPSHOT_POLL_MAX_MS = 10000;
+
 type ConversationItem = {
   aiEnabled?: boolean;
   business: string;
@@ -476,6 +480,14 @@ export function InboxPanel({
 
   // Id estable de la conversacion abierta, para que el polling pida sus mensajes.
   const openConversationId = selectedConversation?.id ?? "";
+  // Conversacion cuyos mensajes ya vinieron renderizados del servidor: al
+  // montar no hace falta pedirlos otra vez al instante.
+  const serverRenderedConversationIdRef = useRef(
+    messages[0]?.conversation_id ?? conversations[0]?.id ?? "",
+  );
+  // Lo llaman las acciones del usuario: tras enviar o cambiar algo se espera
+  // respuesta pronto, asi que el polling vuelve a su ritmo rapido.
+  const resetPollingRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!workspaceId) {
@@ -483,6 +495,10 @@ export function InboxPanel({
     }
 
     let cancelled = false;
+    let timer: number | undefined;
+    let delay = SNAPSHOT_POLL_MIN_MS;
+    let lastPayloadText = "";
+    let latestRequest = 0;
 
     async function refreshSnapshot() {
       // Se pide explicitamente la conversacion abierta: el backend solo carga
@@ -494,21 +510,43 @@ export function InboxPanel({
         query.set("conversationId", openConversationId);
       }
 
-      const response = await fetch(`/api/inbox/snapshot?${query.toString()}`);
+      const requestId = ++latestRequest;
+      let text: string;
 
-      if (!response.ok) {
+      try {
+        const response = await fetch(`/api/inbox/snapshot?${query.toString()}`);
+
+        if (!response.ok) {
+          delay = SNAPSHOT_POLL_MAX_MS;
+          return;
+        }
+
+        text = await response.text();
+      } catch {
+        delay = Math.min(delay * 2, SNAPSHOT_POLL_MAX_MS);
         return;
       }
 
-      const payload = (await response.json()) as {
+      // Una respuesta vieja que llega tarde no pisa a una mas nueva.
+      if (cancelled || requestId !== latestRequest) {
+        return;
+      }
+
+      // Sin cambios no se toca el estado (no se re-renderiza toda la bandeja)
+      // y el siguiente ciclo se espacia; cualquier cambio vuelve al ritmo rapido.
+      if (text === lastPayloadText) {
+        delay = Math.min(Math.round(delay * 1.5), SNAPSHOT_POLL_MAX_MS);
+        return;
+      }
+
+      lastPayloadText = text;
+      delay = SNAPSHOT_POLL_MIN_MS;
+
+      const payload = JSON.parse(text) as {
         conversations?: ConversationItem[];
         messages?: MessageItem[];
         messagesConversationId?: string | null;
       };
-
-      if (cancelled) {
-        return;
-      }
 
       if (payload.conversations?.length) {
         setLocalConversations(payload.conversations);
@@ -532,12 +570,54 @@ export function InboxPanel({
       }
     }
 
-    const interval = window.setInterval(refreshSnapshot, 3500);
-    void refreshSnapshot();
+    // Con la pestana oculta no se consulta nada: un panel abierto en segundo
+    // plano hacia ~1.000 llamadas por hora a la funcion y ~8 por llamada a
+    // Supabase. Al volver a la pestana se actualiza al momento.
+    function schedule() {
+      window.clearTimeout(timer);
+
+      if (cancelled || document.hidden) {
+        return;
+      }
+
+      timer = window.setTimeout(() => {
+        void refreshSnapshot().finally(schedule);
+      }, delay);
+    }
+
+    function refreshNow() {
+      window.clearTimeout(timer);
+      delay = SNAPSHOT_POLL_MIN_MS;
+      void refreshSnapshot().finally(schedule);
+    }
+
+    function handleVisibilityChange() {
+      if (document.hidden) {
+        window.clearTimeout(timer);
+      } else {
+        refreshNow();
+      }
+    }
+
+    resetPollingRef.current = () => {
+      delay = SNAPSHOT_POLL_MIN_MS;
+      schedule();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    if (openConversationId === serverRenderedConversationIdRef.current) {
+      // Primer montaje: lo que hay en pantalla acaba de llegar del servidor.
+      serverRenderedConversationIdRef.current = "";
+      schedule();
+    } else {
+      refreshNow();
+    }
 
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      resetPollingRef.current = () => {};
     };
   }, [openConversationId, workspaceId]);
 
@@ -568,6 +648,7 @@ export function InboxPanel({
 
     setError("");
     upsertLocalMessage(optimisticMessage);
+    resetPollingRef.current();
 
     if (direction === "outbound") {
       const response = await fetch("/api/messages/send", {
@@ -934,6 +1015,7 @@ export function InboxPanel({
     }
 
     setError("");
+    resetPollingRef.current();
     const previous = selectedConversation;
 
     // Al encender o apagar la IA la conversacion cambia de pestana; sin esto

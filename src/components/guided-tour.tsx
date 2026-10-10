@@ -3,7 +3,6 @@
 import { ArrowLeft, ArrowRight, CircleHelp, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { createClient } from "@/lib/supabase/client";
 import { type TourKey, tours } from "@/lib/tours";
 
 export const START_TOUR_EVENT = "levy:start-tour";
@@ -84,7 +83,10 @@ export function GuidedTour({
     }
 
     // Se guarda en la cuenta para que no vuelva a salir en otro dispositivo.
+    // El cliente de Supabase pesa ~64 KB: se carga al terminar el tour, no en
+    // cada pagina que solo muestra el boton "Ver guía".
     if (!seenTours[tourKey]) {
+      const { createClient } = await import("@/lib/supabase/client");
       const supabase = createClient();
       await supabase.auth.updateUser({
         data: { levy_tours: { ...seenTours, [tourKey]: new Date().toISOString() } },

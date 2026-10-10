@@ -30,6 +30,14 @@ export async function isPlatformAdmin(user: UserLike | null | undefined) {
     return true;
   }
 
+  // Todos los llamadores pasan el usuario de `auth.getUser()` o del login, que
+  // vienen del servidor de Auth: su app_metadata ya es el vigente y solo lo
+  // escribe la service role. Recorrer listUsers aqui costaba hasta 20 llamadas
+  // a Auth en cada carga del panel para confirmar lo que ya sabiamos.
+  if (user?.app_metadata) {
+    return false;
+  }
+
   const admin = createAdminClient();
   const authUser = await findAuthUserForPlatformAdmin(admin, email);
 

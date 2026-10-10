@@ -9,6 +9,7 @@ import {
   ListChecks,
   Loader2,
   MessageCircleQuestion,
+  Plus,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
@@ -195,6 +196,92 @@ export function SupportContact({
         Escribir por WhatsApp
       </a>
     </aside>
+  );
+}
+
+/** Tarjeta grande de una sola elección: se toca, no se escribe. */
+export function OptionCard({
+  active,
+  description,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  description?: string;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      aria-pressed={active}
+      className={`grid content-start gap-1 rounded-xl border-2 p-3 text-left transition ${
+        active
+          ? "border-[#10231c] bg-[#eef6df]"
+          : "border-[#e2e6df] bg-white hover:border-[#cbd2c6]"
+      }`}
+      onClick={onClick}
+      type="button"
+    >
+      <span className="text-sm font-semibold leading-snug text-[#20231f]">{label}</span>
+      {description ? (
+        <span className="text-xs leading-relaxed text-[#4d5a51]">{description}</span>
+      ) : null}
+    </button>
+  );
+}
+
+/** Botón-pastilla para marcar varias cosas a la vez. */
+export function Chip({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      aria-pressed={active}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition ${
+        active
+          ? "border-[#10231c] bg-[#10231c] text-white"
+          : "border-[#cbd2c6] bg-white text-[#20231f] hover:border-[#35735b]"
+      }`}
+      onClick={onClick}
+      type="button"
+    >
+      {active ? <Check size={14} /> : <Plus size={14} />}
+      {label}
+    </button>
+  );
+}
+
+/** Bloque de pregunta: título corto arriba y los botones debajo. */
+export function Question({
+  children,
+  hint,
+  optional,
+  title,
+}: {
+  children: ReactNode;
+  hint?: ReactNode;
+  optional?: boolean;
+  title: string;
+}) {
+  return (
+    <div className="grid gap-2.5">
+      <div>
+        <h3 className="text-base font-semibold text-[#20231f]">
+          {title}
+          {optional ? (
+            <span className="ml-2 text-sm font-normal text-[#7a847c]">opcional</span>
+          ) : null}
+        </h3>
+        {hint ? <p className="mt-0.5 text-sm text-[#647067]">{hint}</p> : null}
+      </div>
+      {children}
+    </div>
   );
 }
 

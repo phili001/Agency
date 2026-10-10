@@ -67,7 +67,15 @@ export async function GET(request: Request) {
       requestedConversationId && conversationIds.includes(requestedConversationId)
         ? requestedConversationId
         : conversationIds[0];
-    const [{ data: contacts }, { data: messages }, { data: flowRuns }] = await Promise.all([
+    // Todo lo que solo depende de la lista de conversaciones va en un lote:
+    // esto corre en cada ciclo del inbox y cada viaje en serie suma latencia.
+    const [
+      { data: contacts },
+      { data: messages },
+      { data: flowRuns },
+      { data: pendingReviews },
+      handoffByConversation,
+    ] = await Promise.all([
       contactIds.length
         ? admin
             .from("contacts")
@@ -98,23 +106,19 @@ export async function GET(request: Request) {
             .in("conversation_id", conversationIds)
             .order("updated_at", { ascending: false })
         : Promise.resolve({ data: [] }),
+      conversationIds.length
+        ? admin
+            .from("flow_answer_reviews")
+            .select(
+              "id, contact_id, conversation_id, question, original_answer, validation_reason, attempt_count, created_at",
+            )
+            .eq("workspace_id", workspaceId)
+            .eq("status", "pending_human")
+            .in("conversation_id", conversationIds)
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [] }),
+      getConversationHandoffInfo(admin, workspaceId, conversationIds),
     ]);
-    const { data: pendingReviews } = conversationIds.length
-      ? await admin
-          .from("flow_answer_reviews")
-          .select(
-            "id, contact_id, conversation_id, question, original_answer, validation_reason, attempt_count, created_at",
-          )
-          .eq("workspace_id", workspaceId)
-          .eq("status", "pending_human")
-          .in("conversation_id", conversationIds)
-          .order("created_at", { ascending: false })
-      : { data: [] };
-    const handoffByConversation = await getConversationHandoffInfo(
-      admin,
-      workspaceId,
-      conversationIds,
-    );
     const pendingReviewByConversation = new Map(
       (pendingReviews ?? []).map((review) => [review.conversation_id, review]),
     );

@@ -1,6 +1,11 @@
 import type { Json } from "@/lib/supabase/database.types";
 
 export type BusinessProfileMetadata = {
+  /**
+   * Lo que el dueño eligió a botones en el onboarding. Se guarda tal cual para
+   * poder repintar el formulario; el texto que leen los agentes vive en fields.
+   */
+  choices?: Json;
   custom_fields?: Array<{
     key: string;
     label: string;
@@ -22,6 +27,13 @@ export const businessProfileFields = [
     label: "Nombre empresa",
     placeholder: "Clínica Dental Norte",
     variable: "{company_name}",
+  },
+  {
+    help: "Sector al que pertenece el negocio. Lo elige el onboarding con un botón.",
+    key: "business_type",
+    label: "Tipo de negocio",
+    placeholder: "Clínica dental",
+    variable: "{business_type}",
   },
   {
     help: "Horario normal de atención y excepciones importantes.",
@@ -125,7 +137,9 @@ export function getBusinessProfileMetadata(
         .filter((item) => item.key || item.label || item.value)
     : [];
 
-  return { custom_fields: customFields, fields };
+  // choices viaja intacto: la pestaña Negocio reescribe metadata y no debe
+  // borrar las elecciones del onboarding.
+  return { choices: (record.choices as Json) ?? undefined, custom_fields: customFields, fields };
 }
 
 export function normalizeVariableKey(value: string) {
