@@ -19,3 +19,20 @@ export function getBrowserTimeZone() {
     return "";
   }
 }
+
+/**
+ * "GMT+2" para enseñar la diferencia horaria sin jerga. Se calcula con el
+ * desfase actual, que es estable salvo el día del cambio de hora.
+ */
+export function getZoneOffsetLabel(zone: string) {
+  try {
+    const parts = new Intl.DateTimeFormat("es-ES", {
+      timeZone: zone,
+      timeZoneName: "shortOffset",
+    }).formatToParts(new Date());
+
+    return parts.find((part) => part.type === "timeZoneName")?.value ?? "";
+  } catch {
+    return "";
+  }
+}

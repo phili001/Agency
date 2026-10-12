@@ -234,11 +234,18 @@ export const attendModes: Array<{
   },
 ];
 
+export type CountryTimeZone = {
+  key: string;
+  /** Nombre en cristiano: "Península y Baleares", no "Europe/Madrid". */
+  label: string;
+};
+
 export type Country = {
   cities: string[];
   key: string;
   label: string;
-  timezone: string;
+  /** La primera es la que se usa por defecto. */
+  timezones: CountryTimeZone[];
 };
 
 export const countries: Country[] = [
@@ -262,7 +269,10 @@ export const countries: Country[] = [
     ],
     key: "ES",
     label: "España",
-    timezone: "Europe/Madrid",
+    timezones: [
+      { key: "Europe/Madrid", label: "Península y Baleares" },
+      { key: "Atlantic/Canary", label: "Canarias" },
+    ],
   },
   {
     cities: [
@@ -281,7 +291,7 @@ export const countries: Country[] = [
     ],
     key: "CO",
     label: "Colombia",
-    timezone: "America/Bogota",
+    timezones: [{ key: "America/Bogota", label: "Hora de Colombia" }],
   },
   {
     cities: [
@@ -298,7 +308,13 @@ export const countries: Country[] = [
     ],
     key: "MX",
     label: "México",
-    timezone: "America/Mexico_City",
+    timezones: [
+      { key: "America/Mexico_City", label: "Centro (CDMX, Guadalajara, Monterrey)" },
+      { key: "America/Cancun", label: "Sureste (Cancún, Quintana Roo)" },
+      { key: "America/Mazatlan", label: "Pacífico (Mazatlán, La Paz)" },
+      { key: "America/Hermosillo", label: "Sonora (Hermosillo)" },
+      { key: "America/Tijuana", label: "Noroeste (Tijuana, Baja California)" },
+    ],
   },
   {
     cities: [
@@ -313,64 +329,108 @@ export const countries: Country[] = [
     ],
     key: "AR",
     label: "Argentina",
-    timezone: "America/Argentina/Buenos_Aires",
+    timezones: [{ key: "America/Argentina/Buenos_Aires", label: "Hora de Argentina" }],
   },
   {
     cities: ["Santiago", "Valparaíso", "Viña del Mar", "Concepción", "Antofagasta", "Temuco"],
     key: "CL",
     label: "Chile",
-    timezone: "America/Santiago",
+    timezones: [
+      { key: "America/Santiago", label: "Chile continental" },
+      { key: "America/Punta_Arenas", label: "Magallanes" },
+      { key: "Pacific/Easter", label: "Isla de Pascua" },
+    ],
   },
   {
     cities: ["Lima", "Arequipa", "Trujillo", "Cusco", "Piura", "Chiclayo"],
     key: "PE",
     label: "Perú",
-    timezone: "America/Lima",
+    timezones: [{ key: "America/Lima", label: "Hora de Perú" }],
   },
   {
     cities: ["Quito", "Guayaquil", "Cuenca", "Ambato", "Manta"],
     key: "EC",
     label: "Ecuador",
-    timezone: "America/Guayaquil",
+    timezones: [
+      { key: "America/Guayaquil", label: "Ecuador continental" },
+      { key: "Pacific/Galapagos", label: "Galápagos" },
+    ],
   },
   {
     cities: ["Ciudad de Panamá", "San Miguelito", "David"],
     key: "PA",
     label: "Panamá",
-    timezone: "America/Panama",
+    timezones: [{ key: "America/Panama", label: "Hora de Panamá" }],
   },
   {
     cities: ["Montevideo", "Salto", "Punta del Este"],
     key: "UY",
     label: "Uruguay",
-    timezone: "America/Montevideo",
+    timezones: [{ key: "America/Montevideo", label: "Hora de Uruguay" }],
   },
   {
     cities: ["Miami", "Nueva York", "Los Ángeles", "Houston", "Chicago"],
     key: "US",
     label: "Estados Unidos",
-    timezone: "America/New_York",
+    timezones: [
+      { key: "America/New_York", label: "Este (Nueva York, Miami)" },
+      { key: "America/Chicago", label: "Centro (Chicago, Houston)" },
+      { key: "America/Denver", label: "Montaña (Denver)" },
+      { key: "America/Phoenix", label: "Arizona" },
+      { key: "America/Los_Angeles", label: "Pacífico (Los Ángeles)" },
+    ],
   },
-  { cities: [], key: "other", label: "Otro país", timezone: "" },
+  { cities: [], key: "other", label: "Otro país", timezones: [] },
 ];
+
+/** Un local, consulta o zona de trabajo. Un negocio puede tener varios. */
+export type BusinessLocation = {
+  city: string;
+  /** Solo para la UI: identifica la fila al editar o borrar. */
+  id: string;
+  street: string;
+  venue: string;
+};
 
 export type BusinessChoices = {
   attendMode: AttendMode;
   bookingUrl: string;
-  city: string;
   closeTime: string;
   country: string;
   days: string[];
+  locations: BusinessLocation[];
   openTime: string;
   payments: string[];
   policies: string[];
   sector: string;
   services: string[];
   servicesExtra: string;
-  street: string;
   timezone: string;
-  venue: string;
 };
+
+function createId(prefix: string) {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function createLocation(): BusinessLocation {
+  return { city: "", id: createId("sede"), street: "", venue: "" };
+}
+
+/** Locales con ciudad puesta: los vacíos no llegan a los prompts. */
+export function getFilledLocations(choices: BusinessChoices) {
+  return choices.locations.filter((location) => location.city.trim());
+}
+
+/** "Madrid", "Madrid y Barcelona", "Madrid, Barcelona y Valencia". */
+export function joinWithAnd(items: string[]) {
+  if (items.length <= 1) {
+    return items[0] ?? "";
+  }
+
+  return `${items.slice(0, -1).join(", ")} y ${items[items.length - 1]}`;
+}
 
 export function getCountry(key: string) {
   return countries.find((country) => country.key === key) ?? null;
@@ -382,7 +442,23 @@ export function getSector(key: string) {
 
 /** País probable a partir de la zona horaria del navegador: un toque menos. */
 export function guessCountryKey(timeZone: string) {
-  return countries.find((country) => country.timezone && country.timezone === timeZone)?.key ?? "";
+  return (
+    countries.find((country) => country.timezones.some((zone) => zone.key === timeZone))?.key ?? ""
+  );
+}
+
+/**
+ * Zona horaria que le toca al negocio: la del navegador si pertenece al país
+ * elegido (así un canario no acaba con hora peninsular) y, si no, la primera.
+ */
+export function getCountryTimeZone(countryKey: string, timeZone: string) {
+  const zones = getCountry(countryKey)?.timezones ?? [];
+
+  if (zones.some((zone) => zone.key === timeZone)) {
+    return timeZone;
+  }
+
+  return zones[0]?.key || timeZone;
 }
 
 export function createDefaultChoices(timeZone: string): BusinessChoices {
@@ -391,19 +467,17 @@ export function createDefaultChoices(timeZone: string): BusinessChoices {
   return {
     attendMode: "local",
     bookingUrl: "",
-    city: "",
     closeTime: "18:00",
     country: countryKey,
     days: ["mon", "tue", "wed", "thu", "fri"],
+    locations: [createLocation()],
     openTime: "09:00",
     payments: [],
     policies: [],
     sector: "",
     services: [],
     servicesExtra: "",
-    street: "",
-    timezone: getCountry(countryKey)?.timezone || timeZone,
-    venue: "",
+    timezone: getCountryTimeZone(countryKey, timeZone),
   };
 }
 
@@ -435,23 +509,42 @@ export function getBusinessChoices(
   const attendMode = attendModes.some((mode) => mode.key === record.attendMode)
     ? (record.attendMode as AttendMode)
     : defaults.attendMode;
+  const locations = Array.isArray(record.locations)
+    ? record.locations
+        .filter(
+          (item): item is Record<string, unknown> =>
+            Boolean(item) && typeof item === "object" && !Array.isArray(item),
+        )
+        .map((item) => ({
+          city: asString(item.city),
+          id: asString(item.id) || createLocation().id,
+          street: asString(item.street),
+          venue: asString(item.venue),
+        }))
+    : // Perfiles guardados antes de admitir varias sedes: traen una suelta.
+      [
+        {
+          ...createLocation(),
+          city: asString(record.city),
+          street: asString(record.street),
+          venue: asString(record.venue),
+        },
+      ];
 
   return {
     attendMode,
     bookingUrl: asString(record.bookingUrl),
-    city: asString(record.city),
     closeTime: asString(record.closeTime) || defaults.closeTime,
     country: asString(record.country) || defaults.country,
     days: days.length > 0 ? days : defaults.days,
+    locations: locations.length > 0 ? locations : defaults.locations,
     openTime: asString(record.openTime) || defaults.openTime,
     payments: asStringArray(record.payments),
     policies: asStringArray(record.policies),
     sector: asString(record.sector),
     services: asStringArray(record.services),
     servicesExtra: asString(record.servicesExtra),
-    street: asString(record.street),
     timezone: asString(record.timezone) || defaults.timezone,
-    venue: asString(record.venue),
   };
 }
 
@@ -528,13 +621,23 @@ export function buildLocationText(choices: BusinessChoices) {
     return "Atención online, sin local físico";
   }
 
-  if (!choices.city.trim()) {
+  const cities = [
+    ...new Set(getFilledLocations(choices).map((location) => location.city.trim())),
+  ];
+
+  if (cities.length === 0) {
     return "";
   }
 
-  return choices.attendMode === "domicilio"
-    ? `${choices.city.trim()} y alrededores (vamos donde el cliente)`
-    : choices.city.trim();
+  if (choices.attendMode === "domicilio") {
+    return cities.length > 1
+      ? `${cities.join(", ")} y sus alrededores (vamos donde el cliente)`
+      : `${cities[0]} y alrededores (vamos donde el cliente)`;
+  }
+
+  return cities.length > 1
+    ? `${cities.length} sedes: ${joinWithAnd(cities)}`
+    : cities[0];
 }
 
 export function buildAddressText(choices: BusinessChoices) {
@@ -542,7 +645,29 @@ export function buildAddressText(choices: BusinessChoices) {
     return "";
   }
 
-  return [choices.venue.trim(), choices.street.trim()].filter(Boolean).join(", ");
+  const locations = getFilledLocations(choices).filter((location) =>
+    location.street.trim(),
+  );
+
+  if (locations.length === 0) {
+    return "";
+  }
+
+  // Con varias sedes, cada una lleva nombre y ciudad para que el agente
+  // pueda decir a cuál tiene que ir el cliente.
+  return locations
+    .map((location) => {
+      const street = location.street.trim();
+      const venue = location.venue.trim();
+      const city = location.city.trim();
+
+      if (locations.length === 1) {
+        return [venue, street].filter(Boolean).join(", ");
+      }
+
+      return `${venue || city}: ${street}${venue && city ? ` (${city})` : ""}`;
+    })
+    .join("; ");
 }
 
 /**

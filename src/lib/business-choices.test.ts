@@ -44,25 +44,75 @@ describe("opciones del negocio", () => {
   });
 
   it("describe la ubicación según cómo atiende", () => {
-    const local = buildFieldsFromChoices(
-      { ...base, city: "Madrid", street: "Calle Mayor 1", venue: "Sede Centro" },
-      {},
-    );
+    const madrid = { city: "Madrid", id: "a", street: "Calle Mayor 1", venue: "Sede Centro" };
+    const local = buildFieldsFromChoices({ ...base, locations: [madrid] }, {});
     assert.equal(local.location, "Madrid");
     assert.equal(local.address, "Sede Centro, Calle Mayor 1");
 
     const domicilio = buildFieldsFromChoices(
-      { ...base, attendMode: "domicilio", city: "Sevilla" },
+      { ...base, attendMode: "domicilio", locations: [{ ...madrid, city: "Sevilla" }] },
       {},
     );
     assert.match(domicilio.location, /Sevilla y alrededores/);
 
     const online = buildFieldsFromChoices(
-      { ...base, attendMode: "online", city: "Madrid", street: "Calle Mayor 1" },
+      { ...base, attendMode: "online", locations: [madrid] },
       {},
     );
     assert.equal(online.location, "Atención online, sin local físico");
     assert.equal(online.address, "");
+  });
+
+  it("admite varios locales y los nombra uno a uno", () => {
+    const fields = buildFieldsFromChoices(
+      {
+        ...base,
+        locations: [
+          { city: "Madrid", id: "a", street: "Calle Mayor 1", venue: "Sede Centro" },
+          { city: "Barcelona", id: "b", street: "Av. Diagonal 20", venue: "Sede Diagonal" },
+          { city: "Valencia", id: "c", street: "", venue: "" },
+          { city: "", id: "d", street: "Calle sin ciudad 9", venue: "Borrador" },
+        ],
+      },
+      {},
+    );
+
+    assert.equal(fields.location, "3 sedes: Madrid, Barcelona y Valencia");
+    assert.equal(
+      fields.address,
+      "Sede Centro: Calle Mayor 1 (Madrid); Sede Diagonal: Av. Diagonal 20 (Barcelona)",
+    );
+  });
+
+  it("varias zonas a domicilio se listan juntas", () => {
+    const fields = buildFieldsFromChoices(
+      {
+        ...base,
+        attendMode: "domicilio",
+        locations: [
+          { city: "Madrid", id: "a", street: "", venue: "" },
+          { city: "Toledo", id: "b", street: "", venue: "" },
+        ],
+      },
+      {},
+    );
+
+    assert.equal(
+      fields.location,
+      "Madrid, Toledo y sus alrededores (vamos donde el cliente)",
+    );
+  });
+
+  it("lee perfiles antiguos de una sola sede", () => {
+    const choices = getBusinessChoices(
+      { city: "Madrid", street: "Calle Mayor 1", venue: "Sede Centro" },
+      "Europe/Madrid",
+    );
+
+    assert.equal(choices.locations.length, 1);
+    assert.equal(choices.locations[0].city, "Madrid");
+    assert.equal(choices.locations[0].street, "Calle Mayor 1");
+    assert.ok(choices.locations[0].id);
   });
 
   it("no pisa los campos que el wizard no gestiona", () => {

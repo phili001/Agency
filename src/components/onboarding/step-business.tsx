@@ -1,9 +1,11 @@
 "use client";
 
+import { Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
   type BusinessChoices,
+  type BusinessLocation,
   attendModes,
   businessSectors,
   countries,
@@ -15,14 +17,21 @@ import {
   weekdayPresets,
   weekdays,
   buildFieldsFromChoices,
+  createLocation,
   getBusinessChoices,
+  getCountryTimeZone,
+  getFilledLocations,
 } from "@/lib/business-choices";
 import {
   buildBusinessProfileContent,
   getBusinessProfileMetadata,
 } from "@/lib/business-profile";
 import { createClient } from "@/lib/supabase/client";
-import { getBrowserTimeZone, getTimeZoneOptions } from "@/lib/timezones";
+import {
+  getBrowserTimeZone,
+  getTimeZoneOptions,
+  getZoneOffsetLabel,
+} from "@/lib/timezones";
 
 import {
   Chip,
@@ -47,7 +56,20 @@ export function StepBusiness({ ctx }: { ctx: StepContext }) {
   const supabase = createClient();
   const browserTimeZone = useMemo(() => getBrowserTimeZone(), []);
   const timeOptions = useMemo(() => getTimeOptions(), []);
-  const timeZoneOptions = useMemo(() => getTimeZoneOptions(), []);
+  // Lista de respaldo (país fuera del catálogo): "Madrid (Europe, GMT+2)",
+  // ordenada por ciudad para poder buscarla de un vistazo.
+  const timeZoneOptions = useMemo(
+    () =>
+      getTimeZoneOptions()
+        .map((zone) => ({
+          key: zone,
+          label: `${zone.split("/").slice(1).join(" · ").replace(/_/g, " ") || zone} (${
+            zone.split("/")[0]
+          }, ${getZoneOffsetLabel(zone)})`,
+        }))
+        .sort((first, second) => first.label.localeCompare(second.label, "es")),
+    [],
+  );
   const savedMetadata = useMemo(
     () => getBusinessProfileMetadata(ctx.businessProfile?.metadata ?? {}),
     [ctx.businessProfile],
@@ -66,13 +88,36 @@ export function StepBusiness({ ctx }: { ctx: StepContext }) {
   const sector = getSector(choices.sector);
   const country = getCountry(choices.country);
   const cityOptions = country?.cities ?? [];
-  const cityIsFromList = cityOptions.includes(choices.city);
-  const [cityMode, setCityMode] = useState<"list" | "free">(
-    choices.city && !cityIsFromList ? "free" : "list",
+  const countryZones = country?.timezones ?? [];
+  // Filas donde el cliente eligió "Otra ciudad" y escribe a mano.
+  const [freeCityIds, setFreeCityIds] = useState<string[]>(() =>
+    getBusinessChoices(savedMetadata.choices, browserTimeZone)
+      .locations.filter(
+        (location) =>
+          location.city && !(getCountry(choices.country)?.cities ?? []).includes(location.city),
+      )
+      .map((location) => location.id),
   );
 
   function patch(next: Partial<BusinessChoices>) {
     setChoices((current) => ({ ...current, ...next }));
+  }
+
+  function updateLocation(id: string, next: Partial<BusinessLocation>) {
+    patch({
+      locations: choices.locations.map((location) =>
+        location.id === id ? { ...location, ...next } : location,
+      ),
+    });
+  }
+
+  function addLocation() {
+    patch({ locations: [...choices.locations, createLocation()] });
+  }
+
+  function removeLocation(id: string) {
+    patch({ locations: choices.locations.filter((location) => location.id !== id) });
+    setFreeCityIds((current) => current.filter((item) => item !== id));
   }
 
   function selectSector(key: string) {
@@ -88,12 +133,16 @@ export function StepBusiness({ ctx }: { ctx: StepContext }) {
 
   function selectCountry(key: string) {
     const nextCountry = getCountry(key);
+    // Las ciudades del país anterior ya no valen: se vacían para volver a elegir.
     patch({
-      city: nextCountry?.cities.includes(choices.city) ? choices.city : "",
       country: key,
-      timezone: nextCountry?.timezone || browserTimeZone,
+      locations: choices.locations.map((location) => ({
+        ...location,
+        city: nextCountry?.cities.includes(location.city) ? location.city : "",
+      })),
+      timezone: getCountryTimeZone(key, browserTimeZone),
     });
-    setCityMode(nextCountry?.cities.length ? "list" : "free");
+    setFreeCityIds(nextCountry?.cities.length ? [] : choices.locations.map((item) => item.id));
   }
 
   async function save() {
@@ -172,8 +221,12 @@ export function StepBusiness({ ctx }: { ctx: StepContext }) {
       return;
     }
 
-    if (choices.attendMode !== "online" && !choices.city.trim()) {
-      setError("Elige tu ciudad.");
+    if (choices.attendMode !== "online" && getFilledLocations(choices).length === 0) {
+      setError(
+        choices.attendMode === "domicilio"
+          ? "Elige al menos una ciudad donde trabajas."
+          : "Elige la ciudad de tu local.",
+      );
       return;
     }
 
@@ -383,80 +436,140 @@ export function StepBusiness({ ctx }: { ctx: StepContext }) {
             <Question
               hint={
                 choices.attendMode === "domicilio"
-                  ? "La zona donde te mueves."
-                  : "Donde recibes a los clientes."
+                  ? "Las ciudades o zonas donde te mueves."
+                  : "Si tienes más de un local, añádelos todos: el agente dirá a cuál ir."
               }
-              title="¿En qué ciudad?"
+              title={
+                choices.attendMode === "domicilio"
+                  ? "¿En qué ciudades trabajas?"
+                  : "¿Dónde está tu local?"
+              }
             >
-              {cityOptions.length > 0 && cityMode === "list" ? (
-                <select
-                  className={inputClass}
-                  onChange={(event) => {
-                    if (event.target.value === OTHER_CITY) {
-                      setCityMode("free");
-                      patch({ city: "" });
-                      return;
-                    }
+              <div className="grid gap-3">
+                {choices.locations.map((location, index) => {
+                  const freeCity =
+                    cityOptions.length === 0 || freeCityIds.includes(location.id);
+                  const several = choices.locations.length > 1;
 
-                    patch({ city: event.target.value });
-                  }}
-                  value={choices.city}
-                >
-                  <option value="">Elige tu ciudad</option>
-                  {cityOptions.map((city) => (
-                    <option key={city} value={city}>
-                      {city}
-                    </option>
-                  ))}
-                  <option value={OTHER_CITY}>Otra ciudad…</option>
-                </select>
-              ) : (
-                <div className="grid gap-2">
-                  <input
-                    className={inputClass}
-                    onChange={(event) => patch({ city: event.target.value })}
-                    placeholder="Escribe tu ciudad"
-                    value={choices.city}
-                  />
-                  {cityOptions.length > 0 ? (
-                    <button
-                      className="justify-self-start text-sm font-medium text-[#35735b] underline-offset-4 hover:underline"
-                      onClick={() => {
-                        setCityMode("list");
-                        patch({ city: "" });
-                      }}
-                      type="button"
+                  return (
+                    <div
+                      className={
+                        several
+                          ? "grid gap-3 rounded-xl border border-[#e2e6df] bg-[#fafbf8] p-3"
+                          : "grid gap-3"
+                      }
+                      key={location.id}
                     >
-                      Volver a la lista de ciudades
-                    </button>
-                  ) : null}
-                </div>
-              )}
+                      {several ? (
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-semibold text-[#20231f]">
+                            {choices.attendMode === "domicilio"
+                              ? `Ciudad ${index + 1}`
+                              : location.venue.trim() || `Local ${index + 1}`}
+                          </p>
+                          <button
+                            className="inline-flex items-center gap-1 text-sm font-medium text-[#8a5a12] underline-offset-4 hover:underline"
+                            onClick={() => removeLocation(location.id)}
+                            type="button"
+                          >
+                            <Trash2 size={14} />
+                            Quitar
+                          </button>
+                        </div>
+                      ) : null}
 
-              {choices.attendMode === "local" ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field help="Calle y número." label="Dirección" optional>
-                    <input
-                      className={inputClass}
-                      onChange={(event) => patch({ street: event.target.value })}
-                      placeholder="Calle Mayor 12, local 3"
-                      value={choices.street}
-                    />
-                  </Field>
-                  <Field
-                    help="Solo si tienes varias sedes y quieres distinguirlas."
-                    label="Nombre de la sede"
-                    optional
-                  >
-                    <input
-                      className={inputClass}
-                      onChange={(event) => patch({ venue: event.target.value })}
-                      placeholder="Sede Centro"
-                      value={choices.venue}
-                    />
-                  </Field>
-                </div>
-              ) : null}
+                      {freeCity ? (
+                        <div className="grid gap-2">
+                          <input
+                            className={inputClass}
+                            onChange={(event) =>
+                              updateLocation(location.id, { city: event.target.value })
+                            }
+                            placeholder="Escribe la ciudad"
+                            value={location.city}
+                          />
+                          {cityOptions.length > 0 ? (
+                            <button
+                              className="justify-self-start text-sm font-medium text-[#35735b] underline-offset-4 hover:underline"
+                              onClick={() => {
+                                setFreeCityIds((current) =>
+                                  current.filter((item) => item !== location.id),
+                                );
+                                updateLocation(location.id, { city: "" });
+                              }}
+                              type="button"
+                            >
+                              Volver a la lista de ciudades
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <select
+                          className={inputClass}
+                          onChange={(event) => {
+                            if (event.target.value === OTHER_CITY) {
+                              setFreeCityIds((current) => [...current, location.id]);
+                              updateLocation(location.id, { city: "" });
+                              return;
+                            }
+
+                            updateLocation(location.id, { city: event.target.value });
+                          }}
+                          value={location.city}
+                        >
+                          <option value="">Elige la ciudad</option>
+                          {cityOptions.map((city) => (
+                            <option key={city} value={city}>
+                              {city}
+                            </option>
+                          ))}
+                          <option value={OTHER_CITY}>Otra ciudad…</option>
+                        </select>
+                      )}
+
+                      {choices.attendMode === "local" ? (
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <Field help="Calle y número." label="Dirección" optional>
+                            <input
+                              className={inputClass}
+                              onChange={(event) =>
+                                updateLocation(location.id, { street: event.target.value })
+                              }
+                              placeholder="Calle Mayor 12, local 3"
+                              value={location.street}
+                            />
+                          </Field>
+                          <Field
+                            help="Para que el agente sepa distinguir tus locales."
+                            label="Nombre del local"
+                            optional={!several}
+                          >
+                            <input
+                              className={inputClass}
+                              onChange={(event) =>
+                                updateLocation(location.id, { venue: event.target.value })
+                              }
+                              placeholder="Sede Centro"
+                              value={location.venue}
+                            />
+                          </Field>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <button
+                className="inline-flex items-center gap-1.5 justify-self-start rounded-full border border-dashed border-[#cbd2c6] px-3.5 py-2 text-sm font-medium text-[#4d5a51] hover:border-[#35735b] hover:text-[#20231f]"
+                onClick={addLocation}
+                type="button"
+              >
+                <Plus size={15} />
+                {choices.attendMode === "domicilio"
+                  ? "Añadir otra ciudad"
+                  : "Añadir otro local"}
+              </button>
             </Question>
           ) : null}
 
@@ -508,10 +621,43 @@ export function StepBusiness({ ctx }: { ctx: StepContext }) {
             />
           </Question>
 
-          <div className="rounded-xl border border-[#e2e6df] bg-[#fafbf8] p-3 text-sm text-[#4d5a51]">
-            {showTimeZone || !choices.timezone ? (
+          <Question
+            hint="Es la hora con la que el agente habla de citas y horarios."
+            title="¿Con qué hora trabajas?"
+          >
+            {countryZones.length > 1 ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {countryZones.map((zone) => (
+                  <OptionCard
+                    active={choices.timezone === zone.key}
+                    description={getZoneOffsetLabel(zone.key)}
+                    key={zone.key}
+                    label={zone.label}
+                    onClick={() => patch({ timezone: zone.key })}
+                  />
+                ))}
+              </div>
+            ) : null}
+
+            {countryZones.length === 1 && !showTimeZone ? (
+              <p className="flex flex-wrap items-center gap-2 rounded-xl border border-[#e2e6df] bg-[#fafbf8] px-3 py-2.5">
+                <span className="font-semibold text-[#20231f]">
+                  {countryZones[0].label}
+                </span>
+                <span className="text-[#647067]">{getZoneOffsetLabel(countryZones[0].key)}</span>
+                <button
+                  className="font-medium text-[#35735b] underline-offset-4 hover:underline"
+                  onClick={() => setShowTimeZone(true)}
+                  type="button"
+                >
+                  Usar otra
+                </button>
+              </p>
+            ) : null}
+
+            {countryZones.length === 0 || showTimeZone ? (
               <Field
-                help="Es la hora que usa el agente para hablar de citas."
+                help="Busca la ciudad más cercana a tu negocio."
                 label="Zona horaria"
               >
                 <select
@@ -521,26 +667,14 @@ export function StepBusiness({ ctx }: { ctx: StepContext }) {
                 >
                   <option value="">Elige tu zona horaria</option>
                   {timeZoneOptions.map((zone) => (
-                    <option key={zone} value={zone}>
-                      {zone}
+                    <option key={zone.key} value={zone.key}>
+                      {zone.label}
                     </option>
                   ))}
                 </select>
               </Field>
-            ) : (
-              <p className="flex flex-wrap items-center gap-2">
-                Hora local para las citas:{" "}
-                <span className="font-semibold text-[#20231f]">{choices.timezone}</span>
-                <button
-                  className="font-medium text-[#35735b] underline-offset-4 hover:underline"
-                  onClick={() => setShowTimeZone(true)}
-                  type="button"
-                >
-                  Cambiar
-                </button>
-              </p>
-            )}
-          </div>
+            ) : null}
+          </Question>
         </div>
       )}
 
