@@ -76,11 +76,11 @@ export default async function OnboardingPage({
       .select("id, kind, title, content, metadata, status")
       .eq("workspace_id", workspaceId)
       .eq("kind", "business_profile"),
+    // También los pausados: en el wizard se pueden volver a activar.
     supabase
       .from("agents")
-      .select("id, name, type, config")
+      .select("id, name, type, config, is_active, system_prompt, temperature")
       .eq("workspace_id", workspaceId)
-      .eq("is_active", true)
       .order("created_at", { ascending: true }),
     admin.from("workspace_members").select("id").eq("workspace_id", workspaceId),
     getOnboardingChecklist(workspaceId),

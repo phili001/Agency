@@ -257,7 +257,7 @@ export async function syncDefaultAgentPrompts(
 ): Promise<number> {
   const { data: agents } = await supabase
     .from("agents")
-    .select("id, name, type, model, config, system_prompt")
+    .select("id, name, type, model, config, system_prompt, temperature")
     .eq("workspace_id", workspaceId);
 
   if (!agents?.length) {
@@ -309,7 +309,8 @@ export async function syncDefaultAgentPrompts(
           model: "gpt-4o-mini",
           name: preset.name,
           system_prompt: buildDefaultAgentPrompt(preset),
-          temperature: 0.3,
+          // El tono lo elige el cliente en el onboarding: no se reescribe.
+          temperature: agent.temperature ?? 0.3,
           type: preset.type,
         })
         .eq("id", agent.id)

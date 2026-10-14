@@ -285,6 +285,35 @@ export function Question({
   );
 }
 
+/** Interruptor de encendido/apagado, para activar o pausar un agente. */
+export function ToggleSwitch({
+  checked,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  onChange: () => void;
+}) {
+  return (
+    <button
+      aria-label={label}
+      aria-pressed={checked}
+      className={`relative h-7 w-12 shrink-0 rounded-full transition ${
+        checked ? "bg-[#35735b]" : "bg-[#cbd2c6]"
+      }`}
+      onClick={onChange}
+      type="button"
+    >
+      <span
+        className={`absolute top-1 size-5 rounded-full bg-white transition-all ${
+          checked ? "left-6" : "left-1"
+        }`}
+      />
+    </button>
+  );
+}
+
 export function StatusPill({
   tone,
   children,

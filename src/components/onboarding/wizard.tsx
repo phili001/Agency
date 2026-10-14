@@ -37,7 +37,10 @@ export type WizardIntegration = {
 export type WizardAgent = {
   config: Json;
   id: string;
+  is_active: boolean;
   name: string;
+  system_prompt: string | null;
+  temperature: number | null;
   type: string;
 };
 

@@ -12,6 +12,12 @@ import {
   Wrench,
 } from "lucide-react";
 
+import {
+  agentTones,
+  buildAgentPrompt,
+  getAgentToneValue,
+  parseAgentPrompt,
+} from "@/lib/agent-prompt";
 import type { Json } from "@/lib/supabase/database.types";
 import type { DefaultConversationMode } from "@/lib/conversation-default";
 import { createClient } from "@/lib/supabase/client";
@@ -167,82 +173,6 @@ function sortAgents(agents: AgentItem[]) {
   });
 }
 
-const responseStyles = [
-  {
-    description: "Preciso, controlado y pegado al RAG.",
-    label: "Amigable",
-    value: "0.3",
-  },
-  {
-    description: "Conversacional y equilibrado.",
-    label: "Natural",
-    value: "0.5",
-  },
-  {
-    description: "Mas expresivo y variable.",
-    label: "Creativo",
-    value: "0.8",
-  },
-] as const;
-
-function getResponseStyleValue(temperature?: number | string | null) {
-  const value = Number(temperature ?? 0.5);
-
-  if (value <= 0.35) {
-    return "0.3";
-  }
-
-  if (value <= 0.65) {
-    return "0.5";
-  }
-
-  return "0.8";
-}
-
-function parseAgentPrompt(prompt?: string | null) {
-  const value = prompt ?? "";
-  const rulesMarker = "\n\nReglas -- que SI debe hacer:\n";
-  const restrictionsMarker = "\n\nRestricciones -- que NUNCA debe hacer:\n";
-  const instructionsPrefix = "Instrucciones del agente:\n";
-
-  if (!value.includes(rulesMarker) && !value.includes(restrictionsMarker)) {
-    return {
-      rules: "",
-      restrictions: "",
-      system_prompt: value,
-    };
-  }
-
-  const [instructionsBlock, afterRules = ""] = value.split(rulesMarker);
-  const [rules = "", restrictions = ""] = afterRules.split(restrictionsMarker);
-
-  return {
-    rules,
-    restrictions,
-    system_prompt: instructionsBlock.replace(instructionsPrefix, ""),
-  };
-}
-
-function buildAgentPrompt({
-  rules,
-  restrictions,
-  system_prompt,
-}: {
-  rules: string;
-  restrictions: string;
-  system_prompt: string;
-}) {
-  return [
-    `Instrucciones del agente:\n${system_prompt.trim()}`,
-    rules.trim() ? `Reglas -- que SI debe hacer:\n${rules.trim()}` : "",
-    restrictions.trim()
-      ? `Restricciones -- que NUNCA debe hacer:\n${restrictions.trim()}`
-      : "",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-}
-
 function ToggleSwitch({
   checked,
   disabled,
@@ -302,7 +232,7 @@ export function AgentSettings({
     router_description: selectedConfig.router_description,
     restrictions: selectedPrompt.restrictions,
     system_prompt: selectedPrompt.system_prompt,
-    temperature: getResponseStyleValue(selectedAgent?.temperature),
+    temperature: getAgentToneValue(selectedAgent?.temperature),
     type: normalizeAgentType(selectedAgent?.type),
   }));
   const [testMessage, setTestMessage] = useState(
@@ -364,7 +294,7 @@ export function AgentSettings({
       router_description: config.router_description,
       restrictions: prompt.restrictions,
       system_prompt: prompt.system_prompt,
-      temperature: getResponseStyleValue(agent.temperature),
+      temperature: getAgentToneValue(agent.temperature),
       type: normalizeAgentType(agent.type),
     });
     setStatus("");
@@ -477,7 +407,7 @@ export function AgentSettings({
       router_description: dataConfig.router_description,
       restrictions: dataPrompt.restrictions,
       system_prompt: dataPrompt.system_prompt,
-      temperature: getResponseStyleValue(data.temperature),
+      temperature: getAgentToneValue(data.temperature),
       type: normalizeAgentType(data.type),
     });
     setStatus("Agente creado.");
@@ -525,7 +455,7 @@ export function AgentSettings({
         router_description: config.router_description,
         restrictions: prompt.restrictions,
         system_prompt: prompt.system_prompt,
-        temperature: getResponseStyleValue(nextAgent.temperature),
+        temperature: getAgentToneValue(nextAgent.temperature),
         type: normalizeAgentType(nextAgent.type),
       });
     }
@@ -769,12 +699,12 @@ export function AgentSettings({
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
-                    temperature: event.target.value,
+                    temperature: getAgentToneValue(event.target.value),
                   }))
                 }
                 value={form.temperature}
               >
-                {responseStyles.map((style) => (
+                {agentTones.map((style) => (
                   <option key={style.value} value={style.value}>
                     {style.label}
                   </option>
