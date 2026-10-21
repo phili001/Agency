@@ -69,6 +69,7 @@ for each row execute function public.set_updated_at();
 alter table public.integration_secrets enable row level security;
 revoke all on public.integration_secrets from anon;
 revoke all on public.integration_secrets from authenticated;
+grant select, insert, update, delete on public.integration_secrets to service_role;
 
 create index if not exists idx_integration_secrets_workspace_provider
 on public.integration_secrets(workspace_id, provider);
@@ -82,6 +83,7 @@ create table if not exists public.platform_admins (
 alter table public.platform_admins enable row level security;
 revoke all on public.platform_admins from anon;
 revoke all on public.platform_admins from authenticated;
+grant select, insert, update, delete on public.platform_admins to service_role;
 
 create index if not exists idx_workspaces_owner_id
 on public.workspaces(owner_id);

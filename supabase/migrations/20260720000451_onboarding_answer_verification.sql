@@ -104,3 +104,4 @@ with check (
 );
 
 grant select, update on table public.flow_answer_reviews to authenticated;
+grant select, insert, update, delete on table public.flow_answer_reviews to service_role;

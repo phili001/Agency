@@ -510,3 +510,19 @@ grant select, insert, update, delete on
   public.workspace_assets,
   public.webhook_events
 to authenticated;
+
+-- Supabase stopped auto-granting Data API access on new public tables (2026-10-30).
+grant usage on schema public to service_role;
+grant select, insert, update, delete on
+  public.workspaces,
+  public.workspace_members,
+  public.contacts,
+  public.agents,
+  public.conversations,
+  public.messages,
+  public.integrations,
+  public.integration_secrets,
+  public.usage_events,
+  public.workspace_assets,
+  public.webhook_events
+to service_role;

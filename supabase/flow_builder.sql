@@ -171,3 +171,17 @@ using (app_private.has_workspace_role(workspace_id, array['owner', 'admin', 'age
 with check (app_private.has_workspace_role(workspace_id, array['owner', 'admin', 'agent']));
 
 grant select, update on table public.flow_answer_reviews to authenticated;
+
+-- Supabase stopped auto-granting Data API access on new public tables (2026-10-30).
+grant select, insert, update, delete on
+  public.flows,
+  public.flow_runs,
+  public.flow_events
+to authenticated;
+
+grant select, insert, update, delete on
+  public.flows,
+  public.flow_runs,
+  public.flow_events,
+  public.flow_answer_reviews
+to service_role;
