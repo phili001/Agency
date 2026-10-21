@@ -1,7 +1,7 @@
-# Graph Report - Agency  (2026-10-20)
+# Graph Report - Agency  (2026-10-21)
 
 ## Corpus Check
-- 162 files · ~100,490 words
+- 162 files · ~100,591 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 2, .example 1, .ico 1)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `89df6fd9`
+- Built from commit: `accf9314`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -285,17 +285,17 @@ Nodes (9): configString(), ContactRow, deleteGoHighLevelContact(), getConfigReco
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `createAdminClient()` connect `createAdminClient` to `Herramientas de calendario GHL`, `buffer/route.ts`, `Alta de clientes tras la compra`, `next`, `Webhooks de YCloud`, `apiErrorResponse`, `normalizeAppUrl`, `agent-settings.tsx`, `calendar-request.ts`, `handoff.ts`, `Páginas del panel`, `Datos y métricas del panel`, `Envío de mensajes YCloud`, `Cron de entrega`, `panel-context.ts`, `Webhook entrante de GHL`, `lucide-react`, `Snapshot de la bandeja`, `ghl-sync/route.ts`, `gohighlevel.ts`?**
-  _High betweenness centrality (0.106) - this node is a cross-community bridge._
+- **Why does `next` connect `next` to `Herramientas de calendario GHL`, `buffer/route.ts`, `Alta de clientes tras la compra`, `Dependencias y ESLint`, `Webhooks de YCloud`, `wizard.tsx`, `apiErrorResponse`, `normalizeAppUrl`, `agent-settings.tsx`, `test-prompt/route.ts`, `Envío de mensajes YCloud`, `Auditoría de rendimiento`, `Cron de entrega`, `panel-context.ts`, `Layout y navegación lateral`, `Webhook entrante de GHL`, `lucide-react`, `Snapshot de la bandeja`, `createAdminClient`, `ghl-sync/route.ts`, `webhooks/ycloud/route.ts`?**
+  _High betweenness centrality (0.116) - this node is a cross-community bridge._
 - **What connects `react-dom`, `tailwindcss`, `@tailwindcss/postcss` to the rest of the system?**
   _30 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Herramientas de calendario GHL` be split into smaller, more focused modules?**
   _Cohesion score 0.08469945355191257 - nodes in this community are weakly interconnected._
-- **Why does `next` connect `next` to `Herramientas de calendario GHL`, `buffer/route.ts`, `Alta de clientes tras la compra`, `Dependencias y ESLint`, `Webhooks de YCloud`, `wizard.tsx`, `apiErrorResponse`, `normalizeAppUrl`, `agent-settings.tsx`, `test-prompt/route.ts`, `Envío de mensajes YCloud`, `Auditoría de rendimiento`, `Cron de entrega`, `panel-context.ts`, `Layout y navegación lateral`, `Webhook entrante de GHL`, `lucide-react`, `Snapshot de la bandeja`, `createAdminClient`, `ghl-sync/route.ts`, `webhooks/ycloud/route.ts`?**
-  _High betweenness centrality (0.099) - this node is a cross-community bridge._
+- **Why does `createAdminClient()` connect `createAdminClient` to `Herramientas de calendario GHL`, `buffer/route.ts`, `Alta de clientes tras la compra`, `next`, `Webhooks de YCloud`, `apiErrorResponse`, `normalizeAppUrl`, `agent-settings.tsx`, `calendar-request.ts`, `handoff.ts`, `Páginas del panel`, `Datos y métricas del panel`, `Envío de mensajes YCloud`, `Cron de entrega`, `panel-context.ts`, `Webhook entrante de GHL`, `lucide-react`, `Snapshot de la bandeja`, `ghl-sync/route.ts`, `gohighlevel.ts`?**
+  _High betweenness centrality (0.112) - this node is a cross-community bridge._
 - **Should `buffer/route.ts` be split into smaller, more focused modules?**
   _Cohesion score 0.13405797101449277 - nodes in this community are weakly interconnected._
 - **Why does `lucide-react` connect `lucide-react` to `panel-context.ts`, `Layout y navegación lateral`, `Paso de negocio del onboarding`, `Constructor de flujos`, `Dependencias y ESLint`, `wizard.tsx`, `Bandeja de entrada`, `agent-settings.tsx`, `Guía interactiva y sesión`, `Datos y métricas del panel`, `workspace-settings.tsx`?**
-  _High betweenness centrality (0.065) - this node is a cross-community bridge._
+  _High betweenness centrality (0.058) - this node is a cross-community bridge._
 - **Should `WorkspaceSettings` be split into smaller, more focused modules?**
   _Cohesion score 0.13768115942028986 - nodes in this community are weakly interconnected._
