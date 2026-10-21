@@ -155,6 +155,21 @@ están, de la conexión de GoHighLevel guardada en AAA001.
 El id del calendario sale de GHL: *Calendars > el calendario > Settings*, o del
 final de su enlace de reservas.
 
+**Permisos del token.** El token tiene que ser de una *Private Integration* con
+estos scopes, o GHL responde `The token is not authorized for this scope` y no
+cargan las horas:
+
+- View Calendars
+- View Calendar Events y Edit Calendar Events
+- View Contacts y Edit Contacts (la cita se crea sobre un contacto)
+- View Locations
+
+Ojo: `GHL_AGENCY_TOKEN` se creó para el funnel de compra (contactos y campos
+personalizados) y **no suele tener los de calendario**. Si al heredarlo falla,
+añádeselos en GHL o crea un token aparte y ponlo en `LEVY_MEETING_GHL_TOKEN`.
+Cuando GHL rechaza por permisos, el log del servidor dice qué variable revisar:
+`[levy-calendar] El token de ... no tiene permisos de calendario`.
+
 Si falta `LEVY_MEETING_CALENDAR_ID`, el paso no desaparece: muestra el WhatsApp
 de soporte y deja seguir. `LEVY_WORKSPACE_CODE` (por defecto `AAA001`) solo hace
 falta si la empresa creadora de Levy tuviera otro código.

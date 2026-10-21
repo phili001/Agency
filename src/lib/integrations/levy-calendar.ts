@@ -4,6 +4,7 @@ import { cache } from "react";
 
 import {
   type MeetingDay,
+  isScopeError,
   resolveMeetingCredentials,
 } from "@/lib/onboarding-meeting";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -39,7 +40,27 @@ export type LevyCalendar = {
   apiKey: string;
   calendarId: string;
   locationId: string;
+  /** Qué variable aportó el token, para poder nombrarla si GHL la rechaza. */
+  source: string;
 };
+
+/**
+ * GoHighLevel rechaza por permisos cuando el token no tiene los scopes de
+ * calendario. Se registra diciendo qué variable arreglar: sin esto el error
+ * ("The token is not authorized for this scope") no dice de qué token habla.
+ */
+function logCalendarError(calendar: LevyCalendar | null, error: unknown) {
+  if (calendar && isScopeError(error)) {
+    console.error(
+      `[levy-calendar] El token de ${calendar.source} no tiene permisos de calendario en GoHighLevel. ` +
+        "Añade a esa integración privada: View Calendars, View/Edit Calendar Events, View/Edit Contacts y View Locations.",
+      error,
+    );
+    return;
+  }
+
+  console.error("[levy-calendar] GoHighLevel rechazó la petición:", error);
+}
 
 type Cached<T> = { expiresAt: number; value: T };
 
@@ -68,7 +89,7 @@ export const getLevyCalendar = cache(async (): Promise<LevyCalendar | null> => {
 });
 
 async function resolveLevyCalendar(): Promise<LevyCalendar | null> {
-  const { calendarId, locationId, token } = resolveMeetingCredentials(process.env);
+  const { calendarId, locationId, source, token } = resolveMeetingCredentials(process.env);
 
   // Sin calendario propio no se agenda nada: el calendario de puesta en marcha
   // es distinto del que AAA001 usa con sus clientes, así que nunca se adivina.
@@ -79,7 +100,7 @@ async function resolveLevyCalendar(): Promise<LevyCalendar | null> {
   // Credenciales propias (el calendario vive en otra subcuenta de GHL): ni se
   // toca la base de datos.
   if (token && locationId) {
-    return { apiKey: token, calendarId, locationId };
+    return { apiKey: token, calendarId, locationId, source };
   }
 
   // Si no, el calendario está en la subcuenta de AAA001: se usa su conexión
@@ -105,6 +126,7 @@ async function resolveLevyCalendar(): Promise<LevyCalendar | null> {
     apiKey: token || context.apiKey,
     calendarId,
     locationId: locationId || context.locationId,
+    source: token ? source : "la conexión de GoHighLevel de AAA001",
   };
 }
 
@@ -174,19 +196,27 @@ export async function getLevyMeetingDays(timeZone: string): Promise<MeetingDay[]
 
   const startDate = new Date();
   const endDate = new Date(startDate.getTime() + DAYS_AHEAD * 24 * 60 * 60 * 1000);
-  const { slots } = await getVerifiedFreeSlots({
-    apiKey: calendar.apiKey,
-    calendarId: calendar.calendarId,
-    endDate,
-    locationId: calendar.locationId,
-    startDate,
-    timezone: zone,
-  });
-  const days = groupSlotsByDay(slots, zone);
 
-  slotsCache.set(key, { expiresAt: Date.now() + SLOTS_TTL_MS, value: days });
+  try {
+    const { slots } = await getVerifiedFreeSlots({
+      apiKey: calendar.apiKey,
+      calendarId: calendar.calendarId,
+      endDate,
+      locationId: calendar.locationId,
+      startDate,
+      timezone: zone,
+    });
+    const days = groupSlotsByDay(slots, zone);
 
-  return days;
+    slotsCache.set(key, { expiresAt: Date.now() + SLOTS_TTL_MS, value: days });
+
+    return days;
+  } catch (error) {
+    // Un fallo de GHL no puede tumbar el onboarding: la pantalla enseña el
+    // WhatsApp de soporte y el cliente sigue con su configuración.
+    logCalendarError(calendar, error);
+    throw error;
+  }
 }
 
 /** Tras agendar o cancelar, los huecos cambian: se tira la caché. */
@@ -213,26 +243,40 @@ export async function bookLevyMeeting({
     throw new Error("El calendario de puesta en marcha no está configurado.");
   }
 
-  const contactId = await ensureGhlContact({
-    apiKey: calendar.apiKey,
-    email,
-    fullName: fullName || companyName,
-    locationId: calendar.locationId,
-    phone,
-  });
+  let contactId: string | null;
+
+  try {
+    contactId = await ensureGhlContact({
+      apiKey: calendar.apiKey,
+      email,
+      fullName: fullName || companyName,
+      locationId: calendar.locationId,
+      phone,
+    });
+  } catch (error) {
+    logCalendarError(calendar, error);
+    throw error;
+  }
 
   if (!contactId) {
     throw new Error("GoHighLevel no devolvió el contacto de la reunión.");
   }
 
-  const appointmentId = await createAppointment({
-    apiKey: calendar.apiKey,
-    calendarId: calendar.calendarId,
-    contactId,
-    locationId: calendar.locationId,
-    startTime,
-    title: `Puesta en marcha Levy · ${companyName}`,
-  });
+  let appointmentId: string;
+
+  try {
+    appointmentId = await createAppointment({
+      apiKey: calendar.apiKey,
+      calendarId: calendar.calendarId,
+      contactId,
+      locationId: calendar.locationId,
+      startTime,
+      title: `Puesta en marcha Levy · ${companyName}`,
+    });
+  } catch (error) {
+    logCalendarError(calendar, error);
+    throw error;
+  }
 
   clearLevyMeetingSlots();
 

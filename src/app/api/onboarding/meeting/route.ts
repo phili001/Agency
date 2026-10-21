@@ -82,13 +82,20 @@ export async function GET(request: Request) {
       return NextResponse.json({ available: false, days: [], meeting: null });
     }
 
-    const days = await getLevyMeetingDays(timeZone);
+    const meeting = getBookedMeeting(workspace?.onboarding_state);
 
-    return NextResponse.json({
-      available: true,
-      days,
-      meeting: getBookedMeeting(workspace?.onboarding_state),
-    });
+    try {
+      return NextResponse.json({
+        available: true,
+        days: await getLevyMeetingDays(timeZone),
+        meeting,
+      });
+    } catch {
+      // GoHighLevel caído o mal configurado: el paso sigue abierto, pero sin
+      // horas. La pantalla enseña el contacto de soporte. El motivo real ya
+      // quedó en el log del servidor, con el nombre de la variable a revisar.
+      return NextResponse.json({ available: true, days: [], error: "calendar", meeting });
+    }
   } catch (error) {
     return apiErrorResponse(error, "onboarding/meeting");
   }

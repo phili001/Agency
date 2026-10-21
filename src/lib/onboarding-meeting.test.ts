@@ -5,6 +5,7 @@ import {
   formatMeetingWhen,
   getBookedMeeting,
   isMeetingPast,
+  isScopeError,
   resolveMeetingCredentials,
 } from "./onboarding-meeting.ts";
 
@@ -61,7 +62,12 @@ describe("reunión de puesta en marcha", () => {
         LEVY_MEETING_GHL_LOCATION_ID: "loc_onboarding",
         LEVY_MEETING_GHL_TOKEN: "pit-onboarding",
       }),
-      { calendarId: "cal_onboarding", locationId: "loc_onboarding", token: "pit-onboarding" },
+      {
+        calendarId: "cal_onboarding",
+        locationId: "loc_onboarding",
+        source: "LEVY_MEETING_GHL_TOKEN",
+        token: "pit-onboarding",
+      },
     );
   });
 
@@ -72,12 +78,27 @@ describe("reunión de puesta en marcha", () => {
         GHL_AGENCY_TOKEN: "pit-agencia",
         LEVY_MEETING_CALENDAR_ID: " cal_onboarding ",
       }),
-      { calendarId: "cal_onboarding", locationId: "loc_agencia", token: "pit-agencia" },
+      {
+        calendarId: "cal_onboarding",
+        locationId: "loc_agencia",
+        source: "GHL_AGENCY_TOKEN",
+        token: "pit-agencia",
+      },
     );
   });
 
   it("sin id de calendario no hay reunión que agendar", () => {
     assert.equal(resolveMeetingCredentials({ LEVY_MEETING_CALENDAR_ID: "   " }).calendarId, "");
     assert.equal(resolveMeetingCredentials({}).calendarId, "");
+  });
+
+  it("reconoce el rechazo de GoHighLevel por permisos", () => {
+    assert.equal(isScopeError(new Error("The token is not authorized for this scope.")), true);
+    assert.equal(isScopeError(new Error("GHL 401: unauthorized")), true);
+    assert.equal(isScopeError(new Error("fetch failed")), false);
+  });
+
+  it("sin token propio ni de agencia, el origen es la conexión de AAA001", () => {
+    assert.equal(resolveMeetingCredentials({ LEVY_MEETING_CALENDAR_ID: "cal" }).source, "AAA001");
   });
 });

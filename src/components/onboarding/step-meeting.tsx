@@ -39,6 +39,8 @@ export function StepMeeting({ ctx }: { ctx: StepContext }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [changing, setChanging] = useState(false);
+  // El calendario no contesta (caído o sin permisos): se ofrece el WhatsApp.
+  const [calendarDown, setCalendarDown] = useState(false);
   const timeZone = ctx.timeZone;
 
   useEffect(() => {
@@ -67,7 +69,13 @@ export function StepMeeting({ ctx }: { ctx: StepContext }) {
         return;
       }
 
-      const payload = (await response.json()) as { days: MeetingDay[] };
+      const payload = (await response.json()) as { days: MeetingDay[]; error?: string };
+
+      if (payload.error) {
+        setCalendarDown(true);
+        return;
+      }
+
       setDays(payload.days);
       setDateKey((current) => current || payload.days[0]?.dateKey || "");
       ctx.setMeetingDays(payload.days);
@@ -143,7 +151,7 @@ export function StepMeeting({ ctx }: { ctx: StepContext }) {
     setLoadingDays(days.length === 0);
   }
 
-  if (!ctx.meetingAvailable) {
+  if (!ctx.meetingAvailable || calendarDown) {
     const message = buildSupportMessage({
       companyName: ctx.workspace.name,
       stepIndex: 3,
@@ -155,7 +163,11 @@ export function StepMeeting({ ctx }: { ctx: StepContext }) {
         <StepHeading
           eyebrow="Paso 3 · Reunión con Levy"
           title="¿Prefieres que lo hagamos juntos?"
-          description="Los dos pasos siguientes piden dos llaves. Si no quieres hacerlo solo, escríbenos y lo configuramos contigo."
+          description={
+            calendarDown
+              ? "La agenda no responde ahora mismo. Escríbenos y buscamos un hueco contigo; mientras tanto puedes seguir con la configuración."
+              : "Los dos pasos siguientes piden dos llaves. Si no quieres hacerlo solo, escríbenos y lo configuramos contigo."
+          }
         />
         <a
           className={`${primaryButton} justify-self-start`}

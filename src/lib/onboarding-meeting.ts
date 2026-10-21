@@ -100,6 +100,8 @@ export function isMeetingPast(meeting: BookedMeeting | null, now = new Date()) {
 export type MeetingCredentials = {
   calendarId: string;
   locationId: string;
+  /** De dónde salió el token: lo dice el log cuando GHL rechaza por permisos. */
+  source: "AAA001" | "GHL_AGENCY_TOKEN" | "LEVY_MEETING_GHL_TOKEN";
   token: string;
 };
 
@@ -118,9 +120,27 @@ export function resolveMeetingCredentials(
     return "";
   };
 
+  const token = read("LEVY_MEETING_GHL_TOKEN", "GHL_AGENCY_TOKEN");
+
   return {
     calendarId: read("LEVY_MEETING_CALENDAR_ID"),
     locationId: read("LEVY_MEETING_GHL_LOCATION_ID", "GHL_AGENCY_LOCATION_ID"),
-    token: read("LEVY_MEETING_GHL_TOKEN", "GHL_AGENCY_TOKEN"),
+    source: env.LEVY_MEETING_GHL_TOKEN?.trim()
+      ? "LEVY_MEETING_GHL_TOKEN"
+      : token
+        ? "GHL_AGENCY_TOKEN"
+        : "AAA001",
+    token,
   };
+}
+
+/**
+ * GoHighLevel responde "The token is not authorized for this scope" cuando el
+ * token existe pero no tiene los permisos de calendario. Es el fallo más
+ * común al estrenar el paso, así que se reconoce para poder decir qué arreglar.
+ */
+export function isScopeError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+
+  return /not authorized for this scope|insufficient.*scope|401|403/i.test(message);
 }
