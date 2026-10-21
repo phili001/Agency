@@ -8,6 +8,7 @@ export type OnboardingChecklist = {
   agentReady: boolean;
   businessReady: boolean;
   firstSignalReady: boolean;
+  meetingReady: boolean;
   openaiReady: boolean;
   teamReady: boolean;
   ycloudReady: boolean;
@@ -17,6 +18,7 @@ export type OnboardingStepId =
   | "welcome"
   | "business"
   | "agents"
+  | "meeting"
   | "openai"
   | "whatsapp"
   | "test"
@@ -47,11 +49,13 @@ export const onboardingSteps: OnboardingStep[] = [
   { checklistKey: null, id: "welcome", index: 0, optional: true, shortTitle: "Bienvenida" },
   { checklistKey: "businessReady", id: "business", index: 1, optional: false, shortTitle: "Tu negocio" },
   { checklistKey: "agentReady", id: "agents", index: 2, optional: false, shortTitle: "Tus agentes" },
-  { checklistKey: "openaiReady", id: "openai", index: 3, optional: false, shortTitle: "El cerebro (OpenAI)" },
-  { checklistKey: "ycloudReady", id: "whatsapp", index: 4, optional: false, shortTitle: "Tu WhatsApp" },
-  { checklistKey: "firstSignalReady", id: "test", index: 5, optional: false, shortTitle: "Prueba real" },
-  { checklistKey: "teamReady", id: "extras", index: 6, optional: true, shortTitle: "Equipo y extras" },
-  { checklistKey: null, id: "done", index: 7, optional: true, shortTitle: "Listo" },
+  // Opcional a propósito: quien sepa seguir solo no debe quedarse bloqueado.
+  { checklistKey: "meetingReady", id: "meeting", index: 3, optional: true, shortTitle: "Reunión con Levy" },
+  { checklistKey: "openaiReady", id: "openai", index: 4, optional: false, shortTitle: "El cerebro (OpenAI)" },
+  { checklistKey: "ycloudReady", id: "whatsapp", index: 5, optional: false, shortTitle: "Tu WhatsApp" },
+  { checklistKey: "firstSignalReady", id: "test", index: 6, optional: false, shortTitle: "Prueba real" },
+  { checklistKey: "teamReady", id: "extras", index: 7, optional: true, shortTitle: "Equipo y extras" },
+  { checklistKey: null, id: "done", index: 8, optional: true, shortTitle: "Listo" },
 ];
 
 export const onboardingStepCount = onboardingSteps.length;

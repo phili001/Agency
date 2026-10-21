@@ -14,6 +14,7 @@ const empty = {
   agentReady: false,
   businessReady: false,
   firstSignalReady: false,
+  meetingReady: false,
   openaiReady: false,
   teamReady: false,
   ycloudReady: false,

@@ -10,6 +10,7 @@ import {
   onboardingStepCount,
   onboardingSteps,
 } from "@/lib/onboarding-steps";
+import type { BookedMeeting, MeetingDay } from "@/lib/onboarding-meeting";
 import type { Json } from "@/lib/supabase/database.types";
 
 import { SupportContact } from "./shared";
@@ -17,6 +18,7 @@ import { StepAgents } from "./step-agents";
 import { StepBusiness } from "./step-business";
 import { StepDone } from "./step-done";
 import { StepExtras } from "./step-extras";
+import { StepMeeting } from "./step-meeting";
 import { StepOpenAI } from "./step-openai";
 import { StepTest } from "./step-test";
 import { StepWelcome } from "./step-welcome";
@@ -61,7 +63,15 @@ export type WizardProps = {
   defaultConversationMode: DefaultConversationMode;
   initialStep: number;
   integrations: WizardIntegration[];
+  /** Reunión de puesta en marcha ya agendada, si la hay. */
+  meeting: BookedMeeting | null;
+  /** false cuando AAA001 no tiene calendario conectado: el paso se adapta. */
+  meetingAvailable: boolean;
+  /** Huecos que el servidor adelanta para que el paso pinte sin esperas. */
+  meetingDays: MeetingDay[];
   memberCount: number;
+  /** Zona horaria del negocio: en ella se enseñan y se guardan las horas. */
+  timeZone: string;
   /** Solo existe cuando YCloud ya se guardo; la genera el servidor. */
   webhookUrl: string | null;
   workspace: WizardWorkspace;
@@ -78,18 +88,33 @@ export type StepContext = {
   goNext: () => void;
   goTo: (index: number) => void;
   integrations: WizardIntegration[];
+  meeting: BookedMeeting | null;
+  meetingAvailable: boolean;
+  meetingDays: MeetingDay[];
+  meetingPhone: string;
   memberCount: number;
   patchChecklist: (patch: Partial<OnboardingChecklist>) => void;
   setAgents: (agents: WizardAgent[]) => void;
   setBusinessProfile: (asset: WizardAsset | null) => void;
   setDefaultConversationMode: (mode: DefaultConversationMode) => void;
+  setMeeting: (meeting: BookedMeeting | null) => void;
+  setMeetingDays: (days: MeetingDay[]) => void;
   setMemberCount: (count: number) => void;
   setWebhookUrl: (url: string | null) => void;
   skipForNow: () => Promise<void>;
+  timeZone: string;
   upsertIntegration: (integration: WizardIntegration) => void;
   webhookUrl: string | null;
   workspace: WizardWorkspace;
 };
+
+/** Teléfono que ya conocemos del cliente, para no pedirlo dos veces. */
+function getMeetingPhone(integrations: WizardIntegration[]) {
+  const ycloud = integrations.find((item) => item.provider === "ycloud");
+  const phone = getIntegrationConfig(ycloud).phone_e164;
+
+  return typeof phone === "string" ? phone : "";
+}
 
 export function getIntegrationConfig(integration?: WizardIntegration | null) {
   return integration?.config &&
@@ -106,6 +131,8 @@ export function OnboardingWizard(props: WizardProps) {
   const [agents, setAgents] = useState(props.agents);
   const [businessProfile, setBusinessProfile] = useState(props.businessProfile);
   const [memberCount, setMemberCount] = useState(props.memberCount);
+  const [meeting, setMeeting] = useState(props.meeting);
+  const [meetingDays, setMeetingDays] = useState(props.meetingDays);
   const [webhookUrl, setWebhookUrl] = useState(props.webhookUrl);
   const [defaultConversationMode, setDefaultConversationMode] = useState(
     props.defaultConversationMode,
@@ -146,14 +173,22 @@ export function OnboardingWizard(props: WizardProps) {
     goNext: () => goTo(step + 1),
     goTo,
     integrations,
+    meeting,
+    meetingAvailable: props.meetingAvailable,
+    meetingDays,
+    // El teléfono del WhatsApp conectado, si ya lo puso, ahorra escribirlo.
+    meetingPhone: getMeetingPhone(integrations),
     memberCount,
     patchChecklist: (patch) => setChecklist((current) => ({ ...current, ...patch })),
     setAgents,
     setBusinessProfile,
     setDefaultConversationMode,
+    setMeeting,
+    setMeetingDays,
     setMemberCount,
     setWebhookUrl,
     skipForNow,
+    timeZone: props.timeZone,
     upsertIntegration: (integration) =>
       setIntegrations((current) => [
         ...current.filter((item) => item.provider !== integration.provider),
@@ -205,7 +240,8 @@ export function OnboardingWizard(props: WizardProps) {
               </span>
               <span className="text-[#647067]">{current.shortTitle}</span>
             </div>
-            <ol className="grid grid-cols-7 gap-1.5">
+            {/* auto-cols-fr: la barra se reparte sola, haya 7 pasos o 9. */}
+            <ol className="grid auto-cols-fr grid-flow-col gap-1.5">
               {numberedSteps.map((item) => {
                 // Verde solo si el checklist lo confirma: pasar de largo no cuenta.
                 const done = Boolean(item.checklistKey && checklist[item.checklistKey]);
@@ -238,6 +274,7 @@ export function OnboardingWizard(props: WizardProps) {
           {current.id === "welcome" ? <StepWelcome ctx={context} /> : null}
           {current.id === "business" ? <StepBusiness ctx={context} /> : null}
           {current.id === "agents" ? <StepAgents ctx={context} /> : null}
+          {current.id === "meeting" ? <StepMeeting ctx={context} /> : null}
           {current.id === "openai" ? <StepOpenAI ctx={context} /> : null}
           {current.id === "whatsapp" ? <StepWhatsApp ctx={context} /> : null}
           {current.id === "test" ? <StepTest ctx={context} /> : null}

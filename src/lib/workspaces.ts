@@ -7,6 +7,7 @@ import {
   buildDefaultAgentPrompt,
   defaultAgentPresets,
 } from "@/lib/default-agents";
+import { getBookedMeeting } from "@/lib/onboarding-meeting";
 import {
   type OnboardingChecklist,
   getOnboardingState,
@@ -244,12 +245,15 @@ export async function getOnboardingChecklist(workspaceId: string) {
     getOnboardingState(workspace?.onboarding_state).agents_confirmed_at,
   );
 
+  const meeting = getBookedMeeting(workspace?.onboarding_state);
+
   return {
     agentReady:
       agentsConfirmed ||
       Boolean(agents?.some((agent) => isAgentConfiguredForOnboarding(agent.config))),
     businessReady: Boolean(businessProfile?.length),
     firstSignalReady: Boolean(webhooks?.length || sentMessages?.length),
+    meetingReady: Boolean(meeting),
     openaiReady: activeProviders.has("openai"),
     teamReady: (members?.length ?? 0) > 1,
     ycloudReady: activeProviders.has("ycloud"),

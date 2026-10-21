@@ -52,7 +52,7 @@ export function OnboardingProgressCard({
         </div>
         <Link
           className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#10231c] px-4 text-sm font-semibold text-white"
-          href={next ? `/onboarding?paso=${next.index}` : "/onboarding?paso=7"}
+          href={`/onboarding?paso=${next?.index ?? onboardingSteps.length - 1}`}
         >
           {next ? `Continuar: ${next.shortTitle}` : "Terminar configuración"}
           <ArrowRight size={16} />

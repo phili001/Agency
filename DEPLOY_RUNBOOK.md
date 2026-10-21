@@ -136,6 +136,33 @@ Requisitos: las tres variables de la sección *Alta automática* de
 `nombre_del_negocio` creados en GHL, y en Supabase *Auth > Email OTP
 Expiration* a 86400 (24 h): el enlace de acceso usa esa caducidad.
 
+### Reunión de puesta en marcha (paso 3 del onboarding)
+
+Antes de pedirle las llaves, el cliente puede agendar 30 minutos con nosotros.
+Ese calendario es **propio del onboarding**: no es el que AAA001 usa para
+atender a sus clientes, así que hay que decir cuál es.
+
+| Variable | Cuándo se pone |
+| --- | --- |
+| `LEVY_MEETING_CALENDAR_ID` | **Siempre.** Id del calendario de puesta en marcha. Sin él, el paso no ofrece horas. |
+| `LEVY_MEETING_GHL_TOKEN` | Solo si ese calendario vive en otra subcuenta de GHL. |
+| `LEVY_MEETING_GHL_LOCATION_ID` | Igual que el anterior: la location de esa subcuenta. |
+
+Si no se ponen token y location, se heredan de `GHL_AGENCY_TOKEN` /
+`GHL_AGENCY_LOCATION_ID` (el GoHighLevel del funnel de compra) y, si tampoco
+están, de la conexión de GoHighLevel guardada en AAA001.
+
+El id del calendario sale de GHL: *Calendars > el calendario > Settings*, o del
+final de su enlace de reservas.
+
+Si falta `LEVY_MEETING_CALENDAR_ID`, el paso no desaparece: muestra el WhatsApp
+de soporte y deja seguir. `LEVY_WORKSPACE_CODE` (por defecto `AAA001`) solo hace
+falta si la empresa creadora de Levy tuviera otro código.
+
+Los huecos libres se piden a GHL una vez por minuto y se guardan en memoria, y
+la pantalla del onboarding los recibe ya pintados desde el servidor; si GHL
+tarda más de 2,5 s, la página no espera y los carga la pantalla por su cuenta.
+
 ## 8. Antes de dar acceso a un cliente
 
 - [ ] Preflight en verde

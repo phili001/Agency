@@ -3,7 +3,14 @@ import { redirect } from "next/navigation";
 import { OnboardingWizard } from "@/components/onboarding/wizard";
 import { normalizeAppUrl } from "@/lib/app-url";
 import { getDefaultConversationMode } from "@/lib/conversation-default";
+import { isValidTimeZone } from "@/lib/integrations/ghl-calendar";
+import {
+  getLevyCalendar,
+  getLevyMeetingDays,
+} from "@/lib/integrations/levy-calendar";
 import { getIntegrationSecret } from "@/lib/integrations/secrets";
+import { getBusinessProfileMetadata } from "@/lib/business-profile";
+import { getBookedMeeting } from "@/lib/onboarding-meeting";
 import { getFirstPendingStep, parseStepIndex } from "@/lib/onboarding-steps";
 import { isPlatformAdmin } from "@/lib/platform-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -92,6 +99,22 @@ export default async function OnboardingPage({
   }
 
   const appUrl = normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL);
+  const businessProfile = assets?.[0] ?? null;
+  const profileTimeZone = getBusinessProfileMetadata(businessProfile?.metadata).fields?.timezone;
+  const timeZone =
+    profileTimeZone && isValidTimeZone(profileTimeZone) ? profileTimeZone : "Europe/Madrid";
+  const meeting = getBookedMeeting(workspace.onboarding_state);
+  const meetingCalendar = await getLevyCalendar();
+  // Los huecos se adelantan aquí (están cacheados un minuto) para que el paso
+  // de la reunión aparezca ya pintado. Si GoHighLevel tarda, la pantalla los
+  // pide por su cuenta en vez de retrasar todo el onboarding.
+  const meetingDays =
+    meetingCalendar && !meeting
+      ? await Promise.race([
+          getLevyMeetingDays(timeZone).catch(() => []),
+          new Promise<never[]>((resolve) => setTimeout(() => resolve([]), 2500)),
+        ])
+      : [];
   const companyCode =
     "company_code" in workspace && typeof workspace.company_code === "string"
       ? workspace.company_code
@@ -105,12 +128,16 @@ export default async function OnboardingPage({
     <OnboardingWizard
       agents={(agents ?? []) as never}
       appUrl={appUrl}
-      businessProfile={assets?.[0] ?? null}
+      businessProfile={businessProfile}
       checklist={checklist}
       defaultConversationMode={getDefaultConversationMode(workspace.onboarding_state)}
       initialStep={requestedStep ?? getFirstPendingStep(checklist).index}
       integrations={(integrations ?? []) as never}
+      meeting={meeting}
+      meetingAvailable={Boolean(meetingCalendar)}
+      meetingDays={meetingDays}
       memberCount={members?.length ?? 1}
+      timeZone={timeZone}
       webhookUrl={webhookUrl}
       workspace={{ company_code: companyCode, id: workspace.id, name: workspace.name }}
     />

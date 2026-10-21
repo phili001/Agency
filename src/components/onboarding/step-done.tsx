@@ -3,7 +3,11 @@
 import { ArrowRight, Check, Circle, Loader2 } from "lucide-react";
 import { useState } from "react";
 
-import { getPendingSteps } from "@/lib/onboarding-steps";
+import {
+  type OnboardingStepId,
+  getPendingSteps,
+  onboardingSteps,
+} from "@/lib/onboarding-steps";
 
 import {
   HowTo,
@@ -24,14 +28,30 @@ export function StepDone({ ctx }: { ctx: StepContext }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  // Los pasos vienen del catálogo para que no se descuadren si cambia el orden.
+  const stepIndex = (id: OnboardingStepId) =>
+    onboardingSteps.find((step) => step.id === id)?.index ?? 0;
   const items = [
-    { done: ctx.checklist.businessReady, label: "Datos de tu negocio", step: 1 },
-    { done: ctx.checklist.agentReady, label: "Agentes confirmados", step: 2 },
-    { done: ctx.checklist.openaiReady, label: "OpenAI conectado", step: 3 },
-    { done: ctx.checklist.ycloudReady, label: "WhatsApp conectado", step: 4 },
-    { done: ctx.checklist.firstSignalReady, label: "Primer mensaje recibido", step: 5 },
-    { done: ctx.checklist.teamReady, label: "Equipo invitado (opcional)", step: 6 },
-    { done: ghlConnected, label: "GoHighLevel (opcional)", step: 6 },
+    { done: ctx.checklist.businessReady, label: "Datos de tu negocio", step: stepIndex("business") },
+    { done: ctx.checklist.agentReady, label: "Agentes confirmados", step: stepIndex("agents") },
+    {
+      done: ctx.checklist.meetingReady,
+      label: "Reunión con Levy (opcional)",
+      step: stepIndex("meeting"),
+    },
+    { done: ctx.checklist.openaiReady, label: "OpenAI conectado", step: stepIndex("openai") },
+    { done: ctx.checklist.ycloudReady, label: "WhatsApp conectado", step: stepIndex("whatsapp") },
+    {
+      done: ctx.checklist.firstSignalReady,
+      label: "Primer mensaje recibido",
+      step: stepIndex("test"),
+    },
+    {
+      done: ctx.checklist.teamReady,
+      label: "Equipo invitado (opcional)",
+      step: stepIndex("extras"),
+    },
+    { done: ghlConnected, label: "GoHighLevel (opcional)", step: stepIndex("extras") },
   ];
 
   async function enter() {
