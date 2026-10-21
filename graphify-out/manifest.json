@@ -858,16 +858,16 @@
     "semantic_hash": "050dd1be5e9452c8c8750b612aa3155b"
   },
   "supabase/flow_builder.sql": {
-    "mtime": 1785954902.2667115,
-    "seen": 1792424013.113455,
-    "ast_hash": "e3a5d2aad4a01d44d616bb29e9ac6c16",
-    "semantic_hash": "e3a5d2aad4a01d44d616bb29e9ac6c16"
+    "mtime": 1792596323.2629383,
+    "seen": 1792596501.71359,
+    "ast_hash": "78238edf113f9111f48d875bbec726e1",
+    "semantic_hash": ""
   },
   "supabase/migrations/20260720000451_onboarding_answer_verification.sql": {
-    "mtime": 1785954902.266895,
-    "seen": 1792424013.113455,
-    "ast_hash": "08427c0b37f9cbbfa9673a51fa49d843",
-    "semantic_hash": "08427c0b37f9cbbfa9673a51fa49d843"
+    "mtime": 1792596323.2645516,
+    "seen": 1792596501.713592,
+    "ast_hash": "a5e879da1e92af4279c238a591423e76",
+    "semantic_hash": ""
   },
   "supabase/migrations/20260918000000_conversations_one_open_per_contact.sql": {
     "mtime": 1789737924.0357652,
@@ -888,16 +888,16 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "supabase/schema.sql": {
-    "mtime": 1785954902.2670538,
-    "seen": 1792424013.113457,
-    "ast_hash": "f2dbec5a624adeecc1cfe785f3b1513c",
-    "semantic_hash": "f2dbec5a624adeecc1cfe785f3b1513c"
+    "mtime": 1792596323.2611303,
+    "seen": 1792596501.713595,
+    "ast_hash": "549381c2c986195a836e02cd4659003c",
+    "semantic_hash": ""
   },
   "supabase/self_service_onboarding.sql": {
-    "mtime": 1785954902.2671378,
-    "seen": 1792424013.113457,
-    "ast_hash": "1a6117ba9630f68cdd12fe11990e7314",
-    "semantic_hash": "1a6117ba9630f68cdd12fe11990e7314"
+    "mtime": 1792596323.391464,
+    "seen": 1792596501.7135959,
+    "ast_hash": "dbb1fa21c4384ad96125b389bd54a9d0",
+    "semantic_hash": ""
   },
   "supabase/set_default_handoff.sql": {
     "mtime": 1785954902.267212,
