@@ -283,8 +283,8 @@ export function StepMeeting({ ctx }: { ctx: StepContext }) {
               </Question>
 
               <Field
-                help="Solo lo usamos para avisarte si hay cualquier cambio."
-                label="Teléfono de contacto"
+                help="Tu móvil, para avisarte o llamarte el día de la reunión. No es el número de WhatsApp de tu negocio."
+                label="¿A qué teléfono te contactamos?"
               >
                 <input
                   className={inputClass}

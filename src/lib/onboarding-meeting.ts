@@ -23,6 +23,8 @@ export type MeetingDay = {
 export type BookedMeeting = {
   appointmentId: string;
   bookedAt: string;
+  /** Teléfono personal de contacto, no el WhatsApp del negocio. */
+  phone: string;
   startTime: string;
   timezone: string;
 };
@@ -49,6 +51,7 @@ export function getBookedMeeting(onboardingState: Json | null | undefined): Book
   return {
     appointmentId,
     bookedAt: asString(meeting.bookedAt),
+    phone: asString(meeting.phone),
     startTime,
     timezone: asString(meeting.timezone),
   };

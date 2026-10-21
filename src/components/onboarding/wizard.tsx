@@ -108,14 +108,6 @@ export type StepContext = {
   workspace: WizardWorkspace;
 };
 
-/** Teléfono que ya conocemos del cliente, para no pedirlo dos veces. */
-function getMeetingPhone(integrations: WizardIntegration[]) {
-  const ycloud = integrations.find((item) => item.provider === "ycloud");
-  const phone = getIntegrationConfig(ycloud).phone_e164;
-
-  return typeof phone === "string" ? phone : "";
-}
-
 export function getIntegrationConfig(integration?: WizardIntegration | null) {
   return integration?.config &&
     typeof integration.config === "object" &&
@@ -176,8 +168,9 @@ export function OnboardingWizard(props: WizardProps) {
     meeting,
     meetingAvailable: props.meetingAvailable,
     meetingDays,
-    // El teléfono del WhatsApp conectado, si ya lo puso, ahorra escribirlo.
-    meetingPhone: getMeetingPhone(integrations),
+    // El que dejó al agendar. Nunca el número de WhatsApp del negocio: este es
+    // el teléfono personal con el que le llamamos nosotros.
+    meetingPhone: meeting?.phone ?? "",
     memberCount,
     patchChecklist: (patch) => setChecklist((current) => ({ ...current, ...patch })),
     setAgents,

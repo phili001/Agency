@@ -15,6 +15,7 @@ describe("reunión de puesta en marcha", () => {
       meeting: {
         appointmentId: "evt_1",
         bookedAt: "2026-10-19T09:00:00.000Z",
+        phone: "+34600112233",
         startTime: "2026-10-23T08:00:00.000Z",
         timezone: "Europe/Madrid",
       },
@@ -22,6 +23,8 @@ describe("reunión de puesta en marcha", () => {
 
     assert.equal(meeting?.appointmentId, "evt_1");
     assert.equal(meeting?.timezone, "Europe/Madrid");
+    // El teléfono vuelve con la reunión: al cambiar la hora no se vuelve a pedir.
+    assert.equal(meeting?.phone, "+34600112233");
   });
 
   it("descarta lo que no sea una reunión completa", () => {
@@ -44,6 +47,7 @@ describe("reunión de puesta en marcha", () => {
     const meeting = {
       appointmentId: "evt_1",
       bookedAt: "",
+      phone: "+34600112233",
       startTime: "2026-10-23T08:00:00.000Z",
       timezone: "Europe/Madrid",
     };
