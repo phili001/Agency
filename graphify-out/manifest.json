@@ -276,10 +276,10 @@
     "semantic_hash": "320708a8ac76507e8f63d18cf69fd565"
   },
   "src/app/api/onboarding/meeting/route.ts": {
-    "mtime": 1792422339.6537735,
-    "seen": 1792424013.113416,
-    "ast_hash": "568cb1ceaf405646e0a9075e60e4ea7d",
-    "semantic_hash": "568cb1ceaf405646e0a9075e60e4ea7d"
+    "mtime": 1792554122.6242855,
+    "seen": 1792554639.023749,
+    "ast_hash": "4b299a19ba0dc35e205e97b50b2d3ebe",
+    "semantic_hash": ""
   },
   "src/app/api/onboarding/status/route.ts": {
     "mtime": 1789354483.4584074,
@@ -462,10 +462,10 @@
     "semantic_hash": "f197ae573c2e8069dbf8c20f3fcde5f4"
   },
   "src/components/onboarding/step-meeting.tsx": {
-    "mtime": 1792422409.3747196,
-    "seen": 1792424013.1134279,
-    "ast_hash": "ef9863a8866f2d3c4128bcfab50f8f39",
-    "semantic_hash": "ef9863a8866f2d3c4128bcfab50f8f39"
+    "mtime": 1792554122.6254647,
+    "seen": 1792554639.023767,
+    "ast_hash": "9ff79788478cbbdf333be7eba3fec80a",
+    "semantic_hash": ""
   },
   "src/components/onboarding/step-openai.tsx": {
     "mtime": 1789736996.7576919,
@@ -702,10 +702,10 @@
     "semantic_hash": "84b801fd8ec9f998262518cf81e48c3c"
   },
   "src/lib/integrations/levy-calendar.ts": {
-    "mtime": 1792422314.947507,
-    "seen": 1792424013.113444,
-    "ast_hash": "920ac491c310b153ee22580828b7b5a3",
-    "semantic_hash": "920ac491c310b153ee22580828b7b5a3"
+    "mtime": 1792554106.0249572,
+    "seen": 1792554639.0237901,
+    "ast_hash": "cc6af05ebd7b6b85542b37e42b5bebc8",
+    "semantic_hash": ""
   },
   "src/lib/integrations/openai.ts": {
     "mtime": 1785954902.2653215,
@@ -738,16 +738,16 @@
     "semantic_hash": "c1c162698812fd5e3b02e64a01f80dbf"
   },
   "src/lib/onboarding-meeting.test.ts": {
-    "mtime": 1792422281.2940388,
-    "seen": 1792424013.113447,
-    "ast_hash": "726bde5c8b1d7e11995fd248bb3ee1d7",
-    "semantic_hash": "726bde5c8b1d7e11995fd248bb3ee1d7"
+    "mtime": 1792554083.9193668,
+    "seen": 1792554639.023794,
+    "ast_hash": "593efa7b56fe40fc58501f2c33ead8c9",
+    "semantic_hash": ""
   },
   "src/lib/onboarding-meeting.ts": {
-    "mtime": 1792422271.4208417,
-    "seen": 1792424013.113447,
-    "ast_hash": "5357f0c4abc2a0f5ef98604e0f0c041c",
-    "semantic_hash": "5357f0c4abc2a0f5ef98604e0f0c041c"
+    "mtime": 1792554083.9190674,
+    "seen": 1792554639.023794,
+    "ast_hash": "a5bc64bd084f9ce37013b4924e5b2635",
+    "semantic_hash": ""
   },
   "src/lib/onboarding-steps.test.ts": {
     "mtime": 1792422356.3992345,
@@ -930,10 +930,10 @@
     "semantic_hash": "9e09241799026ac05be315a2f0b50055"
   },
   "CLAUDE.md": {
-    "mtime": 1785954902.253462,
-    "seen": 1792424013.11346,
-    "ast_hash": "5c27369b226fcf2be8a6cfe52224e767",
-    "semantic_hash": "5c27369b226fcf2be8a6cfe52224e767"
+    "mtime": 1792424232.6359668,
+    "seen": 1792554639.023814,
+    "ast_hash": "ffb31ba6167db159c640f1d3821e0501",
+    "semantic_hash": ""
   },
   "COURSE_ALIGNMENT.md": {
     "mtime": 1785954902.2535605,
@@ -948,10 +948,10 @@
     "semantic_hash": "025d045b7246971286c49110a2af25c7"
   },
   "DEPLOY_RUNBOOK.md": {
-    "mtime": 1792422561.7812726,
-    "seen": 1792424013.113461,
-    "ast_hash": "f41436dba8b0bce45490f8f0363c32a8",
-    "semantic_hash": "f41436dba8b0bce45490f8f0363c32a8"
+    "mtime": 1792554136.71175,
+    "seen": 1792554639.0238159,
+    "ast_hash": "f780e8717727057209df9e152182216d",
+    "semantic_hash": ""
   },
   "PERFORMANCE_AUDIT.md": {
     "mtime": 1791597265.904743,
@@ -994,5 +994,17 @@
     "seen": 1792424013.113464,
     "ast_hash": "a2760511c65806022ad20adf74370ff3",
     "semantic_hash": "a2760511c65806022ad20adf74370ff3"
+  },
+  ".claude/settings.json": {
+    "mtime": 1792424232.6381695,
+    "seen": 1792554639.0237172,
+    "ast_hash": "c2e9d9fc1aa9329624202d5ade4451fc",
+    "semantic_hash": ""
+  },
+  ".claude/CLAUDE.md": {
+    "mtime": 1792424232.635521,
+    "seen": 1792554639.023812,
+    "ast_hash": "9b31786b637be3c13978bec4c2330752",
+    "semantic_hash": ""
   }
 }
