@@ -86,6 +86,12 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - Evento con id = uuid de la cita sin guiones (alfabeto válido de Google). `upsertEvent`: POST con id; 409 → PUT. `deleteEvent`: 404/410 cuentan como borrado. `sendUpdates=none` siempre (no se mandan invitaciones).
   - `GoogleCalendarError` es `userFacing` (sale tal cual por `apiErrorResponse`).
 
+- **F3.2 Rutas de Google (2026-11-02).**
+  - Nuevo `requireActiveWorkspaceRole(roles)` en `lib/authz.ts`: empresa activa desde la cookie `active_workspace_id` validada contra las membresías del usuario. **Usarlo en todas las rutas nuevas del CRM/agenda**: el `workspaceId` no viaja en el cuerpo ni la query.
+  - `connect` (GET → redirige a Google), `callback` (GET; empresa sacada del `state` firmado; mismo usuario y rol owner/admin; siempre redirige a `/integraciones?google=conectado` o `?google=error&motivo=…`), `status` (GET), `calendars` (GET, solo calendarios escribibles), `disconnect` (POST). Todas owner/admin.
+  - Desconectar no toca las agendas (conservan calendario y modo); sin conexión, la copia simplemente no se hace (F3.3).
+  - La página `/integraciones` todavía no lee `?google=…`: lo hace F5.7.
+
 ## Tareas
 
 ### F0 — Preparación
@@ -109,7 +115,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 
 ### F3 — Google Calendar por workspace
 - [x] F3.1 `src/lib/integrations/google-calendar.ts`: OAuth (state firmado con workspace y caducidad), tokens cifrados, refresco, error permanente, listCalendars, freeBusy, eventos con id determinista + pruebas con fetch simulado. (dep: F1.5)
-- [ ] F3.2 Rutas `app/api/integrations/google-calendar/{connect,callback,status,calendars,disconnect}` (owner/admin) + pruebas. (dep: F3.1)
+- [x] F3.2 Rutas `app/api/integrations/google-calendar/{connect,callback,status,calendars,disconnect}` (owner/admin) + pruebas. (dep: F3.1)
 - [ ] F3.3 Copia a Google (`push`) y ocupado (`push_and_busy`) integrados en `src/lib/agenda` + cola de pendientes y borrados. (dep: F3.1, F2.4)
 
 ### F4 — Jobs y recordatorios
@@ -163,6 +169,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-02 · F2.4 · `src/lib/agenda/{agendas,appointments,errors,index}.ts` sobre las funciones SQL de F1.4; 13 pruebas nuevas con el doble (RPC simulada, traducción de los 7 SQLSTATE, duración, cancelar como agente, marcar, Google solo en push_and_busy, aislamiento A/B en 12 operaciones sin cambios en B); typecheck, lint y test (187/187) en verde · commit `crm: F2.4 operaciones de agenda`.
 - 2026-11-02 · F2.5 · `crm/csv.ts`, `crm/import-export.ts` (importar/exportar) y `crm/erasure.ts` (borrado RGPD); 9 pruebas nuevas (CSV con `;`, BOM y comillas, anti-fórmulas, importación con 6 motivos de salto, exportar→importar sin duplicar, aislamiento A/B en importación y borrado, cola de borrado en Google); typecheck, lint y test (196/196) en verde · commit `crm: F2.5 CSV y borrado RGPD`.
 - 2026-11-02 · F3.1 · `src/lib/integrations/google-calendar.ts` (OAuth con state firmado, tokens cifrados, renovación, error permanente vs. pasajero, calendarios, freeBusy, eventos con id fijo, desconectar con revocación); 15 pruebas con fetch simulado (state falsificado/caducado/de otro usuario, scopes, refresh conservado, 401→renovar, 409→actualizar, 410 en borrado, tokens por empresa); typecheck, lint y test (211/211) en verde · commit `crm: F3.1 cliente de Google Calendar`.
+- 2026-11-02 · F3.2 · rutas `api/integrations/google-calendar/{connect,callback,status,calendars,disconnect}` + `requireActiveWorkspaceRole` + `google-calendar-callback.ts` (lógica del callback probable); 5 pruebas nuevas (state de otro usuario sin canjear código, agente sin permiso, empresa ajena, cancelación, mensajes); typecheck, lint, test (216/216) y build en verde. Sin probar contra Google real (faltan credenciales) · commit `crm: F3.2 rutas de Google Calendar`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->
