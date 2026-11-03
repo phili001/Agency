@@ -177,6 +177,15 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - Reglas: exenta → ok; **sin fila o sin suscripción → aviso, no bloqueo** (para no cortar a nadie por un registro que falte; las altas por Stripe tendrán fila desde el webhook); active/trialing → ok (aviso si se cancela al final del periodo); incomplete → aviso; past_due → aviso hasta `past_due_since` + gracia, luego bloqueado; canceled/unpaid/paused/incomplete_expired → bloqueado. ⚠️ Revisar: si se prefiere bloquear a las empresas sin suscripción, es cambiar una línea.
   - `src/lib/email.ts`: Resend por `fetch` a su API (sin librería nueva), `buildWelcomeEmail` con el nombre del negocio escapado; los errores no incluyen la clave.
   - Pruebas: configuración, todas las reglas, aislamiento por empresa en la base y envío de correo con `fetch` simulado (15 nuevas).
+- **F6.3 Webhook de Stripe (2026-11-03).**
+  - Ruta `api/webhooks/stripe` (cuerpo crudo + `constructEvent`); lógica en `lib/billing/webhook.ts` (`processStripeEvent`, `verifyStripeEvent`) con dependencias inyectadas. 400 con firma mala; 500 solo si el evento falla (Stripe reintenta); ignorado o repetido → 200.
+  - Dedupe en `billing_events`: lo `processed`/`ignored` no se repite; lo `failed` sí.
+  - `checkout.session.completed` (y `async_payment_succeeded`): relee la sesión con `line_items`; solo Payment Link o precio de Levy; pagado o suscripción en `trialing`. Empresa: `client_reference_id` solo si existe y el correo del pago es el del owner → si no, la del usuario con ese correo → si no, `createCompanyWithOwner` (contraseña aleatoria, nombre del campo `STRIPE_FIELD_COMPANY_NAME`). Guarda `workspace_billing`, pone `metadata.workspace_id` en customer y subscription, manda el correo de acceso (un fallo de correo no tumba el evento: queda en el detalle) y sincroniza AAA001. Un `stripe_customer_id` que ya es de otra empresa → `failed`.
+  - `customer.subscription.*` e `invoice.paid|payment_failed`: siempre releen la suscripción. La empresa sale de los ids guardados; `metadata.workspace_id` solo vale si esa empresa no tiene otro cliente de Stripe. `past_due_since` se pone la primera vez que se ve el impago y se borra al pagar.
+  - CRM de AAA001 (`lib/billing/agency-crm.ts`): contacto por correo y, si no hay, por teléfono (`source = stripe`); **sin teléfono ni contacto con ese correo no se crea** (la tabla exige teléfono) y queda anotado → pedir el teléfono en el Payment Link (anotado en `DEPLOY_RUNBOOK.md`). Etiquetas `cliente-levy` / `levy-impago` / `levy-cancelado` (al pagar se quitan las otras dos), etapa Cliente/Perdido si existen, campos `levy_company_code`, `levy_workspace_id`, `levy_plan` (se crean si faltan). Estas etiquetas **no disparan flujos** de AAA001.
+  - `resolveCompanyName` y `buildWelcomeLink` pasan a `lib/welcome.ts` (`levy-purchase.ts` los reexporta) para que sobrevivan al borrado de GHL en F7.3.
+  - Pruebas (10) con eventos firmados por el SDK real (`generateTestHeaderString`): pago correcto, duplicado, firma inválida/otro secreto/cuerpo alterado, otro producto, sin pagar, `client_reference_id` ajeno y propio, impago y vuelta a pagar, cancelación, metadata de otra empresa.
+  - **Sin verificar con Stripe real** (F7.3 exige un pago de prueba real antes de borrar GHL). `DEPLOY_RUNBOOK.md`: endpoint y eventos a suscribir.
 
 ## Tareas
 
@@ -223,7 +232,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 ### F6 — Stripe y onboarding de Levy
 - [x] F6.1 Migración: `workspace_billing` (5 workspaces actuales con `billing_exempt = true`) y `billing_events`. (dep: F0.1)
 - [x] F6.2 `src/lib/billing/` (cliente Stripe, `getWorkspaceBillingState`) + `src/lib/email.ts` (Resend) + pruebas. (dep: F6.1, F0.2)
-- [ ] F6.3 `app/api/webhooks/stripe` completo + contacto en el CRM de AAA001 + pruebas con eventos firmados. (dep: F6.2, F2.2)
+- [x] F6.3 `app/api/webhooks/stripe` completo + contacto en el CRM de AAA001 + pruebas con eventos firmados. (dep: F6.2, F2.2)
 - [ ] F6.4 Bloqueo por impago en ycloud-webhook, buffer, flows, deliver y crm-jobs + pantalla «Reactiva tu suscripción» + banner de aviso. (dep: F6.2)
 - [ ] F6.5 Página `/bienvenida` con «Reenviar». **Requiere D1.** (dep: F6.3)
 - [ ] F6.6 Facturación en el panel (Customer Portal, botón de pago con `client_reference_id`) y consola de empresas. (dep: F6.3)
@@ -271,6 +280,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-03 · F5.8 · métrica «Citas agendadas» desde `appointments`, lateral de Chats con etapa/etiquetas/próxima cita, portada y readiness sin GHL (Google y Stripe recomendados); typecheck, lint, test (281/281) y build en verde · commit `crm: F5.8 métricas y paneles sin GHL`.
 - 2026-11-03 · F6.1 · migración `billing` aplicada (dry-run previo en transacción deshecha): `workspace_billing` + `billing_events`, 5/5 empresas exentas, RLS solo lectura owner/admin; `schema.sql` y `database.types.ts` al día; checks SQL DRYRUN_OK; typecheck, lint y test (281/281) en verde · commit `crm: F6.1 tablas de facturación`.
 - 2026-11-03 · F6.2 · `lib/billing` (config, reglas `ok|aviso|bloqueado`, lectura por empresa, lista de bloqueadas, cliente Stripe) + `lib/email.ts` (Resend por `fetch`); typecheck, lint y test (296/296) en verde · commit `crm: F6.2 librería de facturación y correo`.
+- 2026-11-03 · F6.3 · webhook de Stripe (firma, dedupe, alta de empresa, estado de suscripción, correo de acceso, contacto en AAA001) + 10 pruebas con eventos firmados; eventos documentados en el runbook; typecheck, lint, test (306/306) y build en verde · commit `crm: F6.3 webhook de Stripe`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->

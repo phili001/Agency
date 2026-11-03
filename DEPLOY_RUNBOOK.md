@@ -62,6 +62,16 @@ En Google Cloud, la URI de redirección es
 `http://localhost:3000` para desarrollo). Los scopes son `calendar.events` y
 `calendar.readonly`; con muchos clientes, Google pedirá verificar la app.
 
+En Stripe (Developers → Webhooks), el endpoint es
+`{NEXT_PUBLIC_APP_URL}/api/webhooks/stripe` con estos eventos:
+`checkout.session.completed`, `checkout.session.async_payment_succeeded`,
+`customer.subscription.created`, `customer.subscription.updated`,
+`customer.subscription.deleted`, `customer.subscription.paused`,
+`customer.subscription.resumed`, `invoice.paid` e `invoice.payment_failed`.
+Su «Signing secret» va en `STRIPE_WEBHOOK_SECRET`. En el Payment Link conviene
+pedir el teléfono: sin teléfono ni un contacto con ese correo, el comprador no
+se puede crear en el CRM de AAA001 (la cuenta sí se crea).
+
 `LEVY_PURCHASE_WEBHOOK_SECRET`, `GHL_AGENCY_*` y `LEVY_MEETING_*GHL*` quedan
 deprecadas: se borran cuando el webhook de Stripe esté verificado.
 
