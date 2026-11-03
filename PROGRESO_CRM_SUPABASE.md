@@ -31,6 +31,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - **D3** Plantilla de WhatsApp aprobada para recordatorios fuera de la ventana de 24 h (nombre por workspace) → mientras, se registran como omitidos.
 
 ## Decisiones tomadas
+- **Sin GoHighLevel (2026-11-03, decisión del usuario):** «Ya no vamos a usar GHL». No habrá token nuevo, así que **no se migran datos desde GHL**: etiquetas y etapas de los 160 contactos de AAA001 que solo existían en GHL y sus citas futuras se pierden (los contactos, conversaciones y mensajes ya están en Supabase). F7.1 se cierra así; F7.2 pasa a ser la parte que no necesita GHL. F7.3 y F7.4 siguen siendo [STOP].
 - **F1.1 Etiquetas (2026-11-02).** Tres cosas distintas, cada una en su sitio:
   1. `crm_tags` + `crm_contact_tags`: **las etiquetas del CRM**, las que ve y gestiona el operador (con color). Se ponen/quitan desde panel, flujo (`crm_action`) o agente (solo etiquetas que ya existan en el workspace: el agente no crea etiquetas). Las de GHL se importan aquí en F7.1.
   2. `contacts.automation_labels`: **marcas internas del sistema** (`flow_opt_out`, `onboarding_eligible`, `onboarding_completed`, `onboarding_excluded_existing`). No se tocan, no se migran y no se muestran como etiquetas en Contactos (la bandeja puede seguir enseñándolas como estado). Nombres reservados: `crm_tags.name` no puede coincidir con ellos (validación en `src/lib/crm` y `check` en la tabla con la lista fija).
@@ -267,8 +268,8 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - [x] F6.7 Reunión de puesta en marcha sobre la agenda de AAA001; wizard y tours sin GHL; `markAgencyContactActive` → etiqueta `levy-activo` en AAA001. (dep: F2.4, F2.2)
 
 ### F7 — Migración de datos y limpieza
-- [!] F7.1 Script `scripts/migrate-ghl-to-crm.ts` (solo AAA001, idempotente, `--dry-run` por defecto): etiquetas y etapa desde GHL para los 160 contactos con `ghl_contact_id`, tool `ghl_calendar` «Consultoría Levi» → agenda, citas futuras del calendario GHL → `appointments`, el flujo con `ghl_action` → `crm_action`, y propuesta de texto nuevo para las tools «Agendar en GoHighLevel» y «Consultar disponibilidad». Ejecutar **solo en dry-run** y apuntar el resultado aquí. Necesita en local la clave de cifrado de `integration_secrets` y acceso a la API de GHL: si no están, marcar `[!]` y pedírmelas. (dep: F5.1, F2.4, F5.3)
-- [ ] **[STOP]** F7.2 Ejecutar la migración real de AAA001 (escribe en producción).
+- [x] F7.1 (cerrada sin datos de GHL por decisión del usuario; el script queda para la parte sin GHL) Script `scripts/migrate-ghl-to-crm.ts` (solo AAA001, idempotente, `--dry-run` por defecto): etiquetas y etapa desde GHL para los 160 contactos con `ghl_contact_id`, tool `ghl_calendar` «Consultoría Levi» → agenda, citas futuras del calendario GHL → `appointments`, el flujo con `ghl_action` → `crm_action`, y propuesta de texto nuevo para las tools «Agendar en GoHighLevel» y «Consultar disponibilidad». Ejecutar **solo en dry-run** y apuntar el resultado aquí. Necesita en local la clave de cifrado de `integration_secrets` y acceso a la API de GHL: si no están, marcar `[!]` y pedírmelas. (dep: F5.1, F2.4, F5.3)
+- [ ] **[STOP]** F7.2 Ejecutar la migración real de AAA001 (escribe en producción). **Sin GHL:** crear la agenda «Consultoría Levi» (L-V 9-18, 30 min, Europe/Madrid, a ajustar en el panel), pasar su tool a `type: "agenda"` (el agente deja de usar GHL), convertir las 2 acciones del flujo «LEVY - Diagnóstico y agenda» y poner el texto nuevo de las tools «Agendar cita» y «Consultar disponibilidad».
 - [ ] **[STOP]** F7.3 Borrar código, rutas y variables de GHL (`ghl-agency.ts`, `webhooks/ghl/**` incluida `purchase` + `levy-purchase.ts`, `integrations/gohighlevel/**`, `cron/ghl-sync`, `vercel.json`). **Solo después de F6.3 verificada** con un pago real de prueba (hoy `webhooks/ghl/purchase` es la vía de venta). (dep: F6.3, F7.2)
 - [ ] **[STOP]** F7.4 Migración destructiva: quitar `gohighlevel` del check de `integrations`, borrar su fila y su secreto, limpiar claves `ghl_*` de `contacts.metadata`, convertir assets `ghl_calendar` restantes.
 - [ ] **[STOP]** F7.5 Orden de salida (lo hago yo contigo): merge de `crm-supabase` → F7.2 → despliegue → variables en Vercel → activar el job de `pg_cron` de F4.3 → comprobar AAA001 por WhatsApp. El merge es todo o nada: no desplegar la rama sin F7.2 hecha o la coexistencia de F5.2 probada.
@@ -314,6 +315,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-03 · F6.7 · reunión de puesta en marcha sobre la agenda de AAA001 (GHL de respaldo sin `LEVY_MEETING_AGENDA_ID`), `levy-activo` en el CRM de AAA001, asistente y tours con Google Calendar en vez de GHL; typecheck, lint, test (320/320) y build en verde · commit `crm: F6.7 onboarding sin GHL`.
 - 2026-11-03 · F7.1 · `[!]` script de migración (dry-run por defecto, idempotente) + reglas puras con 8 pruebas; dry-run ejecutado: **GHL responde 401** con el token guardado de AAA001 (revocado o caducado), solo salen la conversión del flujo (2 acciones) y la propuesta de texto de las tools; typecheck, lint y test (328/328) en verde · commit `crm: F7.1 script de migración de GHL (bloqueado por token)`.
 - 2026-11-03 · F8.1 · `[!]` verificación final: typecheck, lint, test (328/328) y build en verde; advisors sin avisos nuevos y 14 tablas nuevas con RLS; GHL solo en lo que retiran F7.2–F7.4; **sin recorrido del panel con sesión** (necesita tu usuario); resumen final escrito · commit `crm: F8.1 verificación final y resumen`.
+- 2026-11-03 · Decisión · el usuario deja GHL: F7.1 cerrada sin datos de GHL, F7.2 reescrita sin GHL (sigue [STOP]) · sin código.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->
@@ -376,7 +378,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - **Datos reales de GHL de AAA001:** el token guardado da 401 (F7.1 `[!]`).
 
 ### Lo que necesito de ti (pasos manuales)
-1. **Token nuevo de GHL** para AAA001, con permisos de contactos, oportunidades y calendarios. Lo pegas en Integraciones. Después repito el dry-run de F7.1.
+1. ~~Token nuevo de GHL~~: descartado, no se usará GHL. Las etiquetas, etapas y citas que solo estaban en GHL no se migran.
 2. **D1:** ¿agentelevy.com es esta app o una landing aparte? Desbloquea F6.5 (`/bienvenida`).
 3. **D3:** plantilla aprobada de WhatsApp para recordatorios fuera de la ventana de 24 h. Sin ella, esos avisos se omiten. **D2** sigue con los valores por defecto: sin prueba gratis y 7 días de gracia.
 4. **Variables en Vercel** (ver `DEPLOY_RUNBOOK.md`):
