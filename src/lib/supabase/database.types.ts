@@ -381,6 +381,18 @@ export type Database = {
           workspace_id?: string;
         };
       };
+      billing_events: {
+        Row: {
+          created_at: string;
+          error: string | null;
+          processed_at: string;
+          result: "failed" | "ignored" | "processed";
+          stripe_event_id: string;
+          type: string;
+          updated_at: string;
+          workspace_id: string | null;
+        };
+      };
       conversations: {
         Row: {
           agent_id: string | null;
@@ -516,6 +528,30 @@ export type Database = {
           provider: "ycloud";
           status: "stored" | "ignored" | "error";
           workspace_id: string | null;
+        };
+      };
+      workspace_billing: {
+        Row: {
+          billing_exempt: boolean;
+          cancel_at_period_end: boolean;
+          created_at: string;
+          current_period_end: string | null;
+          past_due_since: string | null;
+          price_id: string | null;
+          status:
+            | "active"
+            | "canceled"
+            | "incomplete"
+            | "incomplete_expired"
+            | "past_due"
+            | "paused"
+            | "trialing"
+            | "unpaid"
+            | null;
+          stripe_customer_id: string | null;
+          stripe_subscription_id: string | null;
+          updated_at: string;
+          workspace_id: string;
         };
       };
       workspace_members: {

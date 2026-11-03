@@ -165,6 +165,13 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - Portada: el chequeo de despliegue «GoHighLevel» pasa a «Google Calendar» (`GOOGLE_CLIENT_ID/SECRET`); en la consola de agencia el proveedor `gohighlevel` pasa a `google_calendar`.
   - `health/readiness`: Google y Stripe como variables recomendadas (no bloquean el 200), tablas del CRM y la Agenda en las comprobaciones, y la ruta `cron/ghl-sync` sustituida por `cron/crm-jobs`.
   - Verificado: prueba de aislamiento de la métrica; build. **La interfaz no se ha visto con sesión.**
+- **F6.1 Tablas de facturación (2026-11-03).**
+  - Migración `20261103020000_billing` (aplicada; en remoto `20261103143915`): `workspace_billing` (pk `workspace_id`, cliente y suscripción de Stripe únicos, `status` de Stripe o null, `current_period_end`, `cancel_at_period_end`, `billing_exempt`) y `billing_events` (pk `stripe_event_id`, `type`, `workspace_id` opcional, `result` processed/ignored/failed, `error`, `processed_at`).
+  - Añadido a la especificación: `past_due_since` (inicio del impago, para contar los días de gracia en F6.2 sin depender de la hora del evento).
+  - Las 5 empresas actuales tienen fila con `billing_exempt = true`. Una empresa sin fila (alta nueva antes del webhook) la tratará F6.2.
+  - RLS: solo lectura para owner/admin de la empresa; escribe únicamente el servidor (`service_role`).
+  - Comprobaciones `supabase/tests/billing_checks.sql`: exentas, cliente único, estado válido, dedupe de eventos y RLS del owner (DRYRUN_OK). El caso «agent no ve nada» se salta: hoy no hay ningún miembro que solo sea agent/viewer.
+  - Advisors: solo los 3 avisos previos.
 
 ## Tareas
 
@@ -209,7 +216,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - [x] F5.8 Métricas, `panel-data`, `inbox-panel` (lateral con etapa, etiquetas y próxima cita), portada y `health/readiness` sin GHL. (dep: F5.2, F5.5)
 
 ### F6 — Stripe y onboarding de Levy
-- [ ] F6.1 Migración: `workspace_billing` (5 workspaces actuales con `billing_exempt = true`) y `billing_events`. (dep: F0.1)
+- [x] F6.1 Migración: `workspace_billing` (5 workspaces actuales con `billing_exempt = true`) y `billing_events`. (dep: F0.1)
 - [ ] F6.2 `src/lib/billing/` (cliente Stripe, `getWorkspaceBillingState`) + `src/lib/email.ts` (Resend) + pruebas. (dep: F6.1, F0.2)
 - [ ] F6.3 `app/api/webhooks/stripe` completo + contacto en el CRM de AAA001 + pruebas con eventos firmados. (dep: F6.2, F2.2)
 - [ ] F6.4 Bloqueo por impago en ycloud-webhook, buffer, flows, deliver y crm-jobs + pantalla «Reactiva tu suscripción» + banner de aviso. (dep: F6.2)
@@ -257,6 +264,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-03 · F5.7 · ajustes del CRM en Clientes (etapas, etiquetas, campos) + API `api/crm/{stages,tags,fields}` + tarjeta Google Calendar en Integraciones (GHL solo si ya existía); D4 resuelta por el usuario (Agenda como sección nueva del menú); typecheck, lint, test (280/280) y build en verde · commit `crm: F5.7 ajustes del CRM y Google Calendar`.
 - 2026-11-03 · F5.6 · sección Agenda en el menú + página `/agenda` (semana/día, citas, bloqueos, configuración) + API `api/agenda/**` con sync a Google en `after()`; typecheck, lint, test (280/280) y build en verde · commit `crm: F5.6 panel de agenda`.
 - 2026-11-03 · F5.8 · métrica «Citas agendadas» desde `appointments`, lateral de Chats con etapa/etiquetas/próxima cita, portada y readiness sin GHL (Google y Stripe recomendados); typecheck, lint, test (281/281) y build en verde · commit `crm: F5.8 métricas y paneles sin GHL`.
+- 2026-11-03 · F6.1 · migración `billing` aplicada (dry-run previo en transacción deshecha): `workspace_billing` + `billing_events`, 5/5 empresas exentas, RLS solo lectura owner/admin; `schema.sql` y `database.types.ts` al día; checks SQL DRYRUN_OK; typecheck, lint y test (281/281) en verde · commit `crm: F6.1 tablas de facturación`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->
