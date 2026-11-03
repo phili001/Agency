@@ -227,6 +227,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - **Arreglo encontrado de paso:** el motor de flujos solo ejecutaba las acciones de los pasos `ghl_action`; los pasos «Acción CRM» (`crm_action`, los que crean el editor y las plantillas) se saltaban. Ahora se ejecutan los dos. En producción no había ningún flujo con pasos `crm_action`, así que no hubo efecto. Sin prueba propia del motor (no hay `flow-engine.test`); la conversión sí está probada.
   - Revisa en el panel: horario y duración de la agenda (Agenda → Configurar) y, si quieres, conecta su Google Calendar.
   - Sigue activa la integración de GHL de AAA001 con un token que da 401: sus llamadas fallan sin bloquear nada. La borra F7.4.
+  - Producción (`master`) no reconoce tools `type: "agenda"`: hasta desplegar la rama, el agente de AAA001 no ofrece citas (con GHL en 401 tampoco podía). **El usuario decidió dejarlo así** (2026-11-03) en vez de revertir la tool.
 
 ## Tareas
 
