@@ -206,13 +206,13 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - Asistente: el paso Extras cambia «Conectar GoHighLevel» por «Conectar Google Calendar (opcional)» (`GoogleCalendarCard`) y el resumen final cuenta Google Calendar en vez de GHL. Tour de Chats sin GHL.
   - Pendiente del usuario: crear en AAA001 la agenda de la reunión (horario del equipo, servicio de la duración que quieras) y poner su id en `LEVY_MEETING_AGENDA_ID`.
   - Pruebas (5): agenda solo de AAA001 y activa, agrupación por día en la zona del cliente, reservar/ocupado/cancelar sin tocar el CRM del cliente, hora no ofrecida, `levy-activo` sin crear contactos.
-- **F6.5 `/bienvenida` (2026-11-03) — `[!]` falta aplicar la migración.**
+- **F6.5 `/bienvenida` (2026-11-03).**
   - Página pública `/bienvenida?session_id=…` y `POST /api/billing/welcome-resend`; lógica en `lib/billing/welcome-page.ts`. Solo lee: **la cuenta la crea siempre el webhook**. El enlace de acceso solo viaja por correo y se envía a la dirección del pago. Estados: lista, preparando (se refresca sola, hasta 1 min), pago en proceso, no encontrado y Stripe no disponible.
   - «Lista» exige que el webhook ya haya guardado la facturación y que el correo del pago sea el del owner de esa empresa.
   - Reenviar: máx. 3/hora **por empresa**, atómico en la base (`claim_welcome_resend` + 2 columnas en `workspace_billing`). Un correo fallido gasta intento. El correo automático del webhook no cuenta.
   - `sendWelcomeAccess` es ahora el envío común del webhook y de «Reenviar»; F6.8 cambiará el remitente en `email.ts`.
   - Aspecto de la landing: Figtree servida por la app, colores `#F5E46B`/`#111111`/`#F7F6F1`, logo copiado a `public/levy-logo.png`, contacto `hola@agentelevi.com`, sin scripts ni recursos de terceros. `referrer: no-referrer` porque la URL lleva el id de la sesión.
-  - **Migración sin aplicar:** ensayo en transacción deshecha con `DRYRUN_OK` (6 comprobaciones de `supabase/tests/welcome_resend_checks.sql`), pero `apply_migration` lo denegó el clasificador de permisos y no se aplicó por otra vía. `schema.sql` y `database.types.ts` ya la reflejan. **Hasta aplicarla, «Reenviar» falla con error genérico; la página sí funciona.** Al aplicarla: `get_advisors`, pasar las comprobaciones y marcar `[x]`.
+  - Migración `welcome_resend` aplicada con aprobación del usuario (el primer intento lo denegó el clasificador de permisos): 6 comprobaciones de `supabase/tests/welcome_resend_checks.sql` en verde antes y después, contadores a 0 en las 5 empresas y advisors sin avisos nuevos.
   - Verificado en dev: los estados con datos de prueba temporales (ya quitados), móvil, y que sin `STRIPE_SECRET_KEY` la página no se rompe. **Sin probar con Stripe real.**
 - **F7.1 Script de migración de GHL (2026-11-03) — `[!]` bloqueada por el token de GHL.**
   - `scripts/migrate-ghl-to-crm.ts` (solo AAA001, **dry-run por defecto**, `--apply` para F7.2, `--limit N` para probar). Uso: `node --conditions=react-server --env-file=.env scripts/migrate-ghl-to-crm.ts`. Lee la conexión de GHL de AAA001 (token cifrado en `integration_secrets`, descifrado con `INTEGRATION_ENCRYPTION_KEY`) y reutiliza las funciones del CRM y la Agenda para escribir. No imprime tokens ni datos personales.
@@ -284,7 +284,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - [x] F6.2 `src/lib/billing/` (cliente Stripe, `getWorkspaceBillingState`) + `src/lib/email.ts` (Resend) + pruebas. (dep: F6.1, F0.2)
 - [x] F6.3 `app/api/webhooks/stripe` completo + contacto en el CRM de AAA001 + pruebas con eventos firmados. (dep: F6.2, F2.2)
 - [x] F6.4 Bloqueo por impago en ycloud-webhook, buffer, flows, deliver y crm-jobs + pantalla «Reactiva tu suscripción» + banner de aviso. (dep: F6.2)
-- [!] F6.5 (código hecho y en verde; **falta aplicar la migración `20261103030000_welcome_resend`**: `apply_migration` denegado por permisos, 2026-11-03; ver «Decisiones tomadas») Página `/bienvenida` con «Reenviar» en esta app (D1 resuelta). Que respete el aspecto de la landing `activa.agentelevi.com`: logo, colores y tono. Se pueden copiar de ella, pero sin traer scripts ni recursos de terceros. (dep: F6.3)
+- [x] F6.5 Página `/bienvenida` con «Reenviar» en esta app (D1 resuelta). Que respete el aspecto de la landing `activa.agentelevi.com`: logo, colores y tono. Se pueden copiar de ella, pero sin traer scripts ni recursos de terceros. (dep: F6.3)
 - [ ] F6.8 **Correo con la cuenta de Google** (petición del usuario, 2026-11-03): los correos salen por **Gmail de la cuenta de Google conectada**, usando la API de Gmail por `fetch`, en lugar de Resend.
   - Scope `https://www.googleapis.com/auth/gmail.send` pedido **aparte y opcional**, con autorización incremental (botón «Conectar correo» en Integraciones → Google). Conectar el calendario no debe exigir Gmail, ni al revés.
   - Mismos tokens cifrados por workspace y mismo manejo de errores permanentes que Calendar. Se guarda qué scopes se concedieron y desde qué dirección se envía.
@@ -346,7 +346,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-03 · F8.1 · `[!]` verificación final: typecheck, lint, test (328/328) y build en verde; advisors sin avisos nuevos y 14 tablas nuevas con RLS; GHL solo en lo que retiran F7.2–F7.4; **sin recorrido del panel con sesión** (necesita tu usuario); resumen final escrito · commit `crm: F8.1 verificación final y resumen`.
 - 2026-11-03 · Decisión · el usuario deja GHL: F7.1 cerrada sin datos de GHL, F7.2 reescrita sin GHL (sigue [STOP]) · sin código.
 - 2026-11-03 · F7.2 · aplicada sin GHL en AAA001 (agenda «Consultoría Levi», tool → agenda, textos de tools, flujo convertido, campo `cuello_de_botella_principal`); comprobada en la base e idempotente; arreglo del motor para ejecutar pasos `crm_action`; typecheck, lint y test en verde · commit `crm: F7.2 migración de AAA001 sin GHL`.
-- 2026-11-03 · F6.5 · `[!]` página `/bienvenida` + reenviar (3/hora) + logo y estilo de la landing; 15 pruebas nuevas; typecheck, lint, test (343/343) y build en verde; migración `welcome_resend` ensayada pero **sin aplicar** (`apply_migration` denegado por permisos) · commit `crm: F6.5 página de bienvenida (migración pendiente)`.
+- 2026-11-03 · F6.5 · página `/bienvenida` + reenviar (3/hora) + logo y estilo de la landing; 15 pruebas nuevas; typecheck, lint, test (343/343) y build en verde; migración `welcome_resend` aplicada con aprobación del usuario (comprobaciones y advisors sin avisos nuevos). Sin probar con Stripe real · commits `crm: F6.5 página de bienvenida (migración pendiente)` y `crm: F6.5 migración aplicada`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->
@@ -410,7 +410,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 
 ### Lo que necesito de ti (pasos manuales)
 1. ~~Token nuevo de GHL~~: descartado, no se usará GHL. Las etiquetas, etapas y citas que solo estaban en GHL no se migran.
-2. ~~D1~~ resuelta: `agentelevi.com` es esta app. **Falta aplicar la migración de F6.5.**
+2. ~~D1~~ resuelta: `agentelevi.com` es esta app; F6.5 hecha. Falta que el Payment Link redirija a `/bienvenida` (ver `DEPLOY_RUNBOOK.md`).
 3. **D3:** plantilla aprobada de WhatsApp para recordatorios fuera de la ventana de 24 h. Sin ella, esos avisos se omiten. **D2** sigue con los valores por defecto: sin prueba gratis y 7 días de gracia.
 4. **Variables en Vercel** (ver `DEPLOY_RUNBOOK.md`):
    - `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`, con la URI de redirección en Google Cloud;
