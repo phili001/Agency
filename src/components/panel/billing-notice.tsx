@@ -1,4 +1,5 @@
 import { AlertTriangle, CreditCard } from "lucide-react";
+import Link from "next/link";
 
 import { billingMessage, type WorkspaceBillingState } from "@/lib/billing/state";
 import { getWorkspaceBillingState } from "@/lib/billing/workspace-billing";
@@ -30,9 +31,13 @@ export async function BillingNotice({ role, workspaceId }: { role: string; works
   if (!state || state.state === "ok") return null;
 
   const message = billingMessage(state);
-  // Sin suscripción no se avisa todavía: hasta que exista el botón de pago (F6.6)
-  // el aviso no tendría nada que hacer.
-  if (state.reason === "no_subscription") return null;
+  // Sin suscripción solo se avisa si hay a dónde ir a pagar.
+  if (state.reason === "no_subscription" && !process.env.STRIPE_PAYMENT_LINK_URL?.trim()) return null;
+  const cta = (
+    <Link className="font-medium underline" href="/negocio">
+      {role === "owner" ? "Ir a Facturación" : "Ver Facturación"}
+    </Link>
+  );
 
   if (state.state === "bloqueado") {
     return (
@@ -45,6 +50,7 @@ export async function BillingNotice({ role, workspaceId }: { role: string; works
             <p className="mt-1 text-xs">
               Tus conversaciones, contactos y citas siguen guardados; los mensajes que lleguen también se guardan.
             </p>
+            <p className="mt-2 text-sm">{cta}</p>
           </div>
         </div>
       </div>
@@ -57,7 +63,7 @@ export async function BillingNotice({ role, workspaceId }: { role: string; works
         <AlertTriangle className="mt-0.5 shrink-0" size={16} />
         <span>
           {message}
-          {state.graceEndsAt ? ` Levy seguirá respondiendo hasta el ${formatDate(state.graceEndsAt)}.` : ""}
+          {state.graceEndsAt ? ` Levy seguirá respondiendo hasta el ${formatDate(state.graceEndsAt)}.` : ""} {cta}
         </span>
       </p>
     </div>

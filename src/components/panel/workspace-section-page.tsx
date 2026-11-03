@@ -26,8 +26,11 @@ async function loadAgents(
 
 /** Agentes, Integraciones, Negocio, Tools, Templates, KB, Equipo y Automatizaciones. */
 export async function WorkspaceSectionPage({
+  before,
   tab,
 }: {
+  /** Bloque encima de los ajustes (p. ej. Facturación en Negocio). */
+  before?: React.ReactNode;
   tab: (typeof workspaceTabs)[number];
 }) {
   const { activeRole, supabase, user, workspace, workspaceCode, workspaceId } =
@@ -83,6 +86,7 @@ export async function WorkspaceSectionPage({
       tourKey={tab === "agents" ? "agents" : null}
       userMetadata={user.user_metadata}
     >
+      {before}
       <WorkspaceSettings
         activeRole={activeRole}
         agents={agents}

@@ -24,6 +24,7 @@ export default async function AdminPage() {
     { data: workspaces },
     { data: members },
     { data: integrations },
+    { data: billingRows },
   ] = await Promise.all([
     admin
       .from("workspaces")
@@ -31,6 +32,7 @@ export default async function AdminPage() {
       .order("created_at", { ascending: false }),
     admin.from("workspace_members").select("workspace_id, user_id, role"),
     admin.from("integrations").select("workspace_id, provider, status"),
+    admin.from("workspace_billing").select("workspace_id, billing_exempt, status, stripe_customer_id"),
   ]);
   const { data: authUsers } = await admin.auth.admin.listUsers({
     page: 1,
@@ -56,8 +58,15 @@ export default async function AdminPage() {
         )
         .map((integration) => integration.provider);
 
+      const billing = (billingRows ?? []).find((row) => row.workspace_id === workspace.id);
+
       return {
         activeProviders,
+        billing: {
+          exempt: billing?.billing_exempt ?? false,
+          status: billing?.status ?? null,
+          stripeCustomerId: billing?.stripe_customer_id ?? null,
+        },
         companyCode:
           "company_code" in workspace && typeof workspace.company_code === "string"
             ? workspace.company_code

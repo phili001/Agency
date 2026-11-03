@@ -15,6 +15,7 @@ import { useState } from "react";
 
 type Company = {
   activeProviders: string[];
+  billing: { exempt: boolean; status: string | null; stripeCustomerId: string | null };
   companyCode: string | null;
   id: string;
   memberCount: number;
@@ -44,6 +45,7 @@ export function AdminConsole({
   const [newAdminEmail, setNewAdminEmail] = useState("");
   const [newAdminPassword, setNewAdminPassword] = useState("");
   const [status, setStatus] = useState("");
+  const [customerDrafts, setCustomerDrafts] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState("");
 
   async function postJson(url: string, body: Record<string, unknown>) {
@@ -69,6 +71,26 @@ export function AdminConsole({
 
     if (!response.ok) {
       throw new Error(payload.error ?? "No se pudo completar la acción.");
+    }
+  }
+
+  async function updateBilling(workspaceId: string, change: { billingExempt?: boolean; stripeCustomerId?: string | null }) {
+    setSaving(`billing:${workspaceId}`);
+    setStatus("");
+    try {
+      const response = await fetch("/api/admin/companies/billing", {
+        body: JSON.stringify({ workspaceId, ...change }),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "No se pudo guardar la facturación.");
+      setStatus("Facturación actualizada.");
+      router.refresh();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "No se pudo guardar la facturación.");
+    } finally {
+      setSaving("");
     }
   }
 
@@ -345,6 +367,15 @@ export function AdminConsole({
                     <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs">
                       {company.memberCount} miembros
                     </span>
+                    <span
+                      className={`rounded-lg px-2 py-1 text-xs ${
+                        company.billing.exempt || company.billing.status === "active" || company.billing.status === "trialing"
+                          ? "bg-[#e7f6ce] text-[#31521d]"
+                          : "bg-[#fbeeea] text-[#7a2a1d]"
+                      }`}
+                    >
+                      {company.billing.exempt ? "Exenta" : `Stripe: ${company.billing.status ?? "sin suscripción"}`}
+                    </span>
                     {["openai", "ycloud"].map((provider) => (
                       <span
                         className={`rounded-lg px-2 py-1 text-xs ${
@@ -357,6 +388,31 @@ export function AdminConsole({
                         {provider}
                       </span>
                     ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                    <label className="flex items-center gap-2">
+                      <input
+                        checked={company.billing.exempt}
+                        disabled={saving === `billing:${company.id}`}
+                        onChange={(event) => updateBilling(company.id, { billingExempt: event.target.checked })}
+                        type="checkbox"
+                      />
+                      Exenta de pago
+                    </label>
+                    <input
+                      className="h-9 w-56 rounded-lg border border-[#cbd2c6] px-2 text-sm"
+                      onChange={(event) => setCustomerDrafts((current) => ({ ...current, [company.id]: event.target.value }))}
+                      placeholder="cus_… (cliente de Stripe)"
+                      value={customerDrafts[company.id] ?? company.billing.stripeCustomerId ?? ""}
+                    />
+                    <button
+                      className="h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium disabled:opacity-60"
+                      disabled={saving === `billing:${company.id}` || customerDrafts[company.id] === undefined}
+                      onClick={() => updateBilling(company.id, { stripeCustomerId: (customerDrafts[company.id] ?? "").trim() || null })}
+                      type="button"
+                    >
+                      Enlazar cliente
+                    </button>
                   </div>
                 </div>
                 <button

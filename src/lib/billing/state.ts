@@ -28,6 +28,7 @@ export type WorkspaceBillingRow = {
   current_period_end: string | null;
   past_due_since: string | null;
   status: StripeSubscriptionStatus | null;
+  stripe_customer_id?: string | null;
   workspace_id: string;
 };
 

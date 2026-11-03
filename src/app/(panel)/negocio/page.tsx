@@ -1,5 +1,14 @@
+import { BillingCard } from "@/components/billing/billing-card";
 import { WorkspaceSectionPage } from "@/components/panel/workspace-section-page";
+import { getPanelContext } from "@/lib/panel-context";
 
-export default function BusinessPage() {
-  return <WorkspaceSectionPage tab="business" />;
+export default async function BusinessPage() {
+  const { activeRole, user, workspaceId } = await getPanelContext();
+
+  return (
+    <WorkspaceSectionPage
+      before={workspaceId ? <BillingCard email={user.email ?? null} role={activeRole} workspaceId={workspaceId} /> : null}
+      tab="business"
+    />
+  );
 }

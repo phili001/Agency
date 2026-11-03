@@ -49,6 +49,7 @@ app arranca, pero no se puede conectar Google Calendar ni vender con Stripe.
 | `STRIPE_SECRET_KEY` | API de Stripe (`sk_test_…` en pruebas). Solo servidor |
 | `STRIPE_WEBHOOK_SECRET` | Firma de `/api/webhooks/stripe` (`whsec_…`) |
 | `STRIPE_PAYMENT_LINK_IDS` | Payment Links de Levy (`plink_…`), separados por coma |
+| `STRIPE_PAYMENT_LINK_URL` | URL pública del Payment Link (`https://buy.stripe.com/…`) para «Pagar / reactivar» |
 | `STRIPE_PRICE_IDS` | Precios de Levy (`price_…`), separados por coma |
 | `STRIPE_FIELD_COMPANY_NAME` | Campo personalizado con el nombre del negocio (por defecto `nombredelnegocio`) |
 | `BILLING_GRACE_DAYS` | Días de gracia tras un impago (por defecto 7) |
@@ -68,7 +69,7 @@ En Stripe (Developers → Webhooks), el endpoint es
 `customer.subscription.created`, `customer.subscription.updated`,
 `customer.subscription.deleted`, `customer.subscription.paused`,
 `customer.subscription.resumed`, `invoice.paid` e `invoice.payment_failed`.
-Su «Signing secret» va en `STRIPE_WEBHOOK_SECRET`. En el Payment Link conviene
+Su «Signing secret» va en `STRIPE_WEBHOOK_SECRET`. Activa también el **Customer Portal** (Settings → Billing → Customer portal) para el botón «Gestionar suscripción». En el Payment Link conviene
 pedir el teléfono: sin teléfono ni un contacto con ese correo, el comprador no
 se puede crear en el CRM de AAA001 (la cuenta sí se crea).
 

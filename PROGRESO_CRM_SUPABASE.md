@@ -193,6 +193,12 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - Los mensajes que escribe el equipo a mano también se quedan sin enviar mientras dure el bloqueo (`deliver` no envía).
   - Panel: `components/panel/billing-notice.tsx` en el layout, solo para owner/admin: «Reactiva tu suscripción» (rojo) si está bloqueada, banner ámbar en aviso (con fecha de fin de la gracia). «Sin suscripción» no se muestra hasta que exista el botón de pago (F6.6). No se borra ningún dato.
   - Pruebas: `gate.test.ts` (solo la impagada, fallo de lectura no corta, filtro con ids válidos); la exclusión en `crm-jobs` ya estaba probada.
+- **F6.6 Facturación en el panel y consola (2026-11-03).**
+  - Tarjeta **Facturación** encima de los ajustes de **Negocio** (owner/admin la ven; solo el owner actúa): estado de la suscripción y renovación, «Pagar / reactivar» (Payment Link con `client_reference_id` = empresa y `prefilled_email` = correo del owner) cuando no está pagada, y «Gestionar suscripción» → `POST /api/billing/portal` (solo owner, Customer Portal con vuelta a `/negocio`). Sin menú nuevo.
+  - Variable nueva **`STRIPE_PAYMENT_LINK_URL`** (URL pública del Payment Link; los ids siguen en `STRIPE_PAYMENT_LINK_IDS`) en `.env.example` y `DEPLOY_RUNBOOK.md`, que también pide activar el Customer Portal en Stripe.
+  - El aviso del layout enlaza a Facturación y ahora también avisa de «sin suscripción» si hay `STRIPE_PAYMENT_LINK_URL` (las 5 empresas actuales son exentas: no lo ven).
+  - Consola de empresas (`/admin`): etiqueta con el estado de Stripe o «Exenta», casilla «Exenta de pago» y campo para enlazar un `cus_…` → `PATCH /api/admin/companies/billing` (superadmin; `lib/billing/admin.ts` crea la fila si falta y rechaza un cliente ya enlazado a otra empresa). El estado se rellena con el siguiente evento de Stripe de ese cliente.
+  - Pruebas: enlace de pago, ids de cliente, exención aislada por empresa, alta de fila, cliente duplicado/raro/empresa inexistente (6). En dev: portal 401 y consola 403 sin sesión. **La interfaz no se ha visto con sesión** y el portal no se ha probado contra Stripe.
 
 ## Tareas
 
@@ -242,7 +248,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - [x] F6.3 `app/api/webhooks/stripe` completo + contacto en el CRM de AAA001 + pruebas con eventos firmados. (dep: F6.2, F2.2)
 - [x] F6.4 Bloqueo por impago en ycloud-webhook, buffer, flows, deliver y crm-jobs + pantalla «Reactiva tu suscripción» + banner de aviso. (dep: F6.2)
 - [ ] F6.5 Página `/bienvenida` con «Reenviar». **Requiere D1.** (dep: F6.3)
-- [ ] F6.6 Facturación en el panel (Customer Portal, botón de pago con `client_reference_id`) y consola de empresas. (dep: F6.3)
+- [x] F6.6 Facturación en el panel (Customer Portal, botón de pago con `client_reference_id`) y consola de empresas. (dep: F6.3)
 - [ ] F6.7 Reunión de puesta en marcha sobre la agenda de AAA001; wizard y tours sin GHL; `markAgencyContactActive` → etiqueta `levy-activo` en AAA001. (dep: F2.4, F2.2)
 
 ### F7 — Migración de datos y limpieza
@@ -289,6 +295,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-03 · F6.2 · `lib/billing` (config, reglas `ok|aviso|bloqueado`, lectura por empresa, lista de bloqueadas, cliente Stripe) + `lib/email.ts` (Resend por `fetch`); typecheck, lint y test (296/296) en verde · commit `crm: F6.2 librería de facturación y correo`.
 - 2026-11-03 · F6.3 · webhook de Stripe (firma, dedupe, alta de empresa, estado de suscripción, correo de acceso, contacto en AAA001) + 10 pruebas con eventos firmados; eventos documentados en el runbook; typecheck, lint, test (306/306) y build en verde · commit `crm: F6.3 webhook de Stripe`.
 - 2026-11-03 · F6.4 · corte por impago en ycloud-webhook, buffer, flows, deliver y crm-jobs (lo entrante se guarda) + aviso «Reactiva tu suscripción» y banner de gracia en el panel; typecheck, lint, test (309/309) y build en verde · commit `crm: F6.4 corte por impago`.
+- 2026-11-03 · F6.6 · Facturación en Negocio (Pagar/reactivar + Customer Portal, solo owner), aviso con enlace, consola de empresas con exención y enlace de cliente de Stripe; variable `STRIPE_PAYMENT_LINK_URL`; typecheck, lint, test (315/315) y build en verde · commit `crm: F6.6 facturación en el panel`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->

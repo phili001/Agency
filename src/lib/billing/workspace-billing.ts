@@ -7,7 +7,8 @@ import {
   type WorkspaceBillingState,
 } from "./state.ts";
 
-const BILLING_COLUMNS = "workspace_id, billing_exempt, cancel_at_period_end, current_period_end, past_due_since, status";
+const BILLING_COLUMNS =
+  "workspace_id, billing_exempt, cancel_at_period_end, current_period_end, past_due_since, status, stripe_customer_id";
 
 type Options = { env?: Record<string, string | undefined>; now?: Date };
 
