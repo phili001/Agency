@@ -535,7 +535,38 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      // Solo service_role. Errores con SQLSTATE propio: LVS01 slot_taken,
+      // LVN01 not_offered, LVH01 outside_hours, LVB01 blocked,
+      // LVW01 wrong_workspace, LVA01 agenda_inactive, LVX01 not_active.
+      book_appointment: {
+        Args: {
+          p_actor_user_id?: string | null;
+          p_agenda_id: string;
+          p_contact_id: string;
+          p_conversation_id: string | null;
+          p_created_by: "agent" | "operator" | "flow" | "import";
+          p_ends_at: string;
+          p_notes?: string | null;
+          p_service: string;
+          p_starts_at: string;
+          p_workspace_id: string;
+        };
+        Returns: Database["public"]["Tables"]["appointments"]["Row"];
+      };
+      reschedule_appointment: {
+        Args: {
+          p_actor_user_id?: string | null;
+          p_appointment_id: string;
+          p_conversation_id?: string | null;
+          p_created_by: "agent" | "operator" | "flow" | "import";
+          p_ends_at: string;
+          p_starts_at: string;
+          p_workspace_id: string;
+        };
+        Returns: Database["public"]["Tables"]["appointments"]["Row"];
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

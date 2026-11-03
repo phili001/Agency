@@ -53,6 +53,13 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - `offered_slots` y `google_event_deletions` solo los escribe el servidor (sin políticas de escritura); el panel solo lee (owner/admin en los borrados pendientes).
   - Pruebas SQL repetibles en `supabase/tests/agenda_core_checks.sql`.
 
+- **F1.4 Agendar/reagendar en SQL (2026-11-02).**
+  - Lógica en `app_private.book_appointment` / `reschedule_appointment` / `check_agenda_slot` (security definer, `search_path = ''`). Envoltorios `public.book_appointment` / `public.reschedule_appointment` (security invoker) para RPC; **solo `service_role` puede ejecutarlos** (revocado a `anon`/`authenticated`): el servidor comprueba el rol y saca `workspace_id` de la sesión antes de llamar. Se dio `usage` de `app_private` a `service_role`.
+  - Validación según `created_by`: `agent` exige hora ofrecida a esa conversación en los últimos 30 min + horario/festivo/antelación/límite de días/bloqueos; `flow` lo mismo sin la oferta; `operator` e `import` solo comprueban empresa, agenda activa y solape (el operador puede agendar fuera de horario). El solape lo decide siempre la restricción.
+  - Errores: `LVS01` slot_taken, `LVN01` not_offered, `LVH01` outside_hours (incluye pasado, antelación, límite de días, festivo, cruzar medianoche), `LVB01` blocked, `LVW01` wrong_workspace, `LVA01` agenda_inactive, `LVX01` not_active. F2.4 los traduce.
+  - Ambas funciones apuntan la actividad (`appointment_booked` / `appointment_rescheduled`) en la misma transacción y marcan `google_sync_pending` (nueva si la agenda sincroniza; vieja si tenía evento). Reagendar mantiene servicio, notas, contacto y conversación; enlaza vieja y nueva en `notices`.
+  - Pruebas SQL repetibles en `supabase/tests/agenda_booking_checks.sql` (16 casos).
+
 ## Tareas
 
 ### F0 — Preparación
@@ -64,7 +71,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - [x] F1.1 Decidir y anotar aquí cómo conviven `crm_tags` con `contacts.automation_labels` y `metadata.ai_tags` (sin romper triggers de flujo). Propuesta tras F0.1: `crm_tags` aparte; `automation_labels` sigue siendo marca interna del sistema (no se muestra como etiqueta); `ai_tags` se muestra como sugerencia que el operador puede convertir en etiqueta. (dep: F0.1)
 - [x] F1.2 Migración: `crm_pipeline_stages` (+ siembra para los 5 workspaces y, para los nuevos, con **trigger `after insert on workspaces`** en la base, que cubre `workspaces.ts` y `admin-companies.ts`), columnas nuevas de `contacts`, `crm_tags`, `crm_contact_tags`, `crm_custom_fields`, `crm_contact_notes`, `crm_contact_tasks`, `crm_contact_activity`, con RLS. Tipos regenerados, advisors limpios. (dep: F1.1)
 - [x] F1.3 Migración: extensión `btree_gist`; `agendas` (con `closed_dates date[] default '{}'` para festivos), `appointments` (con exclusión anti-solape), `schedule_blocks`, `offered_slots`, `google_event_deletions`, con RLS. (dep: F0.1)
-- [ ] F1.4 Migración: funciones `book_appointment` y `reschedule_appointment` + pruebas SQL (solape rechazado, hora no ofrecida rechazada, reagendar atómico, workspace ajeno rechazado) ejecutadas con `execute_sql` dentro de una transacción con `rollback`. Las funciones `security definer` llevan `set search_path = ''` y nombres calificados. (dep: F1.3)
+- [x] F1.4 Migración: funciones `book_appointment` y `reschedule_appointment` + pruebas SQL (solape rechazado, hora no ofrecida rechazada, reagendar atómico, workspace ajeno rechazado) ejecutadas con `execute_sql` dentro de una transacción con `rollback`. Las funciones `security definer` llevan `set search_path = ''` y nombres calificados. (dep: F1.3)
 - [ ] F1.5 Migración: `integrations.provider` admite `google_calendar` (sin quitar `gohighlevel`). (dep: F0.1)
 
 ### F2 — Lógica del CRM y la Agenda
@@ -122,6 +129,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-02 · F1.1 · decisión de convivencia de etiquetas apuntada en «Decisiones tomadas» (sin código; typecheck, lint y test en verde) · commit `crm: F1.1 decisión de etiquetas`.
 - 2026-11-02 · F1.2 · migraciones `crm_core` y `crm_core_grants` aplicadas a producción (aditivas; ensayo previo en transacción deshecha); 7 tablas con RLS, 5 columnas nuevas en `contacts`, 30 etapas sembradas, trigger de siembra; pruebas SQL de aislamiento (FK compuestas y RLS como usuario) en verde; advisors de seguridad sin avisos nuevos (siguen los 3 previos: `set_updated_at` search_path, protección de contraseñas filtradas, 2 tablas sin políticas a propósito); `schema.sql` y `database.types.ts` actualizados; typecheck, lint y test (106/106) en verde · commit `crm: F1.2 modelo de datos del CRM`.
 - 2026-11-02 · F1.3 · migración `agenda_core` aplicada a producción (aditiva; ensayo previo en transacción deshecha): `btree_gist`, 5 tablas con RLS y grants explícitos, anti-solape por agenda; 13 comprobaciones SQL en verde antes y después de aplicar; advisors de seguridad sin avisos nuevos; `schema.sql` y `database.types.ts` actualizados; typecheck, lint y test (106/106) en verde · commit `crm: F1.3 agendas y citas`.
+- 2026-11-02 · F1.4 · migración `agenda_booking_functions` aplicada a producción (ensayo previo en transacción deshecha): `book_appointment`, `reschedule_appointment` y `check_agenda_slot` con SQLSTATE propios; 16 comprobaciones SQL en verde antes y después (solape, no ofrecida, oferta caducada, fuera de horario, festivo, bloqueo, empresa/conversación ajena, reagendar atómico, cita inactiva, permisos); advisors sin avisos nuevos; `schema.sql` y tipos actualizados; typecheck, lint y test (106/106) en verde · commit `crm: F1.4 funciones de agendar y reagendar`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->
