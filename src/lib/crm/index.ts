@@ -5,8 +5,11 @@
  */
 export * from "./activity.ts";
 export * from "./contacts.ts";
+export * from "./csv.ts";
 export * from "./custom-fields.ts";
+export * from "./erasure.ts";
 export * from "./errors.ts";
+export * from "./import-export.ts";
 export * from "./normalize.ts";
 export * from "./notes.ts";
 export * from "./shared.ts";

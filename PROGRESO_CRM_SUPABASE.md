@@ -73,6 +73,11 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - Una cita de otra empresa responde `not_active` (no revela que existe).
   - Doble: compara timestamps ISO como instantes (como Postgres) y `createAgenda` inserta explícitamente el horario por defecto (`DEFAULT_WEEKLY_SCHEDULE`, igual que el default de la columna).
 
+- **F2.5 CSV y RGPD (2026-11-02).**
+  - CSV sin dependencias (`crm/csv.ts`): separador `,` o `;` detectado, BOM, comillas y saltos de línea; anti-fórmulas al exportar y su inversa al importar (exportar → Excel → importar no duplica). Columnas: `nombre, telefono, email, empresa, origen, etapa, etiquetas (;), creado, ultimo_mensaje, cf_<clave>`; admite alias (`teléfono`, `phone`, `whatsapp`, `name`, `tags`…).
+  - Importar: máx. 5 MB / 5.000 filas; existente por teléfono → actualiza lo que trae la fila (lo vacío no borra); etiquetas que no existen se crean; etapa por nombre (si no existe, la fila salta con motivo); hasta 50 líneas de error devueltas.
+  - Borrado RGPD (`crm/erasure.ts`): en la base, `messages.contact_id` y `flow_events.contact_id` son `on delete set null`, así que se borran antes; los eventos de Google de sus citas (de agendas con calendario) se apuntan en `google_event_deletions`; luego se borra el contacto (cascada del resto). `webhook_events` no se toca (payload crudo; se purgará por antigüedad, pendiente de decidir dónde).
+
 ## Tareas
 
 ### F0 — Preparación
@@ -92,7 +97,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - [x] F2.2 `src/lib/crm/` contactos, etapas, etiquetas, campos (validación por tipo), notas, tareas, actividad + pruebas + prueba de aislamiento. (dep: F1.2)
 - [x] F2.3 `src/lib/agenda/slots.ts` portado de `agenda.py` (horario, servicios, festivos `closed_dates`, bloqueos, citas, repartir/espaciar) — lógica pura con pruebas extensas (zonas horarias, cambio de horario de verano, bordes del día, aviso mínimo, festivos). (dep: F2.1)
 - [x] F2.4 `src/lib/agenda/` ofrecer, agendar, reagendar, cancelar, confirmar, marcar, bloqueos (sobre las funciones SQL) + traducción de errores + pruebas. (dep: F1.4, F2.3)
-- [ ] F2.5 Import/export CSV y borrado RGPD de contacto (apunta eventos de Google por borrar). (dep: F2.2, F1.3)
+- [x] F2.5 Import/export CSV y borrado RGPD de contacto (apunta eventos de Google por borrar). (dep: F2.2, F1.3)
 
 ### F3 — Google Calendar por workspace
 - [ ] F3.1 `src/lib/integrations/google-calendar.ts`: OAuth (state firmado con workspace y caducidad), tokens cifrados, refresco, error permanente, listCalendars, freeBusy, eventos con id determinista + pruebas con fetch simulado. (dep: F1.5)
@@ -148,6 +153,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-02 · F2.2 · `src/lib/crm/` (contactos, etapas, etiquetas, campos con validación por tipo, notas, tareas, actividad, normalización) + doble `src/lib/testing/fake-supabase.ts`; `apiErrorResponse` acepta errores `userFacing`; 30 pruebas nuevas (19 de validación, 11 con el doble, 3 de aislamiento A/B: lectura, escritura y que toda consulta lleva filtro); typecheck, lint, test (152/152) y build en verde · commit `crm: F2.2 lógica del CRM`.
 - 2026-11-02 · F2.3 · `src/lib/agenda/slots.ts` puro, portado de `agenda.py`/`schedule_config.py`: `agendaConfigFromRow` (tolerante) y `validateAgendaSettings` (estricta, para el panel), `daySlots`/`freeSlots` (horario de pared por zona, ocupados, antelación, máximo de días contado desde ahora igual que `book_appointment`, festivos, hora inexistente del cambio de hora omitida), `isOpenAt`, `closedReason`, `spaced`/`distributeSlots` (= `_espaciados`/`repartir`), `resolveService` (= `resolver_servicio`), `formatSlotLabel` («lunes 7 de septiembre, 10:30»). 22 pruebas nuevas (Madrid en ambos cambios de hora, Bogotá, 24:00, tramos partidos); typecheck, lint y test (174/174) en verde · commit `crm: F2.3 cálculo de huecos`.
 - 2026-11-02 · F2.4 · `src/lib/agenda/{agendas,appointments,errors,index}.ts` sobre las funciones SQL de F1.4; 13 pruebas nuevas con el doble (RPC simulada, traducción de los 7 SQLSTATE, duración, cancelar como agente, marcar, Google solo en push_and_busy, aislamiento A/B en 12 operaciones sin cambios en B); typecheck, lint y test (187/187) en verde · commit `crm: F2.4 operaciones de agenda`.
+- 2026-11-02 · F2.5 · `crm/csv.ts`, `crm/import-export.ts` (importar/exportar) y `crm/erasure.ts` (borrado RGPD); 9 pruebas nuevas (CSV con `;`, BOM y comillas, anti-fórmulas, importación con 6 motivos de salto, exportar→importar sin duplicar, aislamiento A/B en importación y borrado, cola de borrado en Google); typecheck, lint y test (196/196) en verde · commit `crm: F2.5 CSV y borrado RGPD`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->
