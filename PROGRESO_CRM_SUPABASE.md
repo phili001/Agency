@@ -27,6 +27,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 ## Decisiones pendientes (las responde el usuario; mientras, sigue con otras tareas)
 - **D1** ¿`agentelevy.com` es esta app o una landing aparte? → afecta a F6.5 (`/bienvenida`).
 - **D2** Precios (mensual/anual), prueba gratis y días de gracia → por defecto: sin prueba, 7 días de gracia; los ids de precio van por variable de entorno.
+- **D4** ¿Se puede añadir «Agenda» al menú lateral? (el 2026-09-13 pediste no cambiar nombres ni orden del menú) → afecta a F5.6. Opciones: entrada nueva al final del menú, o colgar la Agenda dentro de una página existente (p. ej. una pestaña en Clientes). Mientras, F5.6 espera y se sigue con F5.7.
 - **D3** Plantilla de WhatsApp aprobada para recordatorios fuera de la ventana de 24 h (nombre por workspace) → mientras, se registran como omitidos.
 
 ## Decisiones tomadas
@@ -186,7 +187,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - [x] F5.3 Flujos: `crm_action` (+ conversión de `ghl_action`), flow-builder con desplegables, **implementar** el disparo `tag` en `flow-engine.ts` (hoy no existe) al etiquetar desde panel, flujo o agente + pruebas. (dep: F2.2)
 - [x] F5.4 `ycloud-webhook` sin `syncContactToGoHighLevel`. Sustituto de `webhooks/ghl/send-message`: antes de crearlo, comprobar si alguien externo lo seguirá llamando sin GHL; si sí, crearlo con un nombre que no choque con la `api/flows/start` del panel (p. ej. `webhooks/flows/trigger`) y anotar la decisión; si no, solo se borra en F7.3. (dep: F2.2)
 - [x] F5.5 Panel **Contactos** (lista, kanban, ficha, CSV, RGPD) + `sidebar-nav`. (dep: F2.2, F2.5)
-- [ ] F5.6 Panel **Agenda** (semana/día, citas, bloqueos, configuración de agendas). (dep: F2.4, F3.2)
+- [ ] F5.6 Panel **Agenda** (semana/día, citas, bloqueos, configuración de agendas). **Requiere D4.** (dep: F2.4, F3.2)
 - [ ] F5.7 Ajustes del CRM (etapas, etiquetas, campos) e **Integraciones → Google Calendar** en lugar de GHL. (dep: F2.2, F3.2)
 - [ ] F5.8 Métricas, `panel-data`, `inbox-panel` (lateral con etapa, etiquetas y próxima cita), portada y `health/readiness` sin GHL. (dep: F5.2, F5.5)
 
