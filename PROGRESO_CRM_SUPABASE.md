@@ -153,6 +153,12 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - Ajustes del CRM dentro de **Clientes** (botón «Ajustes del CRM», owner/admin): etapas (nombre, color, tipo, orden, borrar), etiquetas (crear con color, borrar) y campos personalizados (crear por tipo con opciones, «La IA lo puede leer», activar/desactivar). API `api/crm/{stages,tags,fields}/**`, todo owner/admin salvo leer etapas.
   - Integraciones: tarjeta **Google Calendar** (`components/crm/google-calendar-card.tsx`): estado, cuenta, conectar/volver a conectar, desconectar, y lee `?google=conectado|error&motivo=` de la vuelta de Google. La tarjeta de GoHighLevel **solo aparece si el workspace ya tiene la integración** (AAA001 hasta F7.2).
   - Verificado: rutas nuevas 401 sin sesión en dev; build. **La interfaz no se ha visto con sesión.**
+- **F5.6 Panel Agenda (2026-11-03).**
+  - Entrada **«Agenda»** en el menú lateral justo después de Clientes (D4) y página `/agenda`: selector de agenda, vista semana/día en la zona horaria de la agenda, «Ver canceladas», bloqueos visibles y borrables.
+  - Diálogos: nueva cita (buscador de contacto, servicio, día, huecos libres o hora a mano), detalle de cita (confirmar, completada, no asistió, mover, cancelar con motivo), bloqueo (día entero o tramo) y configuración de agenda (horario por día con tramos, servicios, días cerrados, calendario de Google y modo, recordatorio y «no asistió», activa, por defecto).
+  - API `api/agenda/{agendas,appointments,blocks,slots}/**`: leer cualquier rol; citas y bloqueos owner/admin/agent; agendas owner/admin. `workspace_id` siempre de la sesión. Los huecos usan `googleBusyProvider`; tras agendar/mover/cancelar se llama a `syncAppointment` dentro de `after()` (`lib/agenda/after-change.ts`) — queda resuelto el pendiente de F2.4/F3.2.
+  - `withoutConfig` en `lib/agenda/agendas.ts` quita el `config` interno antes de mandar la agenda al navegador.
+  - Verificado: rutas nuevas 401 sin sesión en dev; build. **La interfaz no se ha visto con sesión.**
 
 ## Tareas
 
@@ -192,7 +198,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - [x] F5.3 Flujos: `crm_action` (+ conversión de `ghl_action`), flow-builder con desplegables, **implementar** el disparo `tag` en `flow-engine.ts` (hoy no existe) al etiquetar desde panel, flujo o agente + pruebas. (dep: F2.2)
 - [x] F5.4 `ycloud-webhook` sin `syncContactToGoHighLevel`. Sustituto de `webhooks/ghl/send-message`: antes de crearlo, comprobar si alguien externo lo seguirá llamando sin GHL; si sí, crearlo con un nombre que no choque con la `api/flows/start` del panel (p. ej. `webhooks/flows/trigger`) y anotar la decisión; si no, solo se borra en F7.3. (dep: F2.2)
 - [x] F5.5 Panel **Contactos** (lista, kanban, ficha, CSV, RGPD) + `sidebar-nav`. (dep: F2.2, F2.5)
-- [ ] F5.6 Panel **Agenda** (semana/día, citas, bloqueos, configuración de agendas). Entrada nueva «Agenda» en el menú lateral (D4). (dep: F2.4, F3.2)
+- [x] F5.6 Panel **Agenda** (semana/día, citas, bloqueos, configuración de agendas). Entrada nueva «Agenda» en el menú lateral (D4). (dep: F2.4, F3.2)
 - [x] F5.7 Ajustes del CRM (etapas, etiquetas, campos) e **Integraciones → Google Calendar** en lugar de GHL. (dep: F2.2, F3.2)
 - [ ] F5.8 Métricas, `panel-data`, `inbox-panel` (lateral con etapa, etiquetas y próxima cita), portada y `health/readiness` sin GHL. (dep: F5.2, F5.5)
 
@@ -243,6 +249,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-03 · F5.4 · `ycloud-webhook` actualiza el CRM (`recordInboundMessage`) y deja la sincronización con GHL como legado; sin sustituto para `webhooks/ghl/send-message` (comprobado que nadie lo usa); 2 pruebas nuevas; typecheck, lint, test (280/280) y build en verde · commit `crm: F5.4 webhook de YCloud al CRM`.
 - 2026-11-03 · F5.5 · `/clientes` como CRM (lista, etapas, ficha, CSV, RGPD) + API `api/crm/**` + enlace directo a conversación en la bandeja; sin cambios en el menú lateral (decisión del usuario); typecheck, lint, test (280/280) y build en verde; rutas comprobadas en dev (401 sin sesión) · commit `crm: F5.5 panel de clientes`.
 - 2026-11-03 · F5.7 · ajustes del CRM en Clientes (etapas, etiquetas, campos) + API `api/crm/{stages,tags,fields}` + tarjeta Google Calendar en Integraciones (GHL solo si ya existía); D4 resuelta por el usuario (Agenda como sección nueva del menú); typecheck, lint, test (280/280) y build en verde · commit `crm: F5.7 ajustes del CRM y Google Calendar`.
+- 2026-11-03 · F5.6 · sección Agenda en el menú + página `/agenda` (semana/día, citas, bloqueos, configuración) + API `api/agenda/**` con sync a Google en `after()`; typecheck, lint, test (280/280) y build en verde · commit `crm: F5.6 panel de agenda`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->

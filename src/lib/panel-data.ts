@@ -47,6 +47,7 @@ const deployChecks = [
 ];
 
 export type AppSection =
+  | "agenda"
   | "agents"
   | "automations"
   | "business"
@@ -72,6 +73,7 @@ export const workspaceTabs = [
 ] as const;
 
 export const sectionTitles: Record<AppSection, { eyebrow: string; title: string }> = {
+  agenda: { eyebrow: "CRM", title: "Agenda" },
   agents: { eyebrow: "Workspace", title: "Agentes" },
   automations: { eyebrow: "Workspace", title: "Automatizaciones" },
   business: { eyebrow: "Workspace", title: "Negocio" },

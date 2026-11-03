@@ -44,6 +44,13 @@ export const AGENDA_COLUMNS =
 
 const SYNC_MODES: GoogleSyncMode[] = ["off", "push", "push_and_busy"];
 
+/** La agenda sin `config` (derivado interno), para devolverla al navegador. */
+export function withoutConfig(agenda: Agenda): Omit<Agenda, "config"> {
+  const copy: Partial<Agenda> = { ...agenda };
+  delete copy.config;
+  return copy as Omit<Agenda, "config">;
+}
+
 export function toAgenda(row: Record<string, unknown>): Agenda {
   const agenda = row as unknown as AgendaRow;
   return { ...agenda, closed_dates: agenda.closed_dates ?? [], config: agendaConfigFromRow(row) };
