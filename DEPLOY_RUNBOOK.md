@@ -104,6 +104,56 @@ variable existe en el proyecto.
 >
 > La respuesta de la IA no depende de esto: el webhook la dispara al momento.
 
+### Trabajos del CRM (cada 5 minutos, desde Supabase)
+
+`/api/cron/crm-jobs` copia citas a Google Calendar, borra eventos pendientes,
+manda recordatorios e inasistencias y purga los horarios ofrecidos. No va en
+`vercel.json`: lo lanza la propia base con **pg_cron + pg_net** (job
+`levy-crm-jobs`, migración `20261103010000_crm_jobs_cron`). Se creó
+**desactivado**.
+
+1. Guarda la URL y el secreto en **Supabase Vault** (SQL Editor, una vez; nunca
+   en un archivo del repo):
+
+   ```sql
+   select vault.create_secret('https://tudominio.com/api/cron/crm-jobs', 'crm_jobs_url');
+   select vault.create_secret('<el mismo valor que CRON_SECRET>', 'crm_jobs_cron_secret');
+   ```
+
+   Para cambiarlos: `select vault.update_secret((select id from vault.secrets where name = 'crm_jobs_url'), 'https://…');`
+
+2. Con la app ya desplegada, **actívalo**:
+
+   ```sql
+   select cron.alter_job(job_id := (select jobid from cron.job where jobname = 'levy-crm-jobs'), active := true);
+   ```
+
+3. **Pausarlo** (por ejemplo, si algo manda mensajes que no debe):
+
+   ```sql
+   select cron.alter_job(job_id := (select jobid from cron.job where jobname = 'levy-crm-jobs'), active := false);
+   ```
+
+4. **Ver qué pasó**:
+
+   ```sql
+   -- Últimas ejecuciones del job (¿se lanzó?)
+   select status, return_message, start_time from cron.job_run_details
+   where jobid = (select jobid from cron.job where jobname = 'levy-crm-jobs')
+   order by start_time desc limit 20;
+
+   -- Últimas respuestas de la app (¿qué contestó?). Se guardan 6 horas.
+   select status_code, content, error_msg, created from net._http_response
+   order by created desc limit 20;
+   ```
+
+   Si faltan los secretos de Vault, la función no llama a nada y lo deja en el
+   log de Postgres («faltan crm_jobs_url o crm_jobs_cron_secret»).
+
+También se puede lanzar a mano:
+`curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://tudominio.com/api/cron/crm-jobs`
+(responde 500 si algún paso falló, con el detalle por paso).
+
 ## 5. YCloud
 
 URL del webhook, una por empresa (el código sale de *Integraciones*):

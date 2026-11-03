@@ -11,7 +11,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - Copia de seguridad previa: `~/Backups/levy/levy_20261102_1951.dump` (2026-11-02, pg_dump completo: 167 contactos, 3.565 mensajes, 6 usuarios). Se restaura con `pg_restore` sobre una base nueva, nunca encima de producción.
 - Verificación por tarea: `npm run typecheck && npm run lint && npm test` (+ `npm run build` si toca UI/rutas).
 - Historial de migraciones de Supabase: **vacío** a 2026-11-02 (`list_migrations` → `[]`). Los archivos antiguos de `supabase/migrations/` y los `.sql` sueltos (`flow_builder.sql`, `self_service_onboarding.sql`, `next_workspace_assets_and_webhooks.sql`, `set_default_handoff.sql`) ya están aplicados a mano: **no volver a aplicarlos**. El primer `apply_migration` de este plan abre el historial.
-- Extensiones a 2026-11-02: instaladas `supabase_vault` (esquema `vault`), `pgcrypto`, `uuid-ossp`, `pg_stat_statements`, `btree_gist` (esquema `extensions`, F1.3); disponibles sin instalar `pg_cron`, `pg_net` (F4.3).
+- Extensiones a 2026-11-02: instaladas `supabase_vault` (esquema `vault`), `pgcrypto`, `uuid-ossp`, `pg_stat_statements`, `btree_gist` (esquema `extensions`, F1.3); `pg_cron` (pg_catalog) y `pg_net` (esquema `extensions`, funciones en `net`) instalados en F4.3.
 
 ## Estado real vs. inventario (F0.1, 2026-11-02)
 - `src/lib/timezones.ts` **ya existe** (utilidades de navegador: `getTimeZoneOptions`, `getBrowserTimeZone`, `getZoneOffsetLabel`). F2.1 lo amplía con las funciones puras de `ghl-calendar.ts`; no debe meter dependencias de servidor (lo importan componentes cliente).
@@ -110,6 +110,10 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - Tras encolar avisos se llama a `cron/deliver?workspaceId&conversationId` por cada conversación (máx. 50 por vuelta), igual que hace `ycloud-webhook`: el cron de `deliver` en Vercel es diario y sin parámetros solo manda 10.
   - Ruta `POST|GET /api/cron/crm-jobs`, `maxDuration = 60`, solo `Authorization: Bearer <CRON_SECRET>` (no acepta el secreto por query, a diferencia de los otros cron, para que no quede en logs).
 
+- **F4.3 Cron en la base (2026-11-03).**
+  - Job `levy-crm-jobs` (`*/5 * * * *`) que llama a `app_private.invoke_crm_jobs()`: lee `crm_jobs_url` y `crm_jobs_cron_secret` de Vault y hace `net.http_post` con `Authorization: Bearer …` (timeout 55 s). Sin los dos secretos no llama a nada (solo deja un `raise log`).
+  - **Creado desactivado** y **sin secretos en Vault** (a 2026-11-03): los mete una persona y se activa en F7.5. Instrucciones (crear secretos, activar, pausar, ver `cron.job_run_details` y `net._http_response`) en `DEPLOY_RUNBOOK.md` → «Trabajos del CRM».
+
 ## Tareas
 
 ### F0 — Preparación
@@ -139,7 +143,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 ### F4 — Jobs y recordatorios
 - [x] F4.1 `src/lib/agenda/reminders.ts` portado de `seguimientos.py` (idempotente, ventana 24 h, plantilla o «omitido») + pruebas. (dep: F2.4)
 - [x] F4.2 `app/api/cron/crm-jobs` (lotes: Google pendiente, borrados, recordatorios, inasistencias, purga de ofertas, gracia de facturación) + pruebas. (dep: F3.3, F4.1)
-- [ ] F4.3 Migración: extensiones `pg_cron` y `pg_net`; job cada 5 min llamando a `crm-jobs`, con URL y secreto en Supabase Vault. **Se crea desactivado** (`cron.alter_job(..., active := false)`) y se activa en F7.5 tras desplegar. Documentar cómo pausarlo. (dep: F4.2)
+- [x] F4.3 Migración: extensiones `pg_cron` y `pg_net`; job cada 5 min llamando a `crm-jobs`, con URL y secreto en Supabase Vault. **Se crea desactivado** (`cron.alter_job(..., active := false)`) y se activa en F7.5 tras desplegar. Documentar cómo pausarlo. (dep: F4.2)
 
 ### F5 — Agente, flujos y panel sin GHL
 - [ ] F5.0 Refactor **sin cambio de comportamiento**: sacar de `cron/buffer/route.ts` el runtime de calendario (`buildCalendarRuntime`, `runCalendarTool`, `buildCalendarToolDefinitions`, respuestas directas y saneado) a `src/lib/agenda/agent-tools.ts`, aún sobre GHL, con pruebas de las protecciones actuales (no afirmar cita sin confirmación de la tool, no inventar disponibilidad). (dep: F0.1)
@@ -191,6 +195,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-02 · F3.3 · `src/lib/agenda/google-sync.ts` (copia por cita con control de concurrencia, barrida por empresa conectada, cola de borrados con intentos, ocupado de Google tolerante a fallos); 10 pruebas nuevas (evento con id/nombre/zona, cancelar borra, completada se queda, cambio y borrado durante la copia, barrida cortada por 503 sin tocar empresas no conectadas, intentos de borrado, ocupado solo en push_and_busy y degradado); typecheck, lint y test (226/226) en verde · commit `crm: F3.3 copia y ocupado de Google`.
 - 2026-11-03 · F4.1 · migración `agenda_reminders` aplicada (ensayo previo deshecho; advisors sin avisos nuevos) + `src/lib/agenda/reminders.ts` (recordatorio e inasistencia, ventana de 24 h, horario de envío, omitidos con motivo, idempotente); `agendaChanges` acepta los ajustes de avisos; 11 pruebas nuevas (texto, ventana, horario, cuándo toca, encolar una vez, omitido sin plantilla, espera nocturna, opt-out, apagado/excluida, inasistencia, aislamiento por empresa); typecheck, lint y test (237/237) en verde · commit `crm: F4.1 recordatorios e inasistencias`.
 - 2026-11-03 · F4.2 · `src/lib/agenda/crm-jobs.ts` + ruta `api/cron/crm-jobs`; `runAppointmentNotices` devuelve las conversaciones con avisos encolados; 4 pruebas nuevas (pasos y purga, avisar a deliver, empresas bloqueadas sin avisos, facturación caída no manda nada, paso suelto); typecheck, lint, test (241/241) y build en verde. Sin ejecutar contra producción (lo hará el cron de F4.3) · commit `crm: F4.2 crm-jobs`.
+- 2026-11-03 · F4.3 · migración `crm_jobs_cron` aplicada (ensayo previo deshecho y comprobado): `pg_cron` + `pg_net`, `app_private.invoke_crm_jobs()` con secretos de Vault, job `levy-crm-jobs` cada 5 min **inactivo**; advisors sin avisos nuevos; runbook y `schema.sql` actualizados; typecheck, lint y test en verde · commit `crm: F4.3 cron de crm-jobs desactivado`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->
