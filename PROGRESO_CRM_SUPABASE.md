@@ -78,6 +78,14 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - Importar: máx. 5 MB / 5.000 filas; existente por teléfono → actualiza lo que trae la fila (lo vacío no borra); etiquetas que no existen se crean; etapa por nombre (si no existe, la fila salta con motivo); hasta 50 líneas de error devueltas.
   - Borrado RGPD (`crm/erasure.ts`): en la base, `messages.contact_id` y `flow_events.contact_id` son `on delete set null`, así que se borran antes; los eventos de Google de sus citas (de agendas con calendario) se apuntan en `google_event_deletions`; luego se borra el contacto (cascada del resto). `webhook_events` no se toca (payload crudo; se purgará por antigüedad, pendiente de decidir dónde).
 
+- **F3.1 Google Calendar (2026-11-02).**
+  - `src/lib/integrations/google-calendar.ts` con `fetch` directo (sin librería de Google). Dependencias inyectables (`fetch`, cliente, `env`, `now`).
+  - `state` OAuth = payload base64url `{w: workspace, u: usuario, exp: +10 min, n: nonce}` + HMAC-SHA256 con clave derivada de `INTEGRATION_ENCRYPTION_KEY`; el callback exige el mismo usuario de la sesión (F3.2 debe pasar `user.id`).
+  - Tokens: JSON cifrado en `integration_secrets` (provider `google_calendar`, kind `oauth_tokens`). La integración guarda en `config` `account_email` (id del calendario principal, sin pedir scope de perfil), `scopes` y `connected_at`. Se exigen `calendar.events` + `calendar.readonly` y refresh token (`prompt=consent`).
+  - Renovación con 60 s de margen; `400/401` de Google o credenciales ilegibles → integración `error` con mensaje en `last_error` y `GoogleCalendarError("reconnect_required")`; red/5xx/429 → `temporary` sin desconectar. Un 401 en la API fuerza una renovación y un reintento.
+  - Evento con id = uuid de la cita sin guiones (alfabeto válido de Google). `upsertEvent`: POST con id; 409 → PUT. `deleteEvent`: 404/410 cuentan como borrado. `sendUpdates=none` siempre (no se mandan invitaciones).
+  - `GoogleCalendarError` es `userFacing` (sale tal cual por `apiErrorResponse`).
+
 ## Tareas
 
 ### F0 — Preparación
@@ -100,7 +108,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - [x] F2.5 Import/export CSV y borrado RGPD de contacto (apunta eventos de Google por borrar). (dep: F2.2, F1.3)
 
 ### F3 — Google Calendar por workspace
-- [ ] F3.1 `src/lib/integrations/google-calendar.ts`: OAuth (state firmado con workspace y caducidad), tokens cifrados, refresco, error permanente, listCalendars, freeBusy, eventos con id determinista + pruebas con fetch simulado. (dep: F1.5)
+- [x] F3.1 `src/lib/integrations/google-calendar.ts`: OAuth (state firmado con workspace y caducidad), tokens cifrados, refresco, error permanente, listCalendars, freeBusy, eventos con id determinista + pruebas con fetch simulado. (dep: F1.5)
 - [ ] F3.2 Rutas `app/api/integrations/google-calendar/{connect,callback,status,calendars,disconnect}` (owner/admin) + pruebas. (dep: F3.1)
 - [ ] F3.3 Copia a Google (`push`) y ocupado (`push_and_busy`) integrados en `src/lib/agenda` + cola de pendientes y borrados. (dep: F3.1, F2.4)
 
@@ -154,6 +162,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-02 · F2.3 · `src/lib/agenda/slots.ts` puro, portado de `agenda.py`/`schedule_config.py`: `agendaConfigFromRow` (tolerante) y `validateAgendaSettings` (estricta, para el panel), `daySlots`/`freeSlots` (horario de pared por zona, ocupados, antelación, máximo de días contado desde ahora igual que `book_appointment`, festivos, hora inexistente del cambio de hora omitida), `isOpenAt`, `closedReason`, `spaced`/`distributeSlots` (= `_espaciados`/`repartir`), `resolveService` (= `resolver_servicio`), `formatSlotLabel` («lunes 7 de septiembre, 10:30»). 22 pruebas nuevas (Madrid en ambos cambios de hora, Bogotá, 24:00, tramos partidos); typecheck, lint y test (174/174) en verde · commit `crm: F2.3 cálculo de huecos`.
 - 2026-11-02 · F2.4 · `src/lib/agenda/{agendas,appointments,errors,index}.ts` sobre las funciones SQL de F1.4; 13 pruebas nuevas con el doble (RPC simulada, traducción de los 7 SQLSTATE, duración, cancelar como agente, marcar, Google solo en push_and_busy, aislamiento A/B en 12 operaciones sin cambios en B); typecheck, lint y test (187/187) en verde · commit `crm: F2.4 operaciones de agenda`.
 - 2026-11-02 · F2.5 · `crm/csv.ts`, `crm/import-export.ts` (importar/exportar) y `crm/erasure.ts` (borrado RGPD); 9 pruebas nuevas (CSV con `;`, BOM y comillas, anti-fórmulas, importación con 6 motivos de salto, exportar→importar sin duplicar, aislamiento A/B en importación y borrado, cola de borrado en Google); typecheck, lint y test (196/196) en verde · commit `crm: F2.5 CSV y borrado RGPD`.
+- 2026-11-02 · F3.1 · `src/lib/integrations/google-calendar.ts` (OAuth con state firmado, tokens cifrados, renovación, error permanente vs. pasajero, calendarios, freeBusy, eventos con id fijo, desconectar con revocación); 15 pruebas con fetch simulado (state falsificado/caducado/de otro usuario, scopes, refresh conservado, 401→renovar, 409→actualizar, 410 en borrado, tokens por empresa); typecheck, lint y test (211/211) en verde · commit `crm: F3.1 cliente de Google Calendar`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->
