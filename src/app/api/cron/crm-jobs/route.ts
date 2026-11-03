@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { runCrmJobs } from "@/lib/agenda/crm-jobs";
+import { listBlockedWorkspaceIds } from "@/lib/billing/workspace-billing";
 import { triggerDeliver } from "@/lib/deliver-trigger";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -24,6 +25,8 @@ export async function POST(request: Request) {
 
   const origin = new URL(request.url).origin;
   const report = await runCrmJobs(createAdminClient(), {
+    // Empresas bloqueadas por impago: sin recordatorios ni avisos (F6.4).
+    billing: async (client, now) => ({ blockedWorkspaceIds: await listBlockedWorkspaceIds(client, { now }) }),
     deliver: (targets) => triggerDeliver(origin, targets),
   });
   const failed = Object.values(report.steps).some((step) => step && !step.ok);

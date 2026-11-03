@@ -8,6 +8,7 @@ import {
   getDefaultConversationMode,
 } from "@/lib/conversation-default";
 import { handleInboundFlow } from "@/lib/flow-engine";
+import { isWorkspaceBlockedOrNot } from "@/lib/billing/gate";
 import { recordInboundMessage } from "@/lib/crm/contacts";
 import { syncContactToGoHighLevel } from "@/lib/integrations/gohighlevel";
 import { secretMatchesHash } from "@/lib/integrations/secrets";
@@ -820,7 +821,8 @@ export async function handleYCloudWebhook(
           resolvedWorkspaceId,
           supabase,
         });
-        if (storedMessage.shouldStartAiBuffer) {
+        // Bloqueada por impago: se guarda lo entrante, sin flujos ni IA.
+        if (storedMessage.shouldStartAiBuffer && !(await isWorkspaceBlockedOrNot(supabase, resolvedWorkspaceId))) {
           const flowResult = await handleInboundFlow({
             context: {
               contactId: storedMessage.contactId,
@@ -857,7 +859,8 @@ export async function handleYCloudWebhook(
         resolvedWorkspaceId,
         supabase,
       });
-      if (storedMessage.shouldStartAiBuffer) {
+      // Bloqueada por impago: se guarda lo entrante, sin flujos ni IA.
+      if (storedMessage.shouldStartAiBuffer && !(await isWorkspaceBlockedOrNot(supabase, resolvedWorkspaceId))) {
         const flowResult = await handleInboundFlow({
           context: {
             contactId: storedMessage.contactId,

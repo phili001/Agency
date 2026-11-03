@@ -186,6 +186,13 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - `resolveCompanyName` y `buildWelcomeLink` pasan a `lib/welcome.ts` (`levy-purchase.ts` los reexporta) para que sobrevivan al borrado de GHL en F7.3.
   - Pruebas (10) con eventos firmados por el SDK real (`generateTestHeaderString`): pago correcto, duplicado, firma inválida/otro secreto/cuerpo alterado, otro producto, sin pagar, `client_reference_id` ajeno y propio, impago y vuelta a pagar, cancelación, metadata de otra empresa.
   - **Sin verificar con Stripe real** (F7.3 exige un pago de prueba real antes de borrar GHL). `DEPLOY_RUNBOOK.md`: endpoint y eventos a suscribir.
+- **F6.4 Corte por impago (2026-11-03).**
+  - `lib/billing/gate.ts`: en `cron/buffer`, `cron/flows` y `cron/deliver` las empresas bloqueadas se **excluyen en la consulta** (`.not("workspace_id", "in", …)`), así no ocupan el lote; en `ycloud-webhook` lo entrante se guarda igual (y cuenta en el CRM) pero no se arrancan flujos ni IA. `crm-jobs` recibe ya `listBlockedWorkspaceIds` en su paso `billing` (sin avisos ni recordatorios).
+  - Si la lectura de facturación falla, en esos cuatro caminos **no se bloquea** (se registra el error); en `crm-jobs` sí se paran los avisos, como ya estaba.
+  - Lo encolado de una empresa bloqueada **se queda en cola** y los flujos en espera siguen esperando: salen al reactivar. ⚠️ Tras un bloqueo largo, la IA contestará a mensajes antiguos al volver: si molesta, se puede limitar la ventana del buffer.
+  - Los mensajes que escribe el equipo a mano también se quedan sin enviar mientras dure el bloqueo (`deliver` no envía).
+  - Panel: `components/panel/billing-notice.tsx` en el layout, solo para owner/admin: «Reactiva tu suscripción» (rojo) si está bloqueada, banner ámbar en aviso (con fecha de fin de la gracia). «Sin suscripción» no se muestra hasta que exista el botón de pago (F6.6). No se borra ningún dato.
+  - Pruebas: `gate.test.ts` (solo la impagada, fallo de lectura no corta, filtro con ids válidos); la exclusión en `crm-jobs` ya estaba probada.
 
 ## Tareas
 
@@ -233,7 +240,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - [x] F6.1 Migración: `workspace_billing` (5 workspaces actuales con `billing_exempt = true`) y `billing_events`. (dep: F0.1)
 - [x] F6.2 `src/lib/billing/` (cliente Stripe, `getWorkspaceBillingState`) + `src/lib/email.ts` (Resend) + pruebas. (dep: F6.1, F0.2)
 - [x] F6.3 `app/api/webhooks/stripe` completo + contacto en el CRM de AAA001 + pruebas con eventos firmados. (dep: F6.2, F2.2)
-- [ ] F6.4 Bloqueo por impago en ycloud-webhook, buffer, flows, deliver y crm-jobs + pantalla «Reactiva tu suscripción» + banner de aviso. (dep: F6.2)
+- [x] F6.4 Bloqueo por impago en ycloud-webhook, buffer, flows, deliver y crm-jobs + pantalla «Reactiva tu suscripción» + banner de aviso. (dep: F6.2)
 - [ ] F6.5 Página `/bienvenida` con «Reenviar». **Requiere D1.** (dep: F6.3)
 - [ ] F6.6 Facturación en el panel (Customer Portal, botón de pago con `client_reference_id`) y consola de empresas. (dep: F6.3)
 - [ ] F6.7 Reunión de puesta en marcha sobre la agenda de AAA001; wizard y tours sin GHL; `markAgencyContactActive` → etiqueta `levy-activo` en AAA001. (dep: F2.4, F2.2)
@@ -281,6 +288,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-03 · F6.1 · migración `billing` aplicada (dry-run previo en transacción deshecha): `workspace_billing` + `billing_events`, 5/5 empresas exentas, RLS solo lectura owner/admin; `schema.sql` y `database.types.ts` al día; checks SQL DRYRUN_OK; typecheck, lint y test (281/281) en verde · commit `crm: F6.1 tablas de facturación`.
 - 2026-11-03 · F6.2 · `lib/billing` (config, reglas `ok|aviso|bloqueado`, lectura por empresa, lista de bloqueadas, cliente Stripe) + `lib/email.ts` (Resend por `fetch`); typecheck, lint y test (296/296) en verde · commit `crm: F6.2 librería de facturación y correo`.
 - 2026-11-03 · F6.3 · webhook de Stripe (firma, dedupe, alta de empresa, estado de suscripción, correo de acceso, contacto en AAA001) + 10 pruebas con eventos firmados; eventos documentados en el runbook; typecheck, lint, test (306/306) y build en verde · commit `crm: F6.3 webhook de Stripe`.
+- 2026-11-03 · F6.4 · corte por impago en ycloud-webhook, buffer, flows, deliver y crm-jobs (lo entrante se guarda) + aviso «Reactiva tu suscripción» y banner de gracia en el panel; typecheck, lint, test (309/309) y build en verde · commit `crm: F6.4 corte por impago`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->

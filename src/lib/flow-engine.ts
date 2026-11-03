@@ -2198,9 +2198,12 @@ export async function unblockFlowContact({
 }
 
 export async function resumeDueFlowRuns({
+  excludeWorkspaceIds,
   supabase,
   workspaceId,
 }: {
+  /** Valor de `notInWorkspaces` (empresas bloqueadas por impago). */
+  excludeWorkspaceIds?: string | null;
   supabase: AdminClient;
   workspaceId?: string | null;
 }) {
@@ -2214,6 +2217,10 @@ export async function resumeDueFlowRuns({
 
   if (workspaceId) {
     query = query.eq("workspace_id", workspaceId);
+  }
+  if (excludeWorkspaceIds) {
+    // Siguen esperando: se reanudan cuando la empresa vuelva a pagar.
+    query = query.not("workspace_id", "in", excludeWorkspaceIds);
   }
 
   const { data: runs, error } = await query;

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { apiErrorResponse } from "@/lib/api-error";
+import { blockedWorkspaceIdsOrNone, notInWorkspaces } from "@/lib/billing/gate";
 import { resumeDueFlowRuns } from "@/lib/flow-engine";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -63,8 +64,10 @@ export async function POST(request: Request) {
   const workspaceId = params.get("workspaceId");
 
   try {
+    const supabase = createAdminClient();
     const results = await resumeDueFlowRuns({
-      supabase: createAdminClient(),
+      excludeWorkspaceIds: notInWorkspaces(await blockedWorkspaceIdsOrNone(supabase)),
+      supabase,
       workspaceId,
     });
 

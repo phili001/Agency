@@ -1,5 +1,6 @@
 import { Bot } from "lucide-react";
 
+import { BillingNotice } from "@/components/panel/billing-notice";
 import { SidebarNav } from "@/components/panel/sidebar-nav";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { getPanelContext } from "@/lib/panel-context";
@@ -12,7 +13,7 @@ import { getPanelContext } from "@/lib/panel-context";
 export default async function PanelLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const { platformAdmin, roleByWorkspaceId, user, workspaceId, workspaces } =
+  const { activeRole, platformAdmin, roleByWorkspaceId, user, workspaceId, workspaces } =
     await getPanelContext();
   const workspaceOptions = workspaces.map((item) => ({
     companyCode: typeof item.company_code === "string" ? item.company_code : null,
@@ -47,7 +48,10 @@ export default async function PanelLayout({
           </div>
         </aside>
 
-        <section className="flex min-w-0 flex-col">{children}</section>
+        <section className="flex min-w-0 flex-col">
+          {workspaceId ? <BillingNotice role={activeRole} workspaceId={workspaceId} /> : null}
+          {children}
+        </section>
       </div>
     </main>
   );

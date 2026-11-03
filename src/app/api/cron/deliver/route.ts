@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { blockedWorkspaceIdsOrNone, notInWorkspaces } from "@/lib/billing/gate";
 import { getWorkspaceYCloudKey } from "@/lib/integrations/ycloud";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -168,6 +169,12 @@ export async function POST(request: Request) {
 
   if (workspaceId) {
     messagesQuery = messagesQuery.eq("workspace_id", workspaceId);
+  }
+
+  // Empresas bloqueadas por impago: lo encolado se queda en cola, sin enviar.
+  const blocked = notInWorkspaces(await blockedWorkspaceIdsOrNone(supabase));
+  if (blocked) {
+    messagesQuery = messagesQuery.not("workspace_id", "in", blocked);
   }
 
   const { data: messages, error } = await messagesQuery;

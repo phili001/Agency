@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import type { Json } from "@/lib/supabase/database.types";
 import { resolveCalendarRequestContext } from "@/lib/calendar-request";
+import { blockedWorkspaceIdsOrNone, notInWorkspaces } from "@/lib/billing/gate";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   applyBusinessVariables,
@@ -1016,6 +1017,12 @@ export async function POST(request: Request) {
     }
   } else {
     conversationsQuery = conversationsQuery.lte("last_message_at", cutoff).limit(5);
+  }
+
+  // Empresas bloqueadas por impago: la IA no responde (lo entrante ya está guardado).
+  const blocked = notInWorkspaces(await blockedWorkspaceIdsOrNone(supabase));
+  if (blocked) {
+    conversationsQuery = conversationsQuery.not("workspace_id", "in", blocked);
   }
 
   const { data: conversations, error: conversationsError } =
