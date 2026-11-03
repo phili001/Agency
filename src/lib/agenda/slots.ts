@@ -44,6 +44,15 @@ export type Interval = { end: Date; start: Date };
 export type Slot = Interval & { dateKey: string };
 
 const DAY_KEYS = ["1", "2", "3", "4", "5", "6", "7"] as const;
+
+/** Horario de una agenda nueva: lunes a viernes de 9 a 18 (igual que el default de la columna). */
+export const DEFAULT_WEEKLY_SCHEDULE: WeeklySchedule = {
+  "1": [{ end: "18:00", start: "09:00" }],
+  "2": [{ end: "18:00", start: "09:00" }],
+  "3": [{ end: "18:00", start: "09:00" }],
+  "4": [{ end: "18:00", start: "09:00" }],
+  "5": [{ end: "18:00", start: "09:00" }],
+};
 const WEEKDAY_PLURALS = ["", "lunes", "martes", "miércoles", "jueves", "viernes", "sábados", "domingos"];
 
 // --- Configuración -----------------------------------------------------------

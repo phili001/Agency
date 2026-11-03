@@ -28,9 +28,15 @@ export function fakeId(prefix = "id") {
   return `${prefix}-${idCounter.toString().padStart(6, "0")}`;
 }
 
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
 function compare(a: unknown, b: unknown) {
   if (a === b) {
     return 0;
+  }
+  // Como Postgres con timestamptz: "…00Z" y "…00.000Z" son el mismo instante.
+  if (typeof a === "string" && typeof b === "string" && ISO_INSTANT.test(a) && ISO_INSTANT.test(b)) {
+    return Math.sign(new Date(a).getTime() - new Date(b).getTime());
   }
   if (a === null || a === undefined) {
     return 1;
@@ -398,6 +404,8 @@ export function createCrmFake(tables: FakeTables = {}) {
       crm_custom_fields: [(row) => `${row.workspace_id}|${row.key}`],
       crm_pipeline_stages: [(row) => `${row.workspace_id}|${String(row.name).toLowerCase()}`],
       crm_tags: [(row) => `${row.workspace_id}|${String(row.name).toLowerCase()}`],
+      agendas: [(row) => `${row.workspace_id}|${String(row.name).toLowerCase()}`],
+      offered_slots: [(row) => `${row.conversation_id}|${row.agenda_id}|${row.starts_at}`],
     },
     [
       { childColumn: "contact_id", childTable: "crm_contact_tags", parentTable: "contacts" },
@@ -406,6 +414,8 @@ export function createCrmFake(tables: FakeTables = {}) {
       { childColumn: "contact_id", childTable: "crm_contact_tasks", parentTable: "contacts" },
       { childColumn: "contact_id", childTable: "crm_contact_activity", parentTable: "contacts" },
       { childColumn: "contact_id", childTable: "appointments", parentTable: "contacts" },
+      { childColumn: "agenda_id", childTable: "schedule_blocks", parentTable: "agendas" },
+      { childColumn: "conversation_id", childTable: "offered_slots", parentTable: "conversations" },
     ],
   );
 }
