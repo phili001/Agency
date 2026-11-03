@@ -114,6 +114,10 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - Job `levy-crm-jobs` (`*/5 * * * *`) que llama a `app_private.invoke_crm_jobs()`: lee `crm_jobs_url` y `crm_jobs_cron_secret` de Vault y hace `net.http_post` con `Authorization: Bearer …` (timeout 55 s). Sin los dos secretos no llama a nada (solo deja un `raise log`).
   - **Creado desactivado** y **sin secretos en Vault** (a 2026-11-03): los mete una persona y se activa en F7.5. Instrucciones (crear secretos, activar, pausar, ver `cron.job_run_details` y `net._http_response`) en `DEPLOY_RUNBOOK.md` → «Trabajos del CRM».
 
+- **F5.0 Calendario del agente fuera de `buffer` (2026-11-03).**
+  - En dos módulos (no uno, como decía la tarea, para poder probar sin red): `src/lib/agenda/agent-guards.ts` (puro: `buildCalendarToolDefinitions`, `buildCalendarContext`/`buildNoCalendarContext`, `buildDirectBookingAnswer`/`buildDirectAvailabilityAnswer`, `textLooksLike*`, `has*`, `sanitizeCalendarAnswer`) y `src/lib/agenda/agent-tools.ts` (servidor, aún GHL: `buildCalendarRuntime`, `runCalendarTool`, tipo `CalendarRuntime`).
+  - Código movido literal (comprobado línea a línea contra el commit anterior): solo cambian las firmas. `buildCalendarRuntime` recibe `agentName`, `isBookingAgent` y `enabledToolIds` en vez del agente entero (el enrutado sigue en `buffer`); `runCalendarTool` recibe `{ name, arguments }` y mensajes `CalendarRequestMessage`. `buffer/route.ts` pasa de 2.093 a ~1.330 líneas.
+
 ## Tareas
 
 ### F0 — Preparación
@@ -146,7 +150,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - [x] F4.3 Migración: extensiones `pg_cron` y `pg_net`; job cada 5 min llamando a `crm-jobs`, con URL y secreto en Supabase Vault. **Se crea desactivado** (`cron.alter_job(..., active := false)`) y se activa en F7.5 tras desplegar. Documentar cómo pausarlo. (dep: F4.2)
 
 ### F5 — Agente, flujos y panel sin GHL
-- [ ] F5.0 Refactor **sin cambio de comportamiento**: sacar de `cron/buffer/route.ts` el runtime de calendario (`buildCalendarRuntime`, `runCalendarTool`, `buildCalendarToolDefinitions`, respuestas directas y saneado) a `src/lib/agenda/agent-tools.ts`, aún sobre GHL, con pruebas de las protecciones actuales (no afirmar cita sin confirmación de la tool, no inventar disponibilidad). (dep: F0.1)
+- [x] F5.0 Refactor **sin cambio de comportamiento**: sacar de `cron/buffer/route.ts` el runtime de calendario (`buildCalendarRuntime`, `runCalendarTool`, `buildCalendarToolDefinitions`, respuestas directas y saneado) a `src/lib/agenda/agent-tools.ts`, aún sobre GHL, con pruebas de las protecciones actuales (no afirmar cita sin confirmación de la tool, no inventar disponibilidad). (dep: F0.1)
 - [ ] F5.1 `lib/calendar-tools.ts` a agendas (lee formato viejo) + pruebas. (dep: F2.4)
 - [ ] F5.2 Calendario del agente sobre `src/lib/agenda`, `offered_slots` por conversación, tools `reagendar_cita` y `cancelar_cita`, protecciones conservadas + pruebas. **Coexistencia**: si el workspace aún tiene una tool `ghl_calendar` activa, el agente sigue usando GHL hasta F7.2 (si no, AAA001 se queda sin agenda al desplegar). (dep: F5.0, F5.1)
 - [ ] F5.3 Flujos: `crm_action` (+ conversión de `ghl_action`), flow-builder con desplegables, **implementar** el disparo `tag` en `flow-engine.ts` (hoy no existe) al etiquetar desde panel, flujo o agente + pruebas. (dep: F2.2)
@@ -196,6 +200,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-03 · F4.1 · migración `agenda_reminders` aplicada (ensayo previo deshecho; advisors sin avisos nuevos) + `src/lib/agenda/reminders.ts` (recordatorio e inasistencia, ventana de 24 h, horario de envío, omitidos con motivo, idempotente); `agendaChanges` acepta los ajustes de avisos; 11 pruebas nuevas (texto, ventana, horario, cuándo toca, encolar una vez, omitido sin plantilla, espera nocturna, opt-out, apagado/excluida, inasistencia, aislamiento por empresa); typecheck, lint y test (237/237) en verde · commit `crm: F4.1 recordatorios e inasistencias`.
 - 2026-11-03 · F4.2 · `src/lib/agenda/crm-jobs.ts` + ruta `api/cron/crm-jobs`; `runAppointmentNotices` devuelve las conversaciones con avisos encolados; 4 pruebas nuevas (pasos y purga, avisar a deliver, empresas bloqueadas sin avisos, facturación caída no manda nada, paso suelto); typecheck, lint, test (241/241) y build en verde. Sin ejecutar contra producción (lo hará el cron de F4.3) · commit `crm: F4.2 crm-jobs`.
 - 2026-11-03 · F4.3 · migración `crm_jobs_cron` aplicada (ensayo previo deshecho y comprobado): `pg_cron` + `pg_net`, `app_private.invoke_crm_jobs()` con secretos de Vault, job `levy-crm-jobs` cada 5 min **inactivo**; advisors sin avisos nuevos; runbook y `schema.sql` actualizados; typecheck, lint y test en verde · commit `crm: F4.3 cron de crm-jobs desactivado`.
+- 2026-11-03 · F5.0 · calendario del agente movido de `cron/buffer` a `agenda/agent-guards.ts` + `agenda/agent-tools.ts` sin cambio de comportamiento; 13 pruebas nuevas de las protecciones (no afirmar cita sin `cita_id` confirmado, no inventar disponibilidad, sin calendario, tools con una/varias agendas, instrucciones, respuestas directas); typecheck, lint, test (254/254) y build en verde · commit `crm: F5.0 calendario del agente fuera de buffer`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->
