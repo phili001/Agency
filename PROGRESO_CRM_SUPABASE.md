@@ -33,7 +33,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 
 ### F0 — Preparación
 - [x] F0.1 Crear rama `crm-supabase`; leer `AGENTS.md`, `PROMPT_CRM_SUPABASE.md` y el inventario de GHL con graphify; anotar aquí cualquier diferencia con el inventario.
-- [ ] F0.2 Instalar `stripe` y la librería mínima que haga falta para Google (preferir `fetch` directo a la API REST si basta). Añadir variables nuevas a `.env.example` y `DEPLOY_RUNBOOK.md`.
+- [x] F0.2 Instalar `stripe` y la librería mínima que haga falta para Google (preferir `fetch` directo a la API REST si basta). Añadir variables nuevas a `.env.example` y `DEPLOY_RUNBOOK.md`.
 - ~~F0.3~~ Eliminada: `btree_gist` se instala en F1.3 y `pg_cron`/`pg_net` en F4.3 (no activar `pg_net`, que permite HTTP saliente desde la base, antes de usarla).
 
 ### F1 — Modelo de datos del CRM (aditivo)
@@ -94,6 +94,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 <!-- Una línea por iteración: fecha · tarea · resultado · commit -->
 - 2026-11-02 · Revisión del plan (aprobada) · ajustes: F0.3 repartida en F1.3/F4.3, siembra de etapas por trigger, festivos, F2.1 amplía `timezones.ts`, nueva F5.0 (refactor de `buffer`), coexistencia GHL en F5.2, F5.3 implementa el disparo `tag`, F5.4 revisada, F7.1 ampliada, F7.3 tras F6.3, nueva F7.5 [STOP] · sin código.
 - 2026-11-02 · F0.1 · rama `crm-supabase` creada; diferencias anotadas en «Estado real vs. inventario»; typecheck, lint y test (106/106) en verde · commit `crm: F0.1 rama y revisión del inventario`.
+- 2026-11-02 · F0.2 · `stripe@19.3.0`; Google irá por `fetch` a la API REST (sin librería); variables nuevas en `.env.example` y `DEPLOY_RUNBOOK.md` (GHL marcadas como deprecadas, se borran en F7.3); typecheck, lint y test (106/106) en verde. Nota: `npm audit` avisa de vulnerabilidades previas en `next` (crítica), `postcss`, `sharp` y `nanoid`, ajenas a esta tarea: actualizar Next queda fuera de este plan y lo decide el usuario · commit `crm: F0.2 dependencias y variables`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->
