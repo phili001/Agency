@@ -7,4 +7,5 @@ export * from "./agendas.ts";
 export * from "./appointments.ts";
 export * from "./errors.ts";
 export * from "./google-sync.ts";
+export * from "./reminders.ts";
 export * from "./slots.ts";

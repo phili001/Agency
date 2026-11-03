@@ -98,6 +98,12 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - `googleBusyProvider(client, workspaceId)` es el `ExternalBusyProvider` de F2.4: freeBusy del calendario de la agenda solo si la empresa está conectada; si Google falla, devuelve vacío (se ofrece igual, como en crm-levy).
   - Pendiente para quien use la agenda (F5.2/F5.6): pasar `externalBusy: googleBusyProvider(...)` a `getAgendaFreeSlots` y, tras agendar/mover/cancelar, llamar a `syncAppointment` en `after()` para no esperar a la barrida.
 
+- **F4.1 Recordatorios (2026-11-03).**
+  - Configuración **por agenda** (migración `agenda_reminders`, aditiva): `reminder_enabled` (apagado de fábrica), `reminder_hours_before` (24), `reminder_message`, `reminder_template`, y lo mismo `no_show_*` (1 h después). Es un superconjunto de «por empresa»: cada agenda puede tener su texto. `agendaChanges` ya acepta estos campos para el panel (F5.6).
+  - Envío: dentro de la ventana de 24 h (último mensaje entrante del contacto, con 30 min de margen) se encola un mensaje `outbound/queued` en `messages` que manda `cron/deliver`; fuera de la ventana se **omite con motivo** (en `appointments.notices` y en la actividad `reminder_skipped`/`no_show_skipped`), porque `deliver` aún no manda plantillas (D3). Cuando se decida D3 hay que añadir el envío de plantillas a `deliver` y usar `*_template`.
+  - Reglas de crm-levy: recordatorio solo si la cita se agendó antes del momento del aviso y quedan > 30 min; inasistencia solo si se marcó a mano, han pasado `no_show_hours_after` horas (se toma `updated_at` como momento del marcado) y la cita es de los últimos 7 días; solo se escribe de 08:00 a 21:00 en la zona de la agenda; contactos bloqueados o con `flow_opt_out` se omiten.
+  - Idempotencia: `update … set reminder_sent_at = now() where reminder_sent_at is null` antes de encolar; si encolar falla se suelta. `runAppointmentNotices({ excludeWorkspaceIds })` deja fuera a las empresas bloqueadas por impago (F6.4).
+
 ## Tareas
 
 ### F0 — Preparación
@@ -125,7 +131,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - [x] F3.3 Copia a Google (`push`) y ocupado (`push_and_busy`) integrados en `src/lib/agenda` + cola de pendientes y borrados. (dep: F3.1, F2.4)
 
 ### F4 — Jobs y recordatorios
-- [ ] F4.1 `src/lib/agenda/reminders.ts` portado de `seguimientos.py` (idempotente, ventana 24 h, plantilla o «omitido») + pruebas. (dep: F2.4)
+- [x] F4.1 `src/lib/agenda/reminders.ts` portado de `seguimientos.py` (idempotente, ventana 24 h, plantilla o «omitido») + pruebas. (dep: F2.4)
 - [ ] F4.2 `app/api/cron/crm-jobs` (lotes: Google pendiente, borrados, recordatorios, inasistencias, purga de ofertas, gracia de facturación) + pruebas. (dep: F3.3, F4.1)
 - [ ] F4.3 Migración: extensiones `pg_cron` y `pg_net`; job cada 5 min llamando a `crm-jobs`, con URL y secreto en Supabase Vault. **Se crea desactivado** (`cron.alter_job(..., active := false)`) y se activa en F7.5 tras desplegar. Documentar cómo pausarlo. (dep: F4.2)
 
@@ -177,6 +183,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-02 · F3.1 · `src/lib/integrations/google-calendar.ts` (OAuth con state firmado, tokens cifrados, renovación, error permanente vs. pasajero, calendarios, freeBusy, eventos con id fijo, desconectar con revocación); 15 pruebas con fetch simulado (state falsificado/caducado/de otro usuario, scopes, refresh conservado, 401→renovar, 409→actualizar, 410 en borrado, tokens por empresa); typecheck, lint y test (211/211) en verde · commit `crm: F3.1 cliente de Google Calendar`.
 - 2026-11-02 · F3.2 · rutas `api/integrations/google-calendar/{connect,callback,status,calendars,disconnect}` + `requireActiveWorkspaceRole` + `google-calendar-callback.ts` (lógica del callback probable); 5 pruebas nuevas (state de otro usuario sin canjear código, agente sin permiso, empresa ajena, cancelación, mensajes); typecheck, lint, test (216/216) y build en verde. Sin probar contra Google real (faltan credenciales) · commit `crm: F3.2 rutas de Google Calendar`.
 - 2026-11-02 · F3.3 · `src/lib/agenda/google-sync.ts` (copia por cita con control de concurrencia, barrida por empresa conectada, cola de borrados con intentos, ocupado de Google tolerante a fallos); 10 pruebas nuevas (evento con id/nombre/zona, cancelar borra, completada se queda, cambio y borrado durante la copia, barrida cortada por 503 sin tocar empresas no conectadas, intentos de borrado, ocupado solo en push_and_busy y degradado); typecheck, lint y test (226/226) en verde · commit `crm: F3.3 copia y ocupado de Google`.
+- 2026-11-03 · F4.1 · migración `agenda_reminders` aplicada (ensayo previo deshecho; advisors sin avisos nuevos) + `src/lib/agenda/reminders.ts` (recordatorio e inasistencia, ventana de 24 h, horario de envío, omitidos con motivo, idempotente); `agendaChanges` acepta los ajustes de avisos; 11 pruebas nuevas (texto, ventana, horario, cuándo toca, encolar una vez, omitido sin plantilla, espera nocturna, opt-out, apagado/excluida, inasistencia, aislamiento por empresa); typecheck, lint y test (237/237) en verde · commit `crm: F4.1 recordatorios e inasistencias`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->

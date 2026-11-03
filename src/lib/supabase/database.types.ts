@@ -37,6 +37,14 @@ export type Database = {
           max_days_ahead: number;
           min_notice_minutes: number;
           name: string;
+          no_show_enabled: boolean;
+          no_show_hours_after: number;
+          no_show_message: string | null;
+          no_show_template: string | null;
+          reminder_enabled: boolean;
+          reminder_hours_before: number;
+          reminder_message: string | null;
+          reminder_template: string | null;
           schedule: Json;
           services: Json;
           slot_step_minutes: number;

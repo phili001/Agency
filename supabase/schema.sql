@@ -1545,3 +1545,29 @@ alter table public.integration_secrets
   drop constraint if exists integration_secrets_provider_check,
   add constraint integration_secrets_provider_check
     check (provider in ('openai', 'ycloud', 'gohighlevel', 'google_calendar'));
+
+-- Recordatorios e inasistencias (migración 20261103000000_agenda_reminders).
+alter table public.agendas drop column if exists reminder_enabled,
+--     drop column if exists reminder_hours_before, drop column if exists reminder_message,
+--     drop column if exists reminder_template, drop column if exists no_show_enabled,
+--     drop column if exists no_show_hours_after, drop column if exists no_show_message,
+--     drop column if exists no_show_template;
+alter table public.agendas
+  add column if not exists reminder_enabled boolean not null default false,
+  add column if not exists reminder_hours_before integer not null default 24
+    check (reminder_hours_before between 1 and 72),
+  add column if not exists reminder_message text
+    check (reminder_message is null or char_length(reminder_message) <= 1000),
+  add column if not exists reminder_template text
+    check (reminder_template is null or char_length(reminder_template) <= 512),
+  add column if not exists no_show_enabled boolean not null default false,
+  add column if not exists no_show_hours_after integer not null default 1
+    check (no_show_hours_after between 0 and 72),
+  add column if not exists no_show_message text
+    check (no_show_message is null or char_length(no_show_message) <= 1000),
+  add column if not exists no_show_template text
+    check (no_show_template is null or char_length(no_show_template) <= 512);
+
+create index if not exists idx_appointments_no_show_due
+  on public.appointments (updated_at)
+  where status = 'no_show' and no_show_sent_at is null;

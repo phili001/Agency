@@ -23,6 +23,14 @@ export type AgendaRow = {
   max_days_ahead: number;
   min_notice_minutes: number;
   name: string;
+  no_show_enabled: boolean;
+  no_show_hours_after: number;
+  no_show_message: string | null;
+  no_show_template: string | null;
+  reminder_enabled: boolean;
+  reminder_hours_before: number;
+  reminder_message: string | null;
+  reminder_template: string | null;
   schedule: Json;
   services: Json;
   slot_step_minutes: number;
@@ -32,7 +40,7 @@ export type AgendaRow = {
 export type Agenda = AgendaRow & { config: AgendaConfig };
 
 export const AGENDA_COLUMNS =
-  "id, name, description, is_default, active, timezone, schedule, services, slot_step_minutes, min_notice_minutes, max_days_ahead, closed_dates, google_calendar_id, google_sync_mode";
+  "id, name, description, is_default, active, timezone, schedule, services, slot_step_minutes, min_notice_minutes, max_days_ahead, closed_dates, google_calendar_id, google_sync_mode, reminder_enabled, reminder_hours_before, reminder_message, reminder_template, no_show_enabled, no_show_hours_after, no_show_message, no_show_template";
 
 const SYNC_MODES: GoogleSyncMode[] = ["off", "push", "push_and_busy"];
 
@@ -60,6 +68,14 @@ export type AgendaInput = {
   maxDaysAhead?: unknown;
   minNoticeMinutes?: unknown;
   name?: unknown;
+  noShowEnabled?: unknown;
+  noShowHoursAfter?: unknown;
+  noShowMessage?: unknown;
+  noShowTemplate?: unknown;
+  reminderEnabled?: unknown;
+  reminderHoursBefore?: unknown;
+  reminderMessage?: unknown;
+  reminderTemplate?: unknown;
   schedule?: unknown;
   services?: unknown;
   slotStepMinutes?: unknown;
@@ -104,6 +120,33 @@ export function agendaChanges(input: AgendaInput) {
   }
   if (input.googleCalendarId !== undefined) {
     changes.google_calendar_id = optionalText(input.googleCalendarId, 300);
+  }
+  if (input.reminderEnabled !== undefined) {
+    changes.reminder_enabled = input.reminderEnabled === true;
+  }
+  if (input.reminderHoursBefore !== undefined) {
+    changes.reminder_hours_before = intInRange(input.reminderHoursBefore, "Las horas antes del recordatorio", 1, 72);
+  }
+  if (input.noShowEnabled !== undefined) {
+    changes.no_show_enabled = input.noShowEnabled === true;
+  }
+  if (input.noShowHoursAfter !== undefined) {
+    changes.no_show_hours_after = intInRange(input.noShowHoursAfter, "Las horas después de la inasistencia", 0, 72);
+  }
+  for (const [key, column, max] of [
+    ["reminderMessage", "reminder_message", 1000],
+    ["noShowMessage", "no_show_message", 1000],
+    ["reminderTemplate", "reminder_template", 512],
+    ["noShowTemplate", "no_show_template", 512],
+  ] as const) {
+    const value = input[key];
+    if (value !== undefined) {
+      const text = typeof value === "string" ? value.trim() : "";
+      if (text.length > max) {
+        throw invalid(`El texto admite como máximo ${max} caracteres.`);
+      }
+      changes[column] = text || null;
+    }
   }
 
   const settings = validateAgendaSettings({
