@@ -42,6 +42,35 @@ export default async function FlujosPage() {
             .limit(500),
         ])
       : [0, emptyResult, emptyResult, emptyResult, emptyResult];
+  // Opciones del CRM para los desplegables de acciones y del disparador por etiqueta.
+  const [tagsResult, stagesResult, fieldsResult, agendasResult] = workspaceId
+    ? await Promise.all([
+        supabase.from("crm_tags").select("id, name").eq("workspace_id", workspaceId).order("name"),
+        supabase
+          .from("crm_pipeline_stages")
+          .select("id, name")
+          .eq("workspace_id", workspaceId)
+          .order("position"),
+        supabase
+          .from("crm_custom_fields")
+          .select("key, label")
+          .eq("workspace_id", workspaceId)
+          .eq("active", true)
+          .order("position"),
+        supabase
+          .from("agendas")
+          .select("id, name")
+          .eq("workspace_id", workspaceId)
+          .eq("active", true)
+          .order("name"),
+      ])
+    : [emptyResult, emptyResult, emptyResult, emptyResult];
+  const crm = {
+    agendas: (agendasResult.data ?? []) as Array<{ id: string; name: string }>,
+    customFields: (fieldsResult.data ?? []) as Array<{ key: string; label: string }>,
+    stages: (stagesResult.data ?? []) as Array<{ id: string; name: string }>,
+    tags: (tagsResult.data ?? []) as Array<{ id: string; name: string }>,
+  };
   // Si la sincronizacion cambio algun prompt, se relee para no enseñar el viejo.
   const agents =
     (syncedAgents > 0 ? (await loadAgents()).data : agentsResult.data) ?? [];
@@ -50,6 +79,7 @@ export default async function FlujosPage() {
     <PanelPage hasWorkspace={Boolean(workspace)} section="flows">
       <FlowBuilder
         agents={agents}
+        crm={crm}
         flows={(flowsResult.data ?? []) as never}
         integrations={(integrationsResult.data ?? []) as never}
         runs={(flowRunsResult.data ?? []) as never}

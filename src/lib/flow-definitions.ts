@@ -5,6 +5,7 @@ export type FlowTriggerType = "first_inbound" | "keyword" | "manual" | "tag" | "
 export type FlowStepType =
   | "agent"
   | "condition"
+  | "crm_action"
   | "finish"
   | "ghl_action"
   | "human"
@@ -33,6 +34,109 @@ export type FlowGhlAction = {
     | "update_contact_field";
 };
 
+/**
+ * Acción del CRM propio (F5.3). Sustituye a `FlowGhlAction`: los flujos
+ * guardados con acciones de GoHighLevel se siguen leyendo; mientras el
+ * workspace tenga GHL conectado se ejecutan en GHL y, si no, se convierten
+ * (`convertGhlActionToCrm`) y van al CRM.
+ */
+export type FlowCrmActionType =
+  | "add_note"
+  | "add_tag"
+  | "create_task"
+  | "remove_tag"
+  | "set_booking_agenda"
+  | "set_stage"
+  | "update_contact_field";
+
+export type FlowCrmAction = {
+  /** Agenda que usará el agente de citas para este contacto. */
+  agendaId?: string;
+  engine: "crm";
+  /** Clave de campo personalizado o `full_name` / `email` / `company`. */
+  fieldKey?: string;
+  /** Valor; admite `{{respuesta}}` con las respuestas del flujo. */
+  fieldValue?: string;
+  label: string;
+  noteBody?: string;
+  stageId?: string;
+  /** Nombre de la etapa (lo que deja la conversión desde GHL). */
+  stageName?: string;
+  tagId?: string;
+  /** Nombre de la etiqueta (si no existe, `add_tag` la crea). */
+  tagName?: string;
+  taskDueInDays?: number;
+  taskTitle?: string;
+  type: FlowCrmActionType;
+};
+
+export type FlowAction = FlowCrmAction | FlowGhlAction;
+
+export const crmActionTypes: Array<{ label: string; value: FlowCrmActionType }> = [
+  { label: "Poner etiqueta", value: "add_tag" },
+  { label: "Quitar etiqueta", value: "remove_tag" },
+  { label: "Cambiar etapa", value: "set_stage" },
+  { label: "Actualizar campo", value: "update_contact_field" },
+  { label: "Crear tarea", value: "create_task" },
+  { label: "Añadir nota", value: "add_note" },
+  { label: "Cambiar agenda de citas", value: "set_booking_agenda" },
+];
+
+export function isCrmAction(action: unknown): action is FlowCrmAction {
+  return Boolean(action) && typeof action === "object" && (action as { engine?: unknown }).engine === "crm";
+}
+
+/**
+ * Acción de GHL → acción del CRM. Las etiquetas, campos y tareas pasan tal
+ * cual (por nombre/clave). `upsert_opportunity` y `set_booking_calendar` usan
+ * ids de GoHighLevel que no existen en el CRM: devuelven null (hay que
+ * rehacerlas a mano con una etapa o agenda del CRM).
+ */
+export function convertGhlActionToCrm(action: FlowGhlAction): FlowCrmAction | null {
+  const label = action.label || "Acción";
+
+  switch (action.type) {
+    case "add_tag":
+    case "remove_tag":
+      return action.tag?.trim() ? { engine: "crm", label, tagName: action.tag.trim(), type: action.type } : null;
+    case "update_contact_field":
+      return action.customFieldKey?.trim()
+        ? { engine: "crm", fieldKey: action.customFieldKey.trim(), fieldValue: action.customFieldValue ?? "", label, type: "update_contact_field" }
+        : null;
+    case "create_task":
+      return action.taskTitle?.trim() ? { engine: "crm", label, taskTitle: action.taskTitle.trim(), type: "create_task" } : null;
+    default:
+      return null;
+  }
+}
+
+/** Acciones de un paso, separadas en las del CRM y las viejas de GHL. */
+export function splitStepActions(actions: unknown) {
+  const list = Array.isArray(actions) ? actions : [];
+  return {
+    crm: list.filter(isCrmAction),
+    legacy: list.filter((action): action is FlowGhlAction => !isCrmAction(action) && Boolean(action) && typeof action === "object"),
+  };
+}
+
+/**
+ * ¿Dispara este flujo (trigger `tag`) alguna de estas etiquetas recién puestas?
+ * Por id (`tagId`) o por nombre (`tag`, sin mayúsculas: flujos viejos o de GHL).
+ */
+export function flowMatchesTags(
+  triggerConfig: unknown,
+  tags: Array<{ id: string; name: string }>,
+) {
+  const config =
+    triggerConfig && typeof triggerConfig === "object" && !Array.isArray(triggerConfig)
+      ? (triggerConfig as Record<string, unknown>)
+      : {};
+  const tagId = typeof config.tagId === "string" ? config.tagId : "";
+  const tagName = typeof config.tag === "string" ? config.tag.trim().toLowerCase() : "";
+
+  return tags.some((tag) => (tagId && tag.id === tagId) || (tagName && tag.name.trim().toLowerCase() === tagName));
+}
+
 export type FlowOption = {
   label: string;
   nextStepId?: string;
@@ -40,7 +144,7 @@ export type FlowOption = {
 };
 
 export type FlowStep = {
-  actions?: FlowGhlAction[];
+  actions?: FlowAction[];
   agentId?: string;
   fieldKey?: string;
   id: string;
@@ -108,7 +212,7 @@ export const defaultLevyFlowStages: FlowStage[] = [
     label: "Diagnóstico",
   },
   {
-    description: "Sincronización con GHL y enlace de agenda.",
+    description: "Etiquetas en el CRM y enlace de agenda.",
     key: "conversion",
     label: "Agenda",
   },
@@ -145,7 +249,7 @@ export const flowStepTypes: Array<{
   { description: "Muestra opciones y ramifica.", label: "Opciones", value: "options" },
   { description: "Evalúa campos, tags o respuestas.", label: "Condición", value: "condition" },
   { description: "Espera antes de avanzar.", label: "Espera", value: "wait" },
-  { description: "Ejecuta tags, campos, tareas u oportunidad.", label: "Acción GHL", value: "ghl_action" },
+  { description: "Etiquetas, etapa, campos, tareas, notas o agenda del contacto.", label: "Acción CRM", value: "crm_action" },
   { description: "Llama a una URL externa.", label: "Webhook", value: "webhook" },
   { description: "Transfiere al router de agentes IA.", label: "Agente IA", value: "agent" },
   { description: "Pausa bot/IA para atención humana.", label: "Humano", value: "human" },
@@ -305,17 +409,18 @@ export const defaultLevyFlowSteps: FlowStep[] = [
   {
     actions: [
       {
-        label: "Tag diagnóstico completado",
-        tag: "levy_diagnostico_iniciado",
+        engine: "crm",
+        label: "Etiqueta diagnóstico completado",
+        tagName: "levy_diagnostico_iniciado",
         type: "add_tag",
       },
     ],
     id: "tag_diagnostico",
-    name: "GHL: diagnóstico completado",
+    name: "CRM: diagnóstico completado",
     nextStepId: "transferir_citas",
     requiredForStage: true,
     stageKey: "conversion",
-    type: "ghl_action",
+    type: "crm_action",
   },
   {
     id: "transferir_citas",

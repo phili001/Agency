@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Bot,
   Check,
@@ -18,11 +18,15 @@ import {
 } from "lucide-react";
 
 import {
+  convertGhlActionToCrm,
   createBlankStep,
+  crmActionTypes,
   defaultFlowStages,
   flowStepTypes,
   parseFlowSteps,
-  type FlowGhlAction,
+  splitStepActions,
+  type FlowAction,
+  type FlowCrmAction,
   type FlowAudience,
   type FlowRecord,
   type FlowStatus,
@@ -50,8 +54,17 @@ type IntegrationItem = {
   status: string;
 };
 
+/** Opciones del CRM del workspace para los desplegables de acciones y disparadores. */
+export type FlowCrmOptions = {
+  agendas: Array<{ id: string; name: string }>;
+  customFields: Array<{ key: string; label: string }>;
+  stages: Array<{ id: string; name: string }>;
+  tags: Array<{ id: string; name: string }>;
+};
+
 type FlowBuilderProps = {
   agents: AgentItem[];
+  crm: FlowCrmOptions;
   flows: FlowRecord[];
   integrations: IntegrationItem[];
   runs: FlowRunItem[];
@@ -69,18 +82,10 @@ const triggers: Array<{ label: string; value: FlowTriggerType }> = [
   { label: "Primer mensaje inbound", value: "first_inbound" },
   { label: "Palabra clave", value: "keyword" },
   { label: "Tag", value: "tag" },
-  { label: "Webhook GHL", value: "webhook" },
+  { label: "Webhook", value: "webhook" },
   { label: "Manual", value: "manual" },
 ];
 
-const ghlActionTypes: Array<{ label: string; value: FlowGhlAction["type"] }> = [
-  { label: "Aplicar tag", value: "add_tag" },
-  { label: "Quitar tag", value: "remove_tag" },
-  { label: "Actualizar campo", value: "update_contact_field" },
-  { label: "Mover oportunidad", value: "upsert_opportunity" },
-  { label: "Crear tarea", value: "create_task" },
-  { label: "Cambiar calendario de citas", value: "set_booking_calendar" },
-];
 
 function asConfigRecord(value: Json): Record<string, string> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -166,9 +171,11 @@ function orderAndLinkPipelineSteps(steps: FlowStep[], stages: FlowStage[]) {
 function TriggerConfigEditor({
   flow,
   onChange,
+  tags,
 }: {
   flow: FlowRecord;
   onChange: (patch: Partial<FlowRecord>) => void;
+  tags: FlowCrmOptions["tags"];
 }) {
   const triggerConfig = flow.trigger_config ?? {};
   const audience = String(triggerConfig.audience ?? "all") as FlowAudience;
@@ -211,17 +218,38 @@ function TriggerConfigEditor({
   }
 
   if (flow.trigger_type === "tag") {
+    const selectedTagId = String(triggerConfig.tagId ?? "");
     triggerDetail = (
       <label className="grid gap-1.5 text-sm font-medium">
-        Tag disparador
-        <input
+        Etiqueta que lo dispara
+        <select
           className="h-10 rounded-lg border border-[#cbd2c6] px-3 outline-none"
-          onChange={(event) =>
-            onChange({ trigger_config: { ...triggerConfig, tag: event.target.value } })
-          }
-          placeholder="Ej: levy_inbound"
-          value={String(triggerConfig.tag ?? "")}
-        />
+          onChange={(event) => {
+            const tag = tags.find((item) => item.id === event.target.value);
+            onChange({
+              trigger_config: { ...triggerConfig, tag: tag?.name ?? "", tagId: tag?.id ?? "" },
+            });
+          }}
+          value={selectedTagId}
+        >
+          <option value="">
+            {tags.length === 0 ? "Crea etiquetas en Ajustes del CRM" : "Elige una etiqueta"}
+          </option>
+          {tags.map((tag) => (
+            <option key={tag.id} value={tag.id}>
+              {tag.name}
+            </option>
+          ))}
+        </select>
+        {!selectedTagId && triggerConfig.tag ? (
+          <span className="text-xs font-normal text-[#647067]">
+            Guardado por nombre: «{String(triggerConfig.tag)}». Elige la etiqueta de la lista para fijarla.
+          </span>
+        ) : (
+          <span className="text-xs font-normal text-[#647067]">
+            Arranca cuando se le pone esta etiqueta al contacto (desde el panel, un flujo o el agente).
+          </span>
+        )}
       </label>
     );
   }
@@ -306,61 +334,206 @@ function TriggerConfigEditor({
   );
 }
 
-function GhlActionsEditor({
+const inputClass = "h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none";
+
+function CrmActionFields({
+  action,
+  crm,
+  onPatch,
+}: {
+  action: FlowCrmAction;
+  crm: FlowCrmOptions;
+  onPatch: (patch: Partial<FlowCrmAction>) => void;
+}) {
+  if (action.type === "add_tag" || action.type === "remove_tag") {
+    return (
+      <select
+        className={inputClass}
+        onChange={(event) => {
+          const tag = crm.tags.find((item) => item.id === event.target.value);
+          onPatch({ tagId: tag?.id, tagName: tag?.name });
+        }}
+        value={action.tagId ?? ""}
+      >
+        <option value="">
+          {action.tagName && !action.tagId ? `«${action.tagName}» (se crea si no existe)` : "Elige una etiqueta"}
+        </option>
+        {crm.tags.map((tag) => (
+          <option key={tag.id} value={tag.id}>
+            {tag.name}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  if (action.type === "set_stage") {
+    return (
+      <select
+        className={inputClass}
+        onChange={(event) => {
+          const stage = crm.stages.find((item) => item.id === event.target.value);
+          onPatch({ stageId: stage?.id, stageName: stage?.name });
+        }}
+        value={action.stageId ?? ""}
+      >
+        <option value="">Elige una etapa</option>
+        {crm.stages.map((stage) => (
+          <option key={stage.id} value={stage.id}>
+            {stage.name}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  if (action.type === "update_contact_field") {
+    return (
+      <div className="grid gap-2 md:grid-cols-2">
+        <select className={inputClass} onChange={(event) => onPatch({ fieldKey: event.target.value })} value={action.fieldKey ?? ""}>
+          <option value="">Elige un campo</option>
+          <option value="full_name">Nombre</option>
+          <option value="email">Correo</option>
+          <option value="company">Empresa</option>
+          {crm.customFields.map((field) => (
+            <option key={field.key} value={field.key}>
+              {field.label}
+            </option>
+          ))}
+        </select>
+        <input
+          className={inputClass}
+          onChange={(event) => onPatch({ fieldValue: event.target.value })}
+          placeholder="Valor o {{respuesta}}"
+          value={action.fieldValue ?? ""}
+        />
+      </div>
+    );
+  }
+
+  if (action.type === "create_task") {
+    return (
+      <div className="grid gap-2 md:grid-cols-[1fr_140px]">
+        <input
+          className={inputClass}
+          onChange={(event) => onPatch({ taskTitle: event.target.value })}
+          placeholder="Título de la tarea"
+          value={action.taskTitle ?? ""}
+        />
+        <input
+          className={inputClass}
+          min={0}
+          onChange={(event) => onPatch({ taskDueInDays: event.target.value ? Number(event.target.value) : undefined })}
+          placeholder="Vence en días"
+          type="number"
+          value={action.taskDueInDays ?? ""}
+        />
+      </div>
+    );
+  }
+
+  if (action.type === "add_note") {
+    return (
+      <textarea
+        className="min-h-20 rounded-lg border border-[#cbd2c6] px-3 py-2 text-sm outline-none"
+        onChange={(event) => onPatch({ noteBody: event.target.value })}
+        placeholder="Texto de la nota. Admite {{respuesta}}."
+        value={action.noteBody ?? ""}
+      />
+    );
+  }
+
+  return (
+    <div className="grid gap-2">
+      <select
+        className={`${inputClass} disabled:bg-[#f2f4f0] disabled:text-[#9aa59e]`}
+        disabled={crm.agendas.length === 0}
+        onChange={(event) => onPatch({ agendaId: event.target.value || undefined })}
+        value={action.agendaId ?? ""}
+      >
+        <option value="">{crm.agendas.length === 0 ? "Crea una agenda para elegirla" : "Elige una agenda"}</option>
+        {crm.agendas.map((agenda) => (
+          <option key={agenda.id} value={agenda.id}>
+            {agenda.name}
+          </option>
+        ))}
+      </select>
+      <p className="text-xs text-[#647067]">
+        A partir de aquí, el agente de citas agenda a este contacto en esta agenda.
+      </p>
+    </div>
+  );
+}
+
+function ActionsEditor({
   actions,
-  calendars,
+  crm,
   onChange,
 }: {
-  actions: FlowGhlAction[];
-  calendars: Array<{ id: string; name: string }>;
-  onChange: (actions: FlowGhlAction[]) => void;
+  actions: FlowAction[];
+  crm: FlowCrmOptions;
+  onChange: (actions: FlowAction[]) => void;
 }) {
-  function patchAction(index: number, patch: Partial<FlowGhlAction>) {
-    onChange(
-      actions.map((action, actionIndex) =>
-        actionIndex === index ? ({ ...action, ...patch } as FlowGhlAction) : action,
-      ),
-    );
+  const { crm: crmActions, legacy } = splitStepActions(actions);
+
+  function replaceCrm(next: FlowCrmAction[]) {
+    onChange([...next, ...legacy]);
+  }
+
+  function patchAction(index: number, patch: Partial<FlowCrmAction>) {
+    replaceCrm(crmActions.map((action, actionIndex) => (actionIndex === index ? { ...action, ...patch } : action)));
+  }
+
+  function convertLegacy() {
+    const converted = legacy.map((action) => convertGhlActionToCrm(action));
+    onChange([...crmActions, ...converted.filter((action): action is FlowCrmAction => action !== null)]);
   }
 
   return (
     <div className="rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold">Acciones GHL al ejecutar</p>
+        <p className="text-sm font-semibold">Acciones del CRM al ejecutar</p>
         <button
           className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#cbd2c6] bg-white px-2 text-xs font-medium"
-          onClick={() =>
-            onChange([
-              ...actions,
-              { label: "Nueva acción", tag: "", type: "add_tag" },
-            ])
-          }
+          onClick={() => replaceCrm([...crmActions, { engine: "crm", label: "Nueva acción", type: "add_tag" }])}
           type="button"
         >
           <Plus size={13} />
-          Accion
+          Acción
         </button>
       </div>
+      {legacy.length > 0 ? (
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+          <p>
+            Este paso tiene {legacy.length} acción(es) antiguas de GoHighLevel. Se siguen ejecutando en
+            GoHighLevel mientras esté conectado; si no, se convierten solas al CRM. Las de oportunidad y
+            calendario de GHL no tienen equivalente: rehazlas con «Cambiar etapa» o «Cambiar agenda».
+          </p>
+          <button
+            className="mt-2 inline-flex h-8 items-center rounded-lg border border-amber-300 bg-white px-2 font-medium"
+            onClick={convertLegacy}
+            type="button"
+          >
+            Convertir a acciones del CRM
+          </button>
+        </div>
+      ) : null}
       <div className="mt-3 grid gap-2">
-        {actions.map((action, index) => (
+        {crmActions.map((action, index) => (
           <div className="grid gap-2 rounded-lg border border-[#e2e6df] bg-white p-3" key={index}>
-            <div className="grid gap-2 md:grid-cols-[1fr_180px_auto]">
+            <div className="grid gap-2 md:grid-cols-[1fr_200px_auto]">
               <input
-                className="h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+                className={inputClass}
                 onChange={(event) => patchAction(index, { label: event.target.value })}
                 placeholder="Nombre visible"
                 value={action.label ?? ""}
               />
               <select
-                className="h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
-                onChange={(event) =>
-                  patchAction(index, {
-                    type: event.target.value as FlowGhlAction["type"],
-                  })
-                }
+                className={inputClass}
+                onChange={(event) => patchAction(index, { type: event.target.value as FlowCrmAction["type"] })}
                 value={action.type}
               >
-                {ghlActionTypes.map((type) => (
+                {crmActionTypes.map((type) => (
                   <option key={type.value} value={type.value}>
                     {type.label}
                   </option>
@@ -368,104 +541,15 @@ function GhlActionsEditor({
               </select>
               <button
                 className="inline-flex h-9 items-center justify-center rounded-lg border border-red-200 px-2 text-red-700"
-                onClick={() => onChange(actions.filter((_, actionIndex) => actionIndex !== index))}
+                onClick={() => replaceCrm(crmActions.filter((_, actionIndex) => actionIndex !== index))}
                 type="button"
               >
                 <Trash2 size={14} />
               </button>
             </div>
-            {["add_tag", "remove_tag"].includes(action.type) ? (
-              <input
-                className="h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
-                onChange={(event) => patchAction(index, { tag: event.target.value })}
-                placeholder="Tag GHL. Ej: levy_calificado"
-                value={"tag" in action ? action.tag ?? "" : ""}
-              />
-            ) : null}
-            {action.type === "update_contact_field" ? (
-              <div className="grid gap-2 md:grid-cols-2">
-                <input
-                  className="h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
-                  onChange={(event) =>
-                    patchAction(index, { customFieldKey: event.target.value })
-                  }
-                  placeholder="ID o key del custom field"
-                  value={"customFieldKey" in action ? action.customFieldKey ?? "" : ""}
-                />
-                <input
-                  className="h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
-                  onChange={(event) =>
-                    patchAction(index, { customFieldValue: event.target.value })
-                  }
-                  placeholder="Valor o {{campo}}"
-                  value={"customFieldValue" in action ? action.customFieldValue ?? "" : ""}
-                />
-              </div>
-            ) : null}
-            {action.type === "upsert_opportunity" ? (
-              <div className="grid gap-2">
-                <div className="grid gap-2 md:grid-cols-2">
-                  <input
-                    className="h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
-                    onChange={(event) => patchAction(index, { pipelineId: event.target.value })}
-                    placeholder="Pipeline ID de GoHighLevel"
-                    value={"pipelineId" in action ? action.pipelineId ?? "" : ""}
-                  />
-                  <input
-                    className="h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
-                    onChange={(event) => patchAction(index, { stageId: event.target.value })}
-                    placeholder="Stage ID de GoHighLevel"
-                    value={"stageId" in action ? action.stageId ?? "" : ""}
-                  />
-                </div>
-                <p className="text-xs text-[#647067]">
-                  Los IDs salen de GoHighLevel: Opportunities &gt; Pipelines. Cada
-                  pipeline y cada etapa tienen su propio ID.
-                </p>
-              </div>
-            ) : null}
-            {action.type === "create_task" ? (
-              <input
-                className="h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
-                onChange={(event) => patchAction(index, { taskTitle: event.target.value })}
-                placeholder="Título de tarea"
-                value={"taskTitle" in action ? action.taskTitle ?? "" : ""}
-              />
-            ) : null}
-            {action.type === "set_booking_calendar" ? (
-              <div className="grid gap-2">
-                <select
-                  className="h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none disabled:bg-[#f2f4f0] disabled:text-[#9aa59e]"
-                  disabled={calendars.length === 0}
-                  onChange={(event) =>
-                    patchAction(index, { calendarId: event.target.value })
-                  }
-                  value={"calendarId" in action ? action.calendarId ?? "" : ""}
-                >
-                  <option value="">
-                    {calendars.length === 0
-                      ? "Conecta GoHighLevel para ver calendarios"
-                      : "Elige un calendario"}
-                  </option>
-                  {calendars.map((calendar) => (
-                    <option key={calendar.id} value={calendar.id}>
-                      {calendar.name}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-[#647067]">
-                  A partir de aquí, el agente de citas agenda a este contacto en
-                  este calendario en vez del de por defecto de Tools.
-                </p>
-              </div>
-            ) : null}
+            <CrmActionFields action={action} crm={crm} onPatch={(patch) => patchAction(index, patch)} />
           </div>
         ))}
-        {actions.length === 0 ? (
-          <p className="text-xs text-[#647067]">
-            Puedes dejar el paso sin acciones o sincronizar tags, campos y etapas en GHL.
-          </p>
-        ) : null}
       </div>
     </div>
   );
@@ -473,7 +557,7 @@ function GhlActionsEditor({
 
 function StepEditor({
   agents,
-  calendars,
+  crm,
   flowStages,
   onChange,
   onDelete,
@@ -485,7 +569,7 @@ function StepEditor({
   canMoveUp,
 }: {
   agents: AgentItem[];
-  calendars: Array<{ id: string; name: string }>;
+  crm: FlowCrmOptions;
   flowStages: FlowStage[];
   onChange: (step: FlowStep) => void;
   onDelete: () => void;
@@ -893,9 +977,9 @@ function StepEditor({
       ) : null}
 
       <div className="mt-3">
-        <GhlActionsEditor
+        <ActionsEditor
           actions={step.actions ?? []}
-          calendars={calendars}
+          crm={crm}
           onChange={(actions) => onChange({ ...step, actions })}
         />
       </div>
@@ -905,6 +989,7 @@ function StepEditor({
 
 export function FlowBuilder({
   agents,
+  crm,
   flows,
   integrations,
   runs,
@@ -923,46 +1008,7 @@ export function FlowBuilder({
   const ghlConfig = asConfigRecord(
     integrations.find((integration) => integration.provider === "gohighlevel")?.config ?? {},
   );
-  const [calendars, setCalendars] = useState<Array<{ id: string; name: string }>>([]);
   const activeFlows = localFlows.filter((flow) => flow.status === "active").length;
-  const ghlActive = integrations.some(
-    (integration) =>
-      integration.provider === "gohighlevel" && integration.status === "active",
-  );
-
-  useEffect(() => {
-    if (!workspaceId || !ghlActive) {
-      return;
-    }
-
-    let cancelled = false;
-
-    async function loadCalendars() {
-      const response = await fetch(
-        `/api/integrations/gohighlevel/calendars?workspaceId=${encodeURIComponent(
-          workspaceId!,
-        )}`,
-      );
-
-      if (!response.ok || cancelled) {
-        return;
-      }
-
-      const payload = (await response.json()) as {
-        calendars?: Array<{ id: string; name: string }>;
-      };
-
-      if (!cancelled) {
-        setCalendars(payload.calendars ?? []);
-      }
-    }
-
-    void loadCalendars();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [ghlActive, workspaceId]);
 
   function updateDraft(patch: Partial<FlowRecord>) {
     setDraft((current) => (current ? { ...current, ...patch } : current));
@@ -1416,7 +1462,7 @@ export function FlowBuilder({
                     value={draft.description}
                   />
                 </label>
-                <TriggerConfigEditor flow={draft} onChange={updateDraft} />
+                <TriggerConfigEditor flow={draft} onChange={updateDraft} tags={crm.tags} />
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[#647067]">
                 <span className="inline-flex items-center gap-1 rounded-lg bg-[#eef2eb] px-2 py-1">
@@ -1496,7 +1542,7 @@ export function FlowBuilder({
               {selectedStep && selectedStepIndex >= 0 ? (
                 <StepEditor
                   agents={agents.filter((agent) => agent.is_active)}
-                  calendars={calendars}
+                  crm={crm}
                   canMoveDown={selectedStepIndex < draft.steps.length - 1}
                   canMoveUp={selectedStepIndex > 0}
                   flowStages={flowStages}

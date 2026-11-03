@@ -2,8 +2,15 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { FlowGhlAction, FlowStage, FlowStep } from "@/lib/flow-definitions";
-import { parseFlowSteps } from "@/lib/flow-definitions";
+import type { FlowStage, FlowStep } from "@/lib/flow-definitions";
+import {
+  convertGhlActionToCrm,
+  flowMatchesTags,
+  parseFlowSteps,
+  splitStepActions,
+} from "@/lib/flow-definitions";
+import { runCrmFlowActions } from "@/lib/crm/flow-actions";
+import { contactAudienceLabels } from "@/lib/crm/tags";
 import { badRequest, notFound } from "@/lib/api-error";
 import { getBusinessVariables } from "@/lib/business-profile";
 import { verifyFlowAnswer } from "@/lib/flow-answer-verifier";
@@ -441,6 +448,23 @@ async function updateRun(
     .eq("workspace_id", run.workspace_id);
 }
 
+async function isGoHighLevelActive(supabase: AdminClient, workspaceId: string) {
+  const { data } = await supabase
+    .from("integrations")
+    .select("status")
+    .eq("workspace_id", workspaceId)
+    .eq("provider", "gohighlevel")
+    .maybeSingle();
+
+  return (data as { status?: string } | null)?.status === "active";
+}
+
+/**
+ * Acciones de un paso. Las del CRM (`engine: "crm"`) van al CRM. Las viejas de
+ * GoHighLevel van a GHL mientras el workspace lo tenga conectado (coexistencia
+ * hasta F7.2) y, si no, se convierten y van al CRM. Las etiquetas recién
+ * puestas disparan los flujos con trigger `tag`.
+ */
 async function runStepActions({
   answers,
   contact,
@@ -456,55 +480,108 @@ async function runStepActions({
   step: FlowStep;
   supabase: AdminClient;
 }) {
-  const actions = (step.actions ?? []) as FlowGhlAction[];
+  const { crm, legacy } = splitStepActions(step.actions);
 
-  if (actions.length === 0) {
+  if (crm.length === 0 && legacy.length === 0) {
     return;
   }
 
-  try {
-    const results = await runGoHighLevelFlowActions({
-      actions,
-      answers: answers ?? getAnswers(run.answers),
-      contact,
-      workspaceId: run.workspace_id,
-    });
+  const flowAnswers = answers ?? getAnswers(run.answers);
+  const ghlActive = legacy.length > 0 && (await isGoHighLevelActive(supabase, run.workspace_id));
+  const converted = ghlActive ? [] : legacy.map((action) => convertGhlActionToCrm(action));
+  const crmActions = [...crm, ...converted.filter((action) => action !== null)];
+  const skipped = converted.filter((action) => action === null).length;
 
-    await logFlowEvent({
-      contactId: run.contact_id,
-      conversationId: run.conversation_id,
-      eventType: "flow_ghl_actions_completed",
-      flowId: flow.id,
-      flowRunId: run.id,
-      payload: {
-        results: results as Json,
-        stepId: step.id,
-      },
-      supabase,
-      workspaceId: run.workspace_id,
-    });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Error desconocido en acción GHL.";
+  if (ghlActive) {
+    try {
+      const results = await runGoHighLevelFlowActions({
+        actions: legacy,
+        answers: flowAnswers,
+        contact,
+        workspaceId: run.workspace_id,
+      });
 
-    await logFlowEvent({
-      contactId: run.contact_id,
-      conversationId: run.conversation_id,
-      error: message,
-      eventType: "flow_ghl_actions_failed",
-      flowId: flow.id,
-      flowRunId: run.id,
-      payload: {
-        actions: actions as Json,
-        stepId: step.id,
-      },
-      status: "error",
-      supabase,
-      workspaceId: run.workspace_id,
-    });
+      await logFlowEvent({
+        contactId: run.contact_id,
+        conversationId: run.conversation_id,
+        eventType: "flow_ghl_actions_completed",
+        flowId: flow.id,
+        flowRunId: run.id,
+        payload: {
+          results: results as Json,
+          stepId: step.id,
+        },
+        supabase,
+        workspaceId: run.workspace_id,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Error desconocido en acción GHL.";
 
+      await logFlowEvent({
+        contactId: run.contact_id,
+        conversationId: run.conversation_id,
+        error: message,
+        eventType: "flow_ghl_actions_failed",
+        flowId: flow.id,
+        flowRunId: run.id,
+        payload: {
+          actions: legacy as Json,
+          stepId: step.id,
+        },
+        status: "error",
+        supabase,
+        workspaceId: run.workspace_id,
+      });
+
+      await updateRun(supabase, run, {
+        last_error: message,
+      });
+    }
+  }
+
+  if (crmActions.length === 0) {
+    return;
+  }
+
+  const { addedTagIds, results } = await runCrmFlowActions(
+    supabase,
+    run.workspace_id,
+    run.contact_id,
+    crmActions,
+    flowAnswers,
+  );
+  const failed = results.filter((result) => !result.ok);
+
+  await logFlowEvent({
+    contactId: run.contact_id,
+    conversationId: run.conversation_id,
+    error: failed.length > 0 ? failed.map((result) => `${result.action}: ${result.error}`).join("; ") : undefined,
+    eventType: failed.length > 0 ? "flow_crm_actions_failed" : "flow_crm_actions_completed",
+    flowId: flow.id,
+    flowRunId: run.id,
+    payload: {
+      results: results as unknown as Json,
+      skippedLegacyActions: skipped,
+      stepId: step.id,
+    },
+    status: failed.length > 0 ? "error" : undefined,
+    supabase,
+    workspaceId: run.workspace_id,
+  });
+
+  if (failed.length > 0) {
     await updateRun(supabase, run, {
-      last_error: message,
+      last_error: failed.map((result) => result.error).join("; ").slice(0, 500),
+    });
+  }
+
+  if (addedTagIds.length > 0) {
+    await startTagFlows({
+      contactId: run.contact_id,
+      supabase,
+      tagIds: addedTagIds,
+      workspaceId: run.workspace_id,
     });
   }
 }
@@ -841,6 +918,27 @@ async function getActiveRun(supabase: AdminClient, context: ConversationContext)
   return data as FlowRunRow | null;
 }
 
+async function getContactTagNames(supabase: AdminClient, workspaceId: string, contactId: string) {
+  const { data: links } = await supabase
+    .from("crm_contact_tags")
+    .select("tag_id")
+    .eq("workspace_id", workspaceId)
+    .eq("contact_id", contactId);
+  const tagIds = ((links ?? []) as Array<{ tag_id: string }>).map((link) => link.tag_id);
+
+  if (tagIds.length === 0) {
+    return [];
+  }
+
+  const { data: tags } = await supabase
+    .from("crm_tags")
+    .select("name")
+    .eq("workspace_id", workspaceId)
+    .in("id", tagIds);
+
+  return ((tags ?? []) as Array<{ name: string }>).map((tag) => tag.name);
+}
+
 async function getMatchingFlow(
   supabase: AdminClient,
   context: ConversationContext,
@@ -870,15 +968,24 @@ async function getMatchingFlow(
     (finishedRuns ?? []).map((run) => run.flow_id as string),
   );
 
+  // Audiencias: marcas internas + etiquetas del CRM, sin mayúsculas (F1.1).
+  const labels = contactAudienceLabels(
+    contact.automation_labels,
+    await getContactTagNames(supabase, context.workspaceId, context.contactId),
+  );
+
   for (const flow of (flows ?? []) as FlowRow[]) {
     const config = getRecord(flow.trigger_config);
     const audience = String(config.audience ?? "all");
-    const labels = contact.automation_labels ?? [];
     const requiredLabels = Array.isArray(config.requiredLabels)
-      ? config.requiredLabels.filter((item): item is string => typeof item === "string")
+      ? config.requiredLabels
+          .filter((item): item is string => typeof item === "string")
+          .map((item) => item.trim().toLowerCase())
       : [];
     const excludedLabels = Array.isArray(config.excludedLabels)
-      ? config.excludedLabels.filter((item): item is string => typeof item === "string")
+      ? config.excludedLabels
+          .filter((item): item is string => typeof item === "string")
+          .map((item) => item.trim().toLowerCase())
       : [];
     const allowRepeat = config.allowRepeat === true;
 
@@ -998,6 +1105,120 @@ export async function startWebhookFlow({
     run: run as FlowRunRow,
     supabase,
   });
+}
+
+/** Un flujo por etiqueta no se relanza para el mismo contacto en este rato. */
+const TAG_FLOW_COOLDOWN_MS = 10 * 60_000;
+
+/**
+ * Flujos con trigger `tag` para etiquetas recién puestas a un contacto (desde
+ * el panel, un flujo o el agente). `trigger_config.tagId` o `trigger_config.tag`
+ * (nombre, sin mayúsculas). Corre en la conversación más reciente del contacto;
+ * sin conversación no hay por dónde escribirle y no arranca. Contra bucles: no
+ * arranca si ese flujo ya está en marcha para el contacto o arrancó hace poco.
+ * Quien llama se encarga de pedir a `deliver` que mande lo encolado.
+ */
+export async function startTagFlows({
+  contactId,
+  supabase,
+  tagIds,
+  workspaceId,
+}: {
+  contactId: string;
+  supabase: AdminClient;
+  tagIds: string[];
+  workspaceId: string;
+}) {
+  const started: Array<{ conversationId: string; flowId: string }> = [];
+
+  if (tagIds.length === 0) {
+    return started;
+  }
+
+  const [{ data: tags }, { data: flows }] = await Promise.all([
+    supabase.from("crm_tags").select("id, name").eq("workspace_id", workspaceId).in("id", tagIds),
+    supabase
+      .from("flows")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .eq("status", "active")
+      .eq("trigger_type", "tag")
+      .order("created_at", { ascending: true }),
+  ]);
+  const matching = ((flows ?? []) as FlowRow[]).filter((flow) =>
+    flowMatchesTags(flow.trigger_config, (tags ?? []) as Array<{ id: string; name: string }>),
+  );
+
+  if (matching.length === 0) {
+    return started;
+  }
+
+  const [{ data: contact }, { data: conversations }] = await Promise.all([
+    supabase.from("contacts").select("*").eq("id", contactId).eq("workspace_id", workspaceId).maybeSingle(),
+    supabase
+      .from("conversations")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .eq("contact_id", contactId)
+      .order("last_message_at", { ascending: false })
+      .limit(1),
+  ]);
+  const conversationId = ((conversations ?? []) as Array<{ id: string }>)[0]?.id;
+
+  if (!contact || !conversationId || (contact.automation_labels ?? []).includes(FLOW_OPT_OUT_LABEL)) {
+    return started;
+  }
+
+  for (const flow of matching) {
+    const { data: recent } = await supabase
+      .from("flow_runs")
+      .select("id, status, created_at")
+      .eq("workspace_id", workspaceId)
+      .eq("contact_id", contactId)
+      .eq("flow_id", flow.id)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const last = ((recent ?? []) as Array<{ created_at: string; status: string }>)[0];
+
+    if (
+      last &&
+      (["active", "waiting"].includes(last.status) ||
+        Date.now() - new Date(last.created_at).getTime() < TAG_FLOW_COOLDOWN_MS)
+    ) {
+      continue;
+    }
+
+    const { data: run, error } = await supabase
+      .from("flow_runs")
+      .insert({
+        contact_id: contactId,
+        conversation_id: conversationId,
+        flow_id: flow.id,
+        status: "active",
+        workspace_id: workspaceId,
+      })
+      .select("*")
+      .single();
+
+    if (error || !run) {
+      continue;
+    }
+
+    await logFlowEvent({
+      contactId,
+      conversationId,
+      eventType: "flow_started_from_tag",
+      flowId: flow.id,
+      flowRunId: run.id,
+      payload: { tagIds },
+      supabase,
+      workspaceId,
+    });
+    await executeRun({ contact, flow, run: run as FlowRunRow, supabase });
+    started.push({ conversationId, flowId: flow.id });
+  }
+
+  return started;
 }
 
 export async function startManualContactFlow({
