@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getIntegrationSecret } from "./secrets";
-import { CONTACT_CALENDAR_KEY } from "@/lib/calendar-tools";
+import { LEGACY_CONTACT_CALENDAR_KEY } from "@/lib/calendar-tools";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { FlowGhlAction } from "@/lib/flow-definitions";
 import type { Json } from "@/lib/supabase/database.types";
@@ -401,7 +401,7 @@ export async function runGoHighLevelFlowActions({
         ghl_flow_synced_at: new Date().toISOString(),
         ...(opportunityId ? { ghl_opportunity_id: opportunityId } : {}),
         ...(bookingCalendarId
-          ? { [CONTACT_CALENDAR_KEY]: bookingCalendarId }
+          ? { [LEGACY_CONTACT_CALENDAR_KEY]: bookingCalendarId }
           : {}),
       },
     })

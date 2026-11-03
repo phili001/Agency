@@ -129,7 +129,7 @@ export async function POST(request: Request) {
       () => listCalendars({ apiKey: apiKey!, locationId }),
       (items) => `${items.length} calendario(s) accesible(s).`,
     );
-    const tools = parseCalendarTools(toolAssets ?? []);
+    const tools = parseCalendarTools(toolAssets ?? []).filter((tool) => tool.kind === "ghl");
     const configuredIds = [
       ...new Set([
         ...tools.map((tool) => tool.calendarId),

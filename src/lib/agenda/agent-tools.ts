@@ -106,12 +106,14 @@ export async function buildCalendarRuntime({
     .eq("workspace_id", workspaceId)
     .eq("kind", "tool")
     .neq("status", "archived");
-  const calendarTools = parseCalendarTools(toolAssets ?? []);
+  // Este runtime es el de GoHighLevel: solo tools del formato viejo. Las
+  // agendas propias las usa el runtime de F5.2.
+  const calendarTools = parseCalendarTools(toolAssets ?? []).filter((tool) => tool.kind === "ghl");
   const calendars = resolveCalendarsForAgent({
     contactMetadata: contact.metadata,
     enabledToolIds,
     tools: calendarTools,
-  });
+  }).filter((tool) => tool.kind === "ghl");
   // Compatibilidad: si aun no se crearon tools de calendario, se usa el que
   // quedo configurado en la tarjeta de Integraciones.
   const fallbackCalendars: CalendarTool[] =
@@ -125,6 +127,7 @@ export async function buildCalendarRuntime({
               description: "Calendario configurado en Integraciones.",
               id: "",
               isDefault: true,
+              kind: "ghl" as const,
               title: "Agenda del negocio",
             },
           ]

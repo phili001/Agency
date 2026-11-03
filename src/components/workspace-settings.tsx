@@ -21,7 +21,7 @@ import {
 
 import { AgentSettings } from "@/components/agent-settings";
 import {
-  buildCalendarToolMetadata,
+  buildGhlCalendarToolMetadata,
   isCalendarTool,
   parseCalendarTools,
 } from "@/lib/calendar-tools";
@@ -825,7 +825,7 @@ export function WorkspaceSettings({
     setSavingKey(`calendar:${calendarId}`);
     setStatus("");
 
-    const metadata = buildCalendarToolMetadata({
+    const metadata = buildGhlCalendarToolMetadata({
       calendarId: calendar.id,
       calendarName: calendar.name,
       isDefault: makeDefault,
