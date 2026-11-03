@@ -3,14 +3,12 @@ import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { createCompanyWithOwner, findAuthUserByEmail } from "@/lib/admin-companies";
-import { normalizeAppUrl } from "@/lib/app-url";
 import { syncAgencyContact } from "@/lib/billing/agency-crm";
 import { getBillingConfig } from "@/lib/billing/config";
 import { getStripe } from "@/lib/billing/stripe";
 import { processStripeEvent, verifyStripeEvent } from "@/lib/billing/webhook";
-import { buildWelcomeEmail, sendEmail } from "@/lib/email";
+import { sendWelcomeAccess } from "@/lib/billing/welcome-page";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { buildWelcomeLink } from "@/lib/welcome";
 
 /**
  * Webhook de Stripe (venta de Levy por Payment Link). Cuerpo crudo + firma;
@@ -52,14 +50,7 @@ export async function POST(request: Request) {
       return data.user?.email ?? null;
     },
     findUserIdByEmail: async (email) => (await findAuthUserByEmail(admin, email))?.id ?? null,
-    sendWelcome: async ({ companyName, email }) => {
-      const { data, error } = await admin.auth.admin.generateLink({ email, type: "recovery" });
-      if (error || !data.properties?.hashed_token) {
-        throw error ?? new Error("Supabase no devolvió el enlace de acceso.");
-      }
-      const link = buildWelcomeLink(normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL), data.properties.hashed_token);
-      await sendEmail(buildWelcomeEmail({ companyName, link, to: email }));
-    },
+    sendWelcome: (input) => sendWelcomeAccess(admin, input),
     stripe,
     syncAgencyContact: (input) => syncAgencyContact(admin, input),
   });

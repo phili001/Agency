@@ -551,6 +551,8 @@ export type Database = {
           stripe_customer_id: string | null;
           stripe_subscription_id: string | null;
           updated_at: string;
+          welcome_resend_count: number;
+          welcome_resend_window_start: string | null;
           workspace_id: string;
         };
       };

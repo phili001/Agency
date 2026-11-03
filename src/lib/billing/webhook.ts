@@ -61,7 +61,7 @@ const SUBSCRIPTION_EVENTS = new Set([
   "customer.subscription.updated",
 ]);
 
-function idOf(value: string | { id: string } | null | undefined) {
+export function idOf(value: string | { id: string } | null | undefined) {
   if (!value) return null;
   return typeof value === "string" ? value : value.id;
 }
@@ -132,7 +132,7 @@ async function saveSubscription(
   if (error) throw new Error(`workspace_billing: ${error.message}`);
 }
 
-async function workspaceInfo(client: CrmClient, workspaceId: string) {
+export async function workspaceInfo(client: CrmClient, workspaceId: string) {
   const { data, error } = await client
     .from("workspaces")
     .select("id, owner_id, company_code, name")
@@ -142,7 +142,7 @@ async function workspaceInfo(client: CrmClient, workspaceId: string) {
   return (data as { company_code: string; id: string; name: string; owner_id: string } | null) ?? null;
 }
 
-async function ownedWorkspaceId(client: CrmClient, userId: string) {
+export async function ownedWorkspaceId(client: CrmClient, userId: string) {
   const { data, error } = await client
     .from("workspaces")
     .select("id")

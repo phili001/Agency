@@ -73,6 +73,10 @@ Su «Signing secret» va en `STRIPE_WEBHOOK_SECRET`. Activa también el **Custom
 pedir el teléfono: sin teléfono ni un contacto con ese correo, el comprador no
 se puede crear en el CRM de AAA001 (la cuenta sí se crea).
 
+Tras el pago, el Payment Link tiene que redirigir a
+`https://agentelevi.com/bienvenida?session_id={CHECKOUT_SESSION_ID}` (la landing,
+`activa.agentelevi.com`, no interviene). Esa página solo lee: la cuenta la crea el webhook.
+
 `LEVY_PURCHASE_WEBHOOK_SECRET`, `GHL_AGENCY_*` y `LEVY_MEETING_*GHL*` quedan
 deprecadas: se borran cuando el webhook de Stripe esté verificado.
 
