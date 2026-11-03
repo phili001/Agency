@@ -29,6 +29,14 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - **D2** Precios (mensual/anual), prueba gratis y días de gracia → por defecto: sin prueba, 7 días de gracia; los ids de precio van por variable de entorno.
 - **D3** Plantilla de WhatsApp aprobada para recordatorios fuera de la ventana de 24 h (nombre por workspace) → mientras, se registran como omitidos.
 
+## Decisiones tomadas
+- **F1.1 Etiquetas (2026-11-02).** Tres cosas distintas, cada una en su sitio:
+  1. `crm_tags` + `crm_contact_tags`: **las etiquetas del CRM**, las que ve y gestiona el operador (con color). Se ponen/quitan desde panel, flujo (`crm_action`) o agente (solo etiquetas que ya existan en el workspace: el agente no crea etiquetas). Las de GHL se importan aquí en F7.1.
+  2. `contacts.automation_labels`: **marcas internas del sistema** (`flow_opt_out`, `onboarding_eligible`, `onboarding_completed`, `onboarding_excluded_existing`). No se tocan, no se migran y no se muestran como etiquetas en Contactos (la bandeja puede seguir enseñándolas como estado). Nombres reservados: `crm_tags.name` no puede coincidir con ellos (validación en `src/lib/crm` y `check` en la tabla con la lista fija).
+  3. `metadata.ai_tags`: **sugerencias de la IA** que escribe `cron/buffer` (`insights.tags`). Se sigue escribiendo igual; en la ficha y la bandeja se muestran como «Sugeridas» con un clic para convertirlas en etiqueta. Nunca se crean etiquetas automáticamente desde aquí. Deja de enviarse a GHL cuando muera `cron/ghl-sync` (F7.3).
+  - **Flujos sin romper**: el filtro de audiencia (`requiredLabels` / `excludedLabels`, audiencia `labels`) pasa a comparar contra la **unión** de `automation_labels` y los nombres de `crm_tags` del contacto (sin distinguir mayúsculas), así los flujos guardados siguen funcionando y además aceptan etiquetas del CRM. Se implementa en F5.3 junto con el disparo `tag` (que solo mira `crm_contact_tags`).
+  - Para F1.2: `crm_tags.name` único por workspace sin distinguir mayúsculas (`unique (workspace_id, lower(name))`).
+
 ## Tareas
 
 ### F0 — Preparación
@@ -37,7 +45,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - ~~F0.3~~ Eliminada: `btree_gist` se instala en F1.3 y `pg_cron`/`pg_net` en F4.3 (no activar `pg_net`, que permite HTTP saliente desde la base, antes de usarla).
 
 ### F1 — Modelo de datos del CRM (aditivo)
-- [ ] F1.1 Decidir y anotar aquí cómo conviven `crm_tags` con `contacts.automation_labels` y `metadata.ai_tags` (sin romper triggers de flujo). Propuesta tras F0.1: `crm_tags` aparte; `automation_labels` sigue siendo marca interna del sistema (no se muestra como etiqueta); `ai_tags` se muestra como sugerencia que el operador puede convertir en etiqueta. (dep: F0.1)
+- [x] F1.1 Decidir y anotar aquí cómo conviven `crm_tags` con `contacts.automation_labels` y `metadata.ai_tags` (sin romper triggers de flujo). Propuesta tras F0.1: `crm_tags` aparte; `automation_labels` sigue siendo marca interna del sistema (no se muestra como etiqueta); `ai_tags` se muestra como sugerencia que el operador puede convertir en etiqueta. (dep: F0.1)
 - [ ] F1.2 Migración: `crm_pipeline_stages` (+ siembra para los 5 workspaces y, para los nuevos, con **trigger `after insert on workspaces`** en la base, que cubre `workspaces.ts` y `admin-companies.ts`), columnas nuevas de `contacts`, `crm_tags`, `crm_contact_tags`, `crm_custom_fields`, `crm_contact_notes`, `crm_contact_tasks`, `crm_contact_activity`, con RLS. Tipos regenerados, advisors limpios. (dep: F1.1)
 - [ ] F1.3 Migración: extensión `btree_gist`; `agendas` (con `closed_dates date[] default '{}'` para festivos), `appointments` (con exclusión anti-solape), `schedule_blocks`, `offered_slots`, `google_event_deletions`, con RLS. (dep: F0.1)
 - [ ] F1.4 Migración: funciones `book_appointment` y `reschedule_appointment` + pruebas SQL (solape rechazado, hora no ofrecida rechazada, reagendar atómico, workspace ajeno rechazado) ejecutadas con `execute_sql` dentro de una transacción con `rollback`. Las funciones `security definer` llevan `set search_path = ''` y nombres calificados. (dep: F1.3)
@@ -95,6 +103,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-02 · Revisión del plan (aprobada) · ajustes: F0.3 repartida en F1.3/F4.3, siembra de etapas por trigger, festivos, F2.1 amplía `timezones.ts`, nueva F5.0 (refactor de `buffer`), coexistencia GHL en F5.2, F5.3 implementa el disparo `tag`, F5.4 revisada, F7.1 ampliada, F7.3 tras F6.3, nueva F7.5 [STOP] · sin código.
 - 2026-11-02 · F0.1 · rama `crm-supabase` creada; diferencias anotadas en «Estado real vs. inventario»; typecheck, lint y test (106/106) en verde · commit `crm: F0.1 rama y revisión del inventario`.
 - 2026-11-02 · F0.2 · `stripe@19.3.0`; Google irá por `fetch` a la API REST (sin librería); variables nuevas en `.env.example` y `DEPLOY_RUNBOOK.md` (GHL marcadas como deprecadas, se borran en F7.3); typecheck, lint y test (106/106) en verde. Nota: `npm audit` avisa de vulnerabilidades previas en `next` (crítica), `postcss`, `sharp` y `nanoid`, ajenas a esta tarea: actualizar Next queda fuera de este plan y lo decide el usuario · commit `crm: F0.2 dependencias y variables`.
+- 2026-11-02 · F1.1 · decisión de convivencia de etiquetas apuntada en «Decisiones tomadas» (sin código; typecheck, lint y test en verde) · commit `crm: F1.1 decisión de etiquetas`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->
