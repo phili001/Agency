@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isValidTimeZone } from "@/lib/timezones";
 import { getWorkspaceGoHighLevelKey } from "./gohighlevel";
 
 // Los endpoints de calendario usan una Version distinta a la de contactos.
@@ -29,70 +30,6 @@ function apiBase() {
   return (
     process.env.GHL_API_BASE ?? "https://services.leadconnectorhq.com"
   ).replace(/\/$/, "");
-}
-
-export function isValidTimeZone(timeZone: string) {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function timeZoneOffsetMs(timeZone: string, date: Date) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    hour: "2-digit",
-    hour12: false,
-    minute: "2-digit",
-    month: "2-digit",
-    second: "2-digit",
-    timeZone,
-    year: "numeric",
-  }).formatToParts(date);
-  const map: Record<string, string> = {};
-
-  for (const part of parts) {
-    map[part.type] = part.value;
-  }
-
-  const asUtc = Date.UTC(
-    Number(map.year),
-    Number(map.month) - 1,
-    Number(map.day),
-    Number(map.hour) % 24,
-    Number(map.minute),
-    Number(map.second),
-  );
-
-  return asUtc - date.getTime();
-}
-
-/**
- * Convierte "YYYY-MM-DD" al instante real de medianoche en la zona horaria de
- * esa empresa. Sin esto, `new Date("2026-08-06T00:00:00")` se interpreta en la
- * zona del servidor (UTC en Vercel), asi que el rango se corre varias horas y
- * de forma distinta para cada empresa segun su pais.
- */
-export function zonedStartOfDay(dateKey: string, timeZone: string) {
-  const [year, month, day] = dateKey.split("-").map(Number);
-
-  if (!year || !month || !day || !isValidTimeZone(timeZone)) {
-    return null;
-  }
-
-  const wallClockAsUtc = Date.UTC(year, month - 1, day, 0, 0, 0);
-  const firstOffset = timeZoneOffsetMs(timeZone, new Date(wallClockAsUtc));
-  let epoch = wallClockAsUtc - firstOffset;
-  // Segunda pasada por si el primer instante caia en un cambio de horario.
-  const secondOffset = timeZoneOffsetMs(timeZone, new Date(epoch));
-
-  if (secondOffset !== firstOffset) {
-    epoch = wallClockAsUtc - secondOffset;
-  }
-
-  return new Date(epoch);
 }
 
 async function calendarFetch<T>({

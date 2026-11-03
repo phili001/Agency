@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { apiErrorResponse, badRequest } from "@/lib/api-error";
 import { requireWorkspaceRole } from "@/lib/authz";
-import { isValidTimeZone } from "@/lib/integrations/ghl-calendar";
+import { isValidTimeZone } from "@/lib/timezones";
 import {
   bookLevyMeeting,
   cancelLevyMeeting,

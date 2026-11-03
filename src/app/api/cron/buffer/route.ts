@@ -33,10 +33,9 @@ import {
   getLocationTimezone,
   getVerifiedFreeSlots,
   getWorkspaceCalendarContext,
-  isValidTimeZone,
   listCalendars,
-  zonedStartOfDay,
 } from "@/lib/integrations/ghl-calendar";
+import { isValidTimeZone, zonedStartOfDay } from "@/lib/timezones";
 
 type AgentRow = {
   config: Json;

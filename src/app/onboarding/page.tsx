@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { OnboardingWizard } from "@/components/onboarding/wizard";
 import { normalizeAppUrl } from "@/lib/app-url";
 import { getDefaultConversationMode } from "@/lib/conversation-default";
-import { isValidTimeZone } from "@/lib/integrations/ghl-calendar";
+import { isValidTimeZone } from "@/lib/timezones";
 import {
   getLevyCalendar,
   getLevyMeetingDays,

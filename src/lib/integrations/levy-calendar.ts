@@ -15,8 +15,8 @@ import {
   ensureGhlContact,
   getVerifiedFreeSlots,
   getWorkspaceCalendarContext,
-  isValidTimeZone,
 } from "./ghl-calendar";
+import { isValidTimeZone } from "@/lib/timezones";
 
 /**
  * Calendario con el que los clientes nuevos agendan su puesta en marcha con

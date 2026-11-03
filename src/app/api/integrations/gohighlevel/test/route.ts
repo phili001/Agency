@@ -9,9 +9,9 @@ import {
   getAppointment,
   getLocationTimezone,
   getVerifiedFreeSlots,
-  isValidTimeZone,
   listCalendars,
 } from "@/lib/integrations/ghl-calendar";
+import { isValidTimeZone } from "@/lib/timezones";
 import {
   deleteGoHighLevelContact,
   getWorkspaceGoHighLevelKey,
