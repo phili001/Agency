@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Columns3,
   Download,
@@ -8,6 +9,7 @@ import {
   Loader2,
   Plus,
   Search,
+  Settings2,
   Upload,
   X,
 } from "lucide-react";
@@ -15,7 +17,8 @@ import {
 import { readApiError } from "@/components/onboarding/shared";
 
 import { ContactDrawer } from "./contact-drawer";
-import type { ContactListItem, CrmPanelOptions } from "./types";
+import { CrmSettings } from "./crm-settings";
+import type { ContactListItem, CrmFieldOption, CrmPanelOptions } from "./types";
 
 const SOURCE_LABELS: Record<string, string> = {
   import: "Importado",
@@ -47,15 +50,20 @@ function TagChip({ color, name }: { color: string; name: string }) {
 }
 
 export function ContactsPanel({
+  allFields,
   canManage,
   initial,
   options,
 }: {
-  /** owner/admin: importar, exportar y borrar (RGPD). */
+  /** Campos personalizados también desactivados (para los ajustes). */
+  allFields: CrmFieldOption[];
+  /** owner/admin: importar, exportar, borrar (RGPD) y ajustes del CRM. */
   canManage: boolean;
   initial: { contacts: ContactListItem[]; total: number };
   options: CrmPanelOptions;
 }) {
+  const router = useRouter();
+  const [showSettings, setShowSettings] = useState(false);
   const [view, setView] = useState<"kanban" | "list">("list");
   const [query, setQuery] = useState("");
   const [stageId, setStageId] = useState("");
@@ -209,11 +217,33 @@ export function ContactsPanel({
               />
             </>
           ) : null}
+          {canManage ? (
+            <button
+              aria-expanded={showSettings}
+              className={secondaryButton}
+              onClick={() => setShowSettings(!showSettings)}
+              type="button"
+            >
+              <Settings2 size={15} /> Ajustes del CRM
+            </button>
+          ) : null}
           <button className={primaryButton} onClick={() => setCreating(true)} type="button">
             <Plus size={15} /> Nuevo contacto
           </button>
         </div>
       </div>
+
+      {showSettings && canManage ? (
+        <div className="mt-4 rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3">
+          <CrmSettings
+            initialFields={allFields}
+            initialStages={options.stages}
+            initialTags={options.tags}
+            // Los filtros y la ficha usan las opciones del servidor: se recargan.
+            onChanged={() => router.refresh()}
+          />
+        </div>
+      ) : null}
 
       <div className="mt-4 grid gap-2 md:grid-cols-[1fr_180px_180px_150px]">
         <label className="relative">

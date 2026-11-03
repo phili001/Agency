@@ -27,7 +27,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 ## Decisiones pendientes (las responde el usuario; mientras, sigue con otras tareas)
 - **D1** ¿`agentelevy.com` es esta app o una landing aparte? → afecta a F6.5 (`/bienvenida`).
 - **D2** Precios (mensual/anual), prueba gratis y días de gracia → por defecto: sin prueba, 7 días de gracia; los ids de precio van por variable de entorno.
-- **D4** ¿Se puede añadir «Agenda» al menú lateral? (el 2026-09-13 pediste no cambiar nombres ni orden del menú) → afecta a F5.6. Opciones: entrada nueva al final del menú, o colgar la Agenda dentro de una página existente (p. ej. una pestaña en Clientes). Mientras, F5.6 espera y se sigue con F5.7.
+- ~~**D4**~~ **Resuelta (2026-11-03):** «Agenda» va como **sección nueva en el menú lateral**, igual que Flujos o Automatizaciones (respuesta del usuario). F5.6 la añade al menú.
 - **D3** Plantilla de WhatsApp aprobada para recordatorios fuera de la ventana de 24 h (nombre por workspace) → mientras, se registran como omitidos.
 
 ## Decisiones tomadas
@@ -149,6 +149,11 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - Bandeja: `/?conversacion=<id>` abre esa conversación (lo usa la ficha).
   - Verificado: las rutas nuevas responden 401 sin sesión (dev server) y compila. **La interfaz no se ha visto con sesión** (el panel exige iniciar sesión).
 
+- **F5.7 Ajustes del CRM y Google Calendar (2026-11-03).**
+  - Ajustes del CRM dentro de **Clientes** (botón «Ajustes del CRM», owner/admin): etapas (nombre, color, tipo, orden, borrar), etiquetas (crear con color, borrar) y campos personalizados (crear por tipo con opciones, «La IA lo puede leer», activar/desactivar). API `api/crm/{stages,tags,fields}/**`, todo owner/admin salvo leer etapas.
+  - Integraciones: tarjeta **Google Calendar** (`components/crm/google-calendar-card.tsx`): estado, cuenta, conectar/volver a conectar, desconectar, y lee `?google=conectado|error&motivo=` de la vuelta de Google. La tarjeta de GoHighLevel **solo aparece si el workspace ya tiene la integración** (AAA001 hasta F7.2).
+  - Verificado: rutas nuevas 401 sin sesión en dev; build. **La interfaz no se ha visto con sesión.**
+
 ## Tareas
 
 ### F0 — Preparación
@@ -187,8 +192,8 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - [x] F5.3 Flujos: `crm_action` (+ conversión de `ghl_action`), flow-builder con desplegables, **implementar** el disparo `tag` en `flow-engine.ts` (hoy no existe) al etiquetar desde panel, flujo o agente + pruebas. (dep: F2.2)
 - [x] F5.4 `ycloud-webhook` sin `syncContactToGoHighLevel`. Sustituto de `webhooks/ghl/send-message`: antes de crearlo, comprobar si alguien externo lo seguirá llamando sin GHL; si sí, crearlo con un nombre que no choque con la `api/flows/start` del panel (p. ej. `webhooks/flows/trigger`) y anotar la decisión; si no, solo se borra en F7.3. (dep: F2.2)
 - [x] F5.5 Panel **Contactos** (lista, kanban, ficha, CSV, RGPD) + `sidebar-nav`. (dep: F2.2, F2.5)
-- [ ] F5.6 Panel **Agenda** (semana/día, citas, bloqueos, configuración de agendas). **Requiere D4.** (dep: F2.4, F3.2)
-- [ ] F5.7 Ajustes del CRM (etapas, etiquetas, campos) e **Integraciones → Google Calendar** en lugar de GHL. (dep: F2.2, F3.2)
+- [ ] F5.6 Panel **Agenda** (semana/día, citas, bloqueos, configuración de agendas). Entrada nueva «Agenda» en el menú lateral (D4). (dep: F2.4, F3.2)
+- [x] F5.7 Ajustes del CRM (etapas, etiquetas, campos) e **Integraciones → Google Calendar** en lugar de GHL. (dep: F2.2, F3.2)
 - [ ] F5.8 Métricas, `panel-data`, `inbox-panel` (lateral con etapa, etiquetas y próxima cita), portada y `health/readiness` sin GHL. (dep: F5.2, F5.5)
 
 ### F6 — Stripe y onboarding de Levy
@@ -237,6 +242,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-03 · F5.3 · flujos con `crm_action`, coexistencia con acciones de GHL, disparo de flujos por etiqueta, audiencias con etiquetas del CRM y constructor con desplegables; 9 pruebas nuevas (conversión, separación, plantilla Levy, disparo por id/nombre, las 7 acciones, etiqueta repetida no relanza, fallo aislado, aislamiento A/B); typecheck, lint, test (278/278) y build en verde · commit `crm: F5.3 flujos con acciones del CRM`.
 - 2026-11-03 · F5.4 · `ycloud-webhook` actualiza el CRM (`recordInboundMessage`) y deja la sincronización con GHL como legado; sin sustituto para `webhooks/ghl/send-message` (comprobado que nadie lo usa); 2 pruebas nuevas; typecheck, lint, test (280/280) y build en verde · commit `crm: F5.4 webhook de YCloud al CRM`.
 - 2026-11-03 · F5.5 · `/clientes` como CRM (lista, etapas, ficha, CSV, RGPD) + API `api/crm/**` + enlace directo a conversación en la bandeja; sin cambios en el menú lateral (decisión del usuario); typecheck, lint, test (280/280) y build en verde; rutas comprobadas en dev (401 sin sesión) · commit `crm: F5.5 panel de clientes`.
+- 2026-11-03 · F5.7 · ajustes del CRM en Clientes (etapas, etiquetas, campos) + API `api/crm/{stages,tags,fields}` + tarjeta Google Calendar en Integraciones (GHL solo si ya existía); D4 resuelta por el usuario (Agenda como sección nueva del menú); typecheck, lint, test (280/280) y build en verde · commit `crm: F5.7 ajustes del CRM y Google Calendar`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->

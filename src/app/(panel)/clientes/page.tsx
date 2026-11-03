@@ -16,20 +16,25 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export default async function ClientsPage() {
   const { activeRole, workspace, workspaceId } = await getPanelContext();
   const admin = createAdminClient();
-  const [initial, stages, tags, customFields] = workspaceId
+  const [initial, stages, tags, allFields] = workspaceId
     ? await Promise.all([
         searchContacts(admin, workspaceId, { pageSize: 25 }),
         listStages(admin, workspaceId),
         listTags(admin, workspaceId),
-        listCustomFields(admin, workspaceId),
+        listCustomFields(admin, workspaceId, { includeInactive: true }),
       ])
     : [{ contacts: [], total: 0 }, [], [], []];
-  const options: CrmPanelOptions = { customFields, stages, tags };
+  const options: CrmPanelOptions = {
+    customFields: allFields.filter((field) => field.active),
+    stages,
+    tags,
+  };
 
   return (
     <PanelPage hasWorkspace={Boolean(workspace)} section="clients">
       {workspaceId ? (
         <ContactsPanel
+          allFields={allFields}
           canManage={activeRole === "owner" || activeRole === "admin"}
           initial={{ contacts: initial.contacts as ContactListItem[], total: initial.total }}
           options={options}
