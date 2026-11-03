@@ -23,6 +23,9 @@ describe("reunión de puesta en marcha", () => {
 
     assert.equal(meeting?.appointmentId, "evt_1");
     assert.equal(meeting?.timezone, "Europe/Madrid");
+    // Las reuniones guardadas antes de la agenda propia son de GoHighLevel.
+    assert.equal(meeting?.engine, "ghl");
+    assert.equal(getBookedMeeting({ meeting: { appointmentId: "a", engine: "agenda", startTime: "2026-10-23T08:00:00.000Z" } })?.engine, "agenda");
     // El teléfono vuelve con la reunión: al cambiar la hora no se vuelve a pedir.
     assert.equal(meeting?.phone, "+34600112233");
   });
@@ -47,6 +50,7 @@ describe("reunión de puesta en marcha", () => {
     const meeting = {
       appointmentId: "evt_1",
       bookedAt: "",
+      engine: "ghl" as const,
       phone: "+34600112233",
       startTime: "2026-10-23T08:00:00.000Z",
       timezone: "Europe/Madrid",

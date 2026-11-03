@@ -199,6 +199,12 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - El aviso del layout enlaza a Facturación y ahora también avisa de «sin suscripción» si hay `STRIPE_PAYMENT_LINK_URL` (las 5 empresas actuales son exentas: no lo ven).
   - Consola de empresas (`/admin`): etiqueta con el estado de Stripe o «Exenta», casilla «Exenta de pago» y campo para enlazar un `cus_…` → `PATCH /api/admin/companies/billing` (superadmin; `lib/billing/admin.ts` crea la fila si falta y rechaza un cliente ya enlazado a otra empresa). El estado se rellena con el siguiente evento de Stripe de ese cliente.
   - Pruebas: enlace de pago, ids de cliente, exención aislada por empresa, alta de fila, cliente duplicado/raro/empresa inexistente (6). En dev: portal 401 y consola 403 sin sesión. **La interfaz no se ha visto con sesión** y el portal no se ha probado contra Stripe.
+- **F6.7 Onboarding sin GHL (2026-11-03).**
+  - Reunión de puesta en marcha en la **agenda propia de AAA001** (`lib/agenda/levy-meeting.ts`): huecos libres de la agenda `LEVY_MEETING_AGENDA_ID` (respeta lo ocupado en Google si la agenda está en `push_and_busy`), el cliente queda como contacto de AAA001 por su teléfono personal (pide prefijo `+`), la cita lleva el nombre y código de la empresa en las notas y se copia a Google en `after()`. Solo vale una agenda **activa de AAA001**; si no, se usa el calendario de GHL como antes (coexistencia hasta F7.2). Cada reunión guarda `engine` (`agenda`/`ghl`; las antiguas son GHL) para cancelarla donde está.
+  - Fin del onboarding: `markAgencyContactActiveInCrm` pone `levy-activo` al contacto de AAA001 con el correo del owner (no crea contactos); la llamada a GHL sigue hasta F7.3.
+  - Asistente: el paso Extras cambia «Conectar GoHighLevel» por «Conectar Google Calendar (opcional)» (`GoogleCalendarCard`) y el resumen final cuenta Google Calendar en vez de GHL. Tour de Chats sin GHL.
+  - Pendiente del usuario: crear en AAA001 la agenda de la reunión (horario del equipo, servicio de la duración que quieras) y poner su id en `LEVY_MEETING_AGENDA_ID`.
+  - Pruebas (5): agenda solo de AAA001 y activa, agrupación por día en la zona del cliente, reservar/ocupado/cancelar sin tocar el CRM del cliente, hora no ofrecida, `levy-activo` sin crear contactos.
 
 ## Tareas
 
@@ -249,7 +255,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - [x] F6.4 Bloqueo por impago en ycloud-webhook, buffer, flows, deliver y crm-jobs + pantalla «Reactiva tu suscripción» + banner de aviso. (dep: F6.2)
 - [ ] F6.5 Página `/bienvenida` con «Reenviar». **Requiere D1.** (dep: F6.3)
 - [x] F6.6 Facturación en el panel (Customer Portal, botón de pago con `client_reference_id`) y consola de empresas. (dep: F6.3)
-- [ ] F6.7 Reunión de puesta en marcha sobre la agenda de AAA001; wizard y tours sin GHL; `markAgencyContactActive` → etiqueta `levy-activo` en AAA001. (dep: F2.4, F2.2)
+- [x] F6.7 Reunión de puesta en marcha sobre la agenda de AAA001; wizard y tours sin GHL; `markAgencyContactActive` → etiqueta `levy-activo` en AAA001. (dep: F2.4, F2.2)
 
 ### F7 — Migración de datos y limpieza
 - [ ] F7.1 Script `scripts/migrate-ghl-to-crm.ts` (solo AAA001, idempotente, `--dry-run` por defecto): etiquetas y etapa desde GHL para los 160 contactos con `ghl_contact_id`, tool `ghl_calendar` «Consultoría Levi» → agenda, citas futuras del calendario GHL → `appointments`, el flujo con `ghl_action` → `crm_action`, y propuesta de texto nuevo para las tools «Agendar en GoHighLevel» y «Consultar disponibilidad». Ejecutar **solo en dry-run** y apuntar el resultado aquí. Necesita en local la clave de cifrado de `integration_secrets` y acceso a la API de GHL: si no están, marcar `[!]` y pedírmelas. (dep: F5.1, F2.4, F5.3)
@@ -296,6 +302,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-03 · F6.3 · webhook de Stripe (firma, dedupe, alta de empresa, estado de suscripción, correo de acceso, contacto en AAA001) + 10 pruebas con eventos firmados; eventos documentados en el runbook; typecheck, lint, test (306/306) y build en verde · commit `crm: F6.3 webhook de Stripe`.
 - 2026-11-03 · F6.4 · corte por impago en ycloud-webhook, buffer, flows, deliver y crm-jobs (lo entrante se guarda) + aviso «Reactiva tu suscripción» y banner de gracia en el panel; typecheck, lint, test (309/309) y build en verde · commit `crm: F6.4 corte por impago`.
 - 2026-11-03 · F6.6 · Facturación en Negocio (Pagar/reactivar + Customer Portal, solo owner), aviso con enlace, consola de empresas con exención y enlace de cliente de Stripe; variable `STRIPE_PAYMENT_LINK_URL`; typecheck, lint, test (315/315) y build en verde · commit `crm: F6.6 facturación en el panel`.
+- 2026-11-03 · F6.7 · reunión de puesta en marcha sobre la agenda de AAA001 (GHL de respaldo sin `LEVY_MEETING_AGENDA_ID`), `levy-activo` en el CRM de AAA001, asistente y tours con Google Calendar en vez de GHL; typecheck, lint, test (320/320) y build en verde · commit `crm: F6.7 onboarding sin GHL`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->

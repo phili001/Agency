@@ -32,7 +32,7 @@ export type WizardWorkspace = {
 
 export type WizardIntegration = {
   config: Json;
-  provider: "gohighlevel" | "openai" | "ycloud";
+  provider: "gohighlevel" | "google_calendar" | "openai" | "ycloud";
   status: string;
 };
 

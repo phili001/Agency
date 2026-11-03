@@ -11,6 +11,7 @@ import {
   isChecklistComplete,
   setActiveWorkspaceId,
 } from "@/lib/workspaces";
+import { markAgencyContactActiveInCrm } from "@/lib/billing/agency-crm";
 import { markAgencyContactActive } from "@/lib/integrations/ghl-agency";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -113,13 +114,19 @@ export async function POST(request: Request) {
         throw error;
       }
 
-      // Avisa al CRM de la agencia (etiqueta levy-activo) para cortar los
-      // recordatorios de activación. Fuera de la respuesta: si GHL falla, el
+      // Avisa al CRM de la agencia (etiqueta levy-activo en AAA001) para cortar
+      // los recordatorios de activación. Fuera de la respuesta: si falla, el
       // cliente entra igual.
       const ownerId = workspace?.owner_id;
       if (ownerId) {
         after(async () => {
           const { data: owner } = await admin.auth.admin.getUserById(ownerId);
+          try {
+            await markAgencyContactActiveInCrm(admin, owner.user?.email);
+          } catch (crmError) {
+            console.error("[workspaces] No se pudo marcar levy-activo en el CRM de AAA001:", crmError);
+          }
+          // GoHighLevel de la agencia, mientras exista (se borra en F7.3).
           await markAgencyContactActive(owner.user?.email);
         });
       }

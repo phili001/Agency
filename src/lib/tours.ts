@@ -45,7 +45,7 @@ export const tours: Record<TourKey, { steps: TourStep[]; title: string }> = {
         title: "Notas para tu equipo",
       },
       {
-        body: "Datos del contacto, resumen que hace la IA y etiquetas. Si conectaste GoHighLevel, aquí ves si ya está sincronizado.",
+        body: "Datos del contacto, resumen que hace la IA, etiquetas, etapa del CRM y su próxima cita.",
         target: "contact-panel",
         title: "Ficha del contacto",
       },

@@ -10,6 +10,8 @@ import {
 } from "@/lib/integrations/levy-calendar";
 import { getIntegrationSecret } from "@/lib/integrations/secrets";
 import { getBusinessProfileMetadata } from "@/lib/business-profile";
+import { googleBusyProvider } from "@/lib/agenda/google-sync";
+import { getMeetingDays, resolveMeetingAgenda } from "@/lib/agenda/levy-meeting";
 import { getBookedMeeting } from "@/lib/onboarding-meeting";
 import { getFirstPendingStep, parseStepIndex } from "@/lib/onboarding-steps";
 import { isPlatformAdmin } from "@/lib/platform-admin";
@@ -104,14 +106,23 @@ export default async function OnboardingPage({
   const timeZone =
     profileTimeZone && isValidTimeZone(profileTimeZone) ? profileTimeZone : "Europe/Madrid";
   const meeting = getBookedMeeting(workspace.onboarding_state);
-  const meetingCalendar = await getLevyCalendar();
-  // Los huecos se adelantan aquí (están cacheados un minuto) para que el paso
-  // de la reunión aparezca ya pintado. Si GoHighLevel tarda, la pantalla los
-  // pide por su cuenta en vez de retrasar todo el onboarding.
+  // La reunión va en la agenda de AAA001 si está configurada; si no, en GHL (hasta F7.2).
+  const adminClient = createAdminClient();
+  const meetingAgenda = await resolveMeetingAgenda(adminClient).catch(() => null);
+  const meetingCalendar = meetingAgenda ? null : await getLevyCalendar();
+  // Los huecos se adelantan aquí para que el paso de la reunión aparezca ya
+  // pintado. Si tardan, la pantalla los pide por su cuenta en vez de retrasar
+  // todo el onboarding.
+  const loadDays = meetingAgenda
+    ? () =>
+        getMeetingDays(adminClient, meetingAgenda, timeZone, {
+          externalBusy: googleBusyProvider(adminClient, meetingAgenda.workspaceId),
+        })
+    : () => getLevyMeetingDays(timeZone);
   const meetingDays =
-    meetingCalendar && !meeting
+    (meetingAgenda || meetingCalendar) && !meeting
       ? await Promise.race([
-          getLevyMeetingDays(timeZone).catch(() => []),
+          loadDays().catch(() => []),
           new Promise<never[]>((resolve) => setTimeout(() => resolve([]), 2500)),
         ])
       : [];
@@ -134,7 +145,7 @@ export default async function OnboardingPage({
       initialStep={requestedStep ?? getFirstPendingStep(checklist).index}
       integrations={(integrations ?? []) as never}
       meeting={meeting}
-      meetingAvailable={Boolean(meetingCalendar)}
+      meetingAvailable={Boolean(meetingAgenda || meetingCalendar)}
       meetingDays={meetingDays}
       memberCount={members?.length ?? 1}
       timeZone={timeZone}

@@ -22,8 +22,8 @@ import type { StepContext } from "./wizard";
 export function StepDone({ ctx }: { ctx: StepContext }) {
   const pending = getPendingSteps(ctx.checklist);
   const complete = pending.length === 0;
-  const ghlConnected = ctx.integrations.some(
-    (item) => item.provider === "gohighlevel" && item.status === "active",
+  const googleConnected = ctx.integrations.some(
+    (item) => item.provider === "google_calendar" && item.status === "active",
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -51,7 +51,7 @@ export function StepDone({ ctx }: { ctx: StepContext }) {
       label: "Equipo invitado (opcional)",
       step: stepIndex("extras"),
     },
-    { done: ghlConnected, label: "GoHighLevel (opcional)", step: stepIndex("extras") },
+    { done: googleConnected, label: "Google Calendar (opcional)", step: stepIndex("extras") },
   ];
 
   async function enter() {

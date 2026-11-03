@@ -13,6 +13,8 @@ import type { StripeSubscriptionStatus } from "./state.ts";
  */
 
 export const LEVY_TAGS = { active: "cliente-levy", canceled: "levy-cancelado", pastDue: "levy-impago" } as const;
+/** El cliente terminó la configuración guiada (corta los recordatorios de activación). */
+export const LEVY_ACTIVE_TAG = "levy-activo";
 const STAGES = { active: "Cliente", canceled: "Perdido" } as const;
 const FIELDS = [
   { key: "levy_company_code", label: "Levy: código de empresa" },
@@ -141,4 +143,41 @@ export async function syncAgencyContact(
   }
 
   return { contactId, ok: true };
+}
+
+/**
+ * Fin del onboarding: etiqueta `levy-activo` en el contacto de AAA001 con ese
+ * correo. Si no existe (cuentas creadas a mano), no se crea: no hay teléfono.
+ */
+export async function markAgencyContactActiveInCrm(
+  client: CrmClient,
+  email: string | null | undefined,
+  env: Record<string, string | undefined> = process.env,
+) {
+  const normalized = normalizeEmail(email ?? "");
+  if (!normalized) return { ok: false as const, reason: "no_email" as const };
+
+  const { data: agency, error } = await client
+    .from("workspaces")
+    .select("id")
+    .eq("company_code", agencyWorkspaceCode(env))
+    .maybeSingle();
+  if (error) throw new Error(`agency workspace: ${error.message}`);
+  if (!agency) return { ok: false as const, reason: "no_agency_workspace" as const };
+  const agencyId = (agency as { id: string }).id;
+
+  const { data, error: lookupError } = await client
+    .from("contacts")
+    .select("id")
+    .eq("workspace_id", agencyId)
+    .eq("email", normalized)
+    .order("created_at", { ascending: true })
+    .limit(1);
+  if (lookupError) throw new Error(`agency contact lookup: ${lookupError.message}`);
+  const contactId = ((data ?? [])[0] as { id: string } | undefined)?.id;
+  if (!contactId) return { ok: false as const, reason: "no_contact" as const };
+
+  const tag = await ensureTag(client, agencyId, LEVY_ACTIVE_TAG);
+  await addTagToContact(client, agencyId, contactId, tag.id, { kind: "system" });
+  return { contactId, ok: true as const };
 }

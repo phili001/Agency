@@ -1,9 +1,10 @@
 import type { Json } from "@/lib/supabase/database.types";
 
 /**
- * Reunión de puesta en marcha con el equipo de Levy. Se agenda en el
- * calendario de GoHighLevel de la empresa creadora (AAA001) y se guarda en
- * `workspaces.onboarding_state.meeting`.
+ * Reunión de puesta en marcha con el equipo de Levy. Se agenda en la agenda
+ * propia de AAA001 (`LEVY_MEETING_AGENDA_ID`, `lib/agenda/levy-meeting.ts`) o,
+ * mientras no esté configurada, en su calendario de GoHighLevel. Se guarda en
+ * `workspaces.onboarding_state.meeting` con el motor que la creó.
  */
 export type MeetingSlot = {
   /** Inicio en ISO, tal como lo devuelve GoHighLevel. */
@@ -23,6 +24,8 @@ export type MeetingDay = {
 export type BookedMeeting = {
   appointmentId: string;
   bookedAt: string;
+  /** Dónde vive la cita; las antiguas (sin dato) son de GoHighLevel. */
+  engine: "agenda" | "ghl";
   /** Teléfono personal de contacto, no el WhatsApp del negocio. */
   phone: string;
   startTime: string;
@@ -51,6 +54,7 @@ export function getBookedMeeting(onboardingState: Json | null | undefined): Book
   return {
     appointmentId,
     bookedAt: asString(meeting.bookedAt),
+    engine: meeting.engine === "agenda" ? "agenda" : "ghl",
     phone: asString(meeting.phone),
     startTime,
     timezone: asString(meeting.timezone),
