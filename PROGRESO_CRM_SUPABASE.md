@@ -60,6 +60,13 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - Ambas funciones apuntan la actividad (`appointment_booked` / `appointment_rescheduled`) en la misma transacción y marcan `google_sync_pending` (nueva si la agenda sincroniza; vieja si tenía evento). Reagendar mantiene servicio, notas, contacto y conversación; enlaza vieja y nueva en `notices`.
   - Pruebas SQL repetibles en `supabase/tests/agenda_booking_checks.sql` (16 casos).
 
+- **F2.2 Lógica del CRM (2026-11-02).**
+  - `src/lib/crm/` recibe el cliente como parámetro (`CrmClient`, en producción `createAdminClient()`) y el `workspaceId` de la sesión; **cada consulta filtra por `workspace_id`** y, antes de escribir sobre un contacto/etiqueta/etapa, comprueba que es de la empresa (404 si no, sin revelar de quién es).
+  - Patrón para que se pueda probar con `node --test`: solo `import type` para rutas `@/…`, imports relativos con `.ts`, sin propiedades en constructores (Node solo quita tipos). Errores de usuario con `CrmError` (`invalid` 400, `not_found` 404, `conflict` 409); `apiErrorResponse` los reconoce por `userFacing` sin importar el módulo.
+  - Doble de Supabase en memoria reutilizable: `src/lib/testing/fake-supabase.ts` (`createCrmFake`), con únicas y cascadas del esquema. No aplica defaults de columnas: el código inserta explícitamente lo que la lógica luego filtra (p. ej. `active: true`).
+  - `addTagToContact` devuelve `added` (false si ya la tenía) para que F5.3 dispare flujos `tag` solo cuando cambia algo. `contactAudienceLabels` = unión de marcas internas y etiquetas (F1.1).
+  - `upsertContactByPhone` (Stripe/onboarding) no pisa nombre, correo ni empresa; solo rellena vacíos. `touchContactInbound` queda listo para F5.4.
+
 ## Tareas
 
 ### F0 — Preparación
@@ -76,7 +83,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 
 ### F2 — Lógica del CRM y la Agenda
 - [x] F2.1 **Ampliar** el `src/lib/timezones.ts` existente con las utilidades puras de `ghl-calendar.ts` (`isValidTimeZone`, `zonedStartOfDay`, …), que `ghl-calendar.ts` pasa a importar; sin romper los imports actuales del navegador; con pruebas. (dep: F0.1)
-- [ ] F2.2 `src/lib/crm/` contactos, etapas, etiquetas, campos (validación por tipo), notas, tareas, actividad + pruebas + prueba de aislamiento. (dep: F1.2)
+- [x] F2.2 `src/lib/crm/` contactos, etapas, etiquetas, campos (validación por tipo), notas, tareas, actividad + pruebas + prueba de aislamiento. (dep: F1.2)
 - [ ] F2.3 `src/lib/agenda/slots.ts` portado de `agenda.py` (horario, servicios, festivos `closed_dates`, bloqueos, citas, repartir/espaciar) — lógica pura con pruebas extensas (zonas horarias, cambio de horario de verano, bordes del día, aviso mínimo, festivos). (dep: F2.1)
 - [ ] F2.4 `src/lib/agenda/` ofrecer, agendar, reagendar, cancelar, confirmar, marcar, bloqueos (sobre las funciones SQL) + traducción de errores + pruebas. (dep: F1.4, F2.3)
 - [ ] F2.5 Import/export CSV y borrado RGPD de contacto (apunta eventos de Google por borrar). (dep: F2.2, F1.3)
@@ -132,6 +139,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-02 · F1.4 · migración `agenda_booking_functions` aplicada a producción (ensayo previo en transacción deshecha): `book_appointment`, `reschedule_appointment` y `check_agenda_slot` con SQLSTATE propios; 16 comprobaciones SQL en verde antes y después (solape, no ofrecida, oferta caducada, fuera de horario, festivo, bloqueo, empresa/conversación ajena, reagendar atómico, cita inactiva, permisos); advisors sin avisos nuevos; `schema.sql` y tipos actualizados; typecheck, lint y test (106/106) en verde · commit `crm: F1.4 funciones de agendar y reagendar`.
 - 2026-11-02 · F1.5 · migración `integrations_google_calendar` aplicada (ensayo previo deshecho): `google_calendar` admitido en `integrations` e `integration_secrets` (checks ampliados, validados, `gohighlevel` intacto); `IntegrationProvider`, tipos y `schema.sql` actualizados; advisors sin avisos nuevos; typecheck, lint y test (106/106) en verde · commit `crm: F1.5 proveedor google_calendar`.
 - 2026-11-02 · F2.1 · `src/lib/timezones.ts` ampliado (sin imports, válido en servidor y navegador): `isValidTimeZone`, `zonedStartOfDay` (movidas de `ghl-calendar.ts`), `getZonedParts`, `zonedDateTime` (null en la hora que no existe al adelantar el reloj; primera ocurrencia al atrasarlo), `parseClockTime` (admite 24:00), `dateKeyInTimeZone`, `addDaysToDateKey`, `isoWeekdayOfDateKey`. Imports actualizados en `ghl-calendar.ts`, `levy-calendar.ts`, `cron/buffer`, `gohighlevel/test`, `onboarding/meeting` y `onboarding/page`. `calendar-request.ts` conserva sus `dateKeyInTimezone`/`addDaysToDateKey` (no se toca para no romper sus pruebas; F2.3 usa los de `timezones.ts`). 16 pruebas nuevas (cambio de hora en Madrid y Nueva York); typecheck, lint, test (122/122) y build en verde · commit `crm: F2.1 utilidades de zona horaria`.
+- 2026-11-02 · F2.2 · `src/lib/crm/` (contactos, etapas, etiquetas, campos con validación por tipo, notas, tareas, actividad, normalización) + doble `src/lib/testing/fake-supabase.ts`; `apiErrorResponse` acepta errores `userFacing`; 30 pruebas nuevas (19 de validación, 11 con el doble, 3 de aislamiento A/B: lectura, escritura y que toda consulta lleva filtro); typecheck, lint, test (152/152) y build en verde · commit `crm: F2.2 lógica del CRM`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->

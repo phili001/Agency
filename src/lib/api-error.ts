@@ -37,11 +37,27 @@ export function notFound(message = "No se encontró el recurso.") {
 }
 
 /**
+ * Errores de módulos que no pueden importar este archivo (por `next/server`)
+ * pero cuyo mensaje sí es para el usuario, como `CrmError`.
+ */
+function isUserFacingError(error: unknown): error is Error & { status: number } {
+  return (
+    error instanceof Error &&
+    (error as { userFacing?: unknown }).userFacing === true &&
+    typeof (error as { status?: unknown }).status === "number"
+  );
+}
+
+/**
  * Convierte cualquier excepcion en una respuesta JSON coherente.
  * `context` solo se usa para el log del servidor, nunca viaja al cliente.
  */
 export function apiErrorResponse(error: unknown, context: string) {
   if (error instanceof ApiError) {
+    return NextResponse.json({ error: error.message }, { status: error.status });
+  }
+
+  if (isUserFacingError(error)) {
     return NextResponse.json({ error: error.message }, { status: error.status });
   }
 
