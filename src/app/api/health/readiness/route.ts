@@ -21,7 +21,8 @@ const requiredEnv = [
   "NEXT_PUBLIC_APP_URL",
 ];
 
-const recommendedEnv: string[] = [];
+// Sin ellas la app arranca, pero no hay Google Calendar ni venta con Stripe.
+const recommendedEnv = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"];
 
 const requiredTables = [
   "workspaces",
@@ -34,7 +35,15 @@ const requiredTables = [
   "usage_events",
 ];
 
-const incrementalTables = ["workspace_assets", "webhook_events", "integration_secrets"];
+const incrementalTables = [
+  "workspace_assets",
+  "webhook_events",
+  "integration_secrets",
+  "crm_pipeline_stages",
+  "crm_tags",
+  "agendas",
+  "appointments",
+];
 
 async function tableCheck(
   supabase: SupabaseClient | null,
@@ -115,7 +124,7 @@ export async function GET(request: Request) {
       routes: {
         bufferCron: "/api/cron/buffer",
         deliverCron: "/api/cron/deliver",
-        ghlSyncCron: "/api/cron/ghl-sync",
+        crmJobsCron: "/api/cron/crm-jobs",
         supabaseHealth: "/api/health/supabase",
         ycloudWebhook: "/api/webhooks/ycloud/AAA001/secret",
       },

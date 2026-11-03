@@ -159,6 +159,12 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - API `api/agenda/{agendas,appointments,blocks,slots}/**`: leer cualquier rol; citas y bloqueos owner/admin/agent; agendas owner/admin. `workspace_id` siempre de la sesión. Los huecos usan `googleBusyProvider`; tras agendar/mover/cancelar se llama a `syncAppointment` dentro de `after()` (`lib/agenda/after-change.ts`) — queda resuelto el pendiente de F2.4/F3.2.
   - `withoutConfig` en `lib/agenda/agendas.ts` quita el `config` interno antes de mandar la agenda al navegador.
   - Verificado: rutas nuevas 401 sin sesión en dev; build. **La interfaz no se ha visto con sesión.**
+- **F5.8 Métricas, Chats, portada y readiness sin GHL (2026-11-03).**
+  - `business-metrics`: «Contactos con cita» (contaba `metadata.ghl_appointment_id`) pasa a **«Citas agendadas»**: citas de `appointments` creadas en los últimos 7 días, sin canceladas. ⚠️ Mientras AAA001 siga agendando en GHL (hasta F7.2) su cifra saldrá baja.
+  - Chats: el bloque «GoHighLevel» del lateral se sustituye por `ContactCrmSummary` (etapa, etiquetas y próxima cita, leídos de la ficha `GET /api/crm/contacts/[id]`, con enlace a Clientes). `panel-data` ya no lee `ghl_*` del metadata.
+  - Portada: el chequeo de despliegue «GoHighLevel» pasa a «Google Calendar» (`GOOGLE_CLIENT_ID/SECRET`); en la consola de agencia el proveedor `gohighlevel` pasa a `google_calendar`.
+  - `health/readiness`: Google y Stripe como variables recomendadas (no bloquean el 200), tablas del CRM y la Agenda en las comprobaciones, y la ruta `cron/ghl-sync` sustituida por `cron/crm-jobs`.
+  - Verificado: prueba de aislamiento de la métrica; build. **La interfaz no se ha visto con sesión.**
 
 ## Tareas
 
@@ -200,7 +206,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - [x] F5.5 Panel **Contactos** (lista, kanban, ficha, CSV, RGPD) + `sidebar-nav`. (dep: F2.2, F2.5)
 - [x] F5.6 Panel **Agenda** (semana/día, citas, bloqueos, configuración de agendas). Entrada nueva «Agenda» en el menú lateral (D4). (dep: F2.4, F3.2)
 - [x] F5.7 Ajustes del CRM (etapas, etiquetas, campos) e **Integraciones → Google Calendar** en lugar de GHL. (dep: F2.2, F3.2)
-- [ ] F5.8 Métricas, `panel-data`, `inbox-panel` (lateral con etapa, etiquetas y próxima cita), portada y `health/readiness` sin GHL. (dep: F5.2, F5.5)
+- [x] F5.8 Métricas, `panel-data`, `inbox-panel` (lateral con etapa, etiquetas y próxima cita), portada y `health/readiness` sin GHL. (dep: F5.2, F5.5)
 
 ### F6 — Stripe y onboarding de Levy
 - [ ] F6.1 Migración: `workspace_billing` (5 workspaces actuales con `billing_exempt = true`) y `billing_events`. (dep: F0.1)
@@ -250,6 +256,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-03 · F5.5 · `/clientes` como CRM (lista, etapas, ficha, CSV, RGPD) + API `api/crm/**` + enlace directo a conversación en la bandeja; sin cambios en el menú lateral (decisión del usuario); typecheck, lint, test (280/280) y build en verde; rutas comprobadas en dev (401 sin sesión) · commit `crm: F5.5 panel de clientes`.
 - 2026-11-03 · F5.7 · ajustes del CRM en Clientes (etapas, etiquetas, campos) + API `api/crm/{stages,tags,fields}` + tarjeta Google Calendar en Integraciones (GHL solo si ya existía); D4 resuelta por el usuario (Agenda como sección nueva del menú); typecheck, lint, test (280/280) y build en verde · commit `crm: F5.7 ajustes del CRM y Google Calendar`.
 - 2026-11-03 · F5.6 · sección Agenda en el menú + página `/agenda` (semana/día, citas, bloqueos, configuración) + API `api/agenda/**` con sync a Google en `after()`; typecheck, lint, test (280/280) y build en verde · commit `crm: F5.6 panel de agenda`.
+- 2026-11-03 · F5.8 · métrica «Citas agendadas» desde `appointments`, lateral de Chats con etapa/etiquetas/próxima cita, portada y readiness sin GHL (Google y Stripe recomendados); typecheck, lint, test (281/281) y build en verde · commit `crm: F5.8 métricas y paneles sin GHL`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->

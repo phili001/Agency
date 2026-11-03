@@ -335,9 +335,9 @@ export default async function Home({
       icon: Hand,
     },
     {
-      label: "Contactos con cita",
-      value: stableNumber(businessMetrics?.contactsWithAppointment ?? 0),
-      detail: "agendadas en el calendario",
+      label: "Citas agendadas",
+      value: stableNumber(businessMetrics?.appointmentsBooked ?? 0),
+      detail: `en la Agenda, ${BUSINESS_METRICS_WINDOW_DAYS} días`,
       icon: CalendarCheck,
     },
   ];
@@ -480,7 +480,7 @@ export default async function Home({
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {["ycloud", "openai", "gohighlevel"].map((provider) => (
+                  {["ycloud", "openai", "google_calendar"].map((provider) => (
                     <span
                       className={`rounded-lg px-2 py-1 text-xs ${
                         agencyWorkspace.activeProviders.includes(provider)

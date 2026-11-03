@@ -40,9 +40,9 @@ const deployChecks = [
     label: "App URL",
   },
   {
-    description: "Sincronización de contactos/leads por empresa",
-    envKeys: ["INTEGRATION_ENCRYPTION_KEY"],
-    label: "GoHighLevel",
+    description: "Calendario de Google de cada empresa en la Agenda",
+    envKeys: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+    label: "Google Calendar",
   },
 ];
 
@@ -173,12 +173,6 @@ export function getContactMetadata(
               : undefined,
         }
       : undefined,
-    ghl_contact_id:
-      typeof record.ghl_contact_id === "string" ? record.ghl_contact_id : undefined,
-    ghl_last_error:
-      typeof record.ghl_last_error === "string" ? record.ghl_last_error : undefined,
-    ghl_synced_at:
-      typeof record.ghl_synced_at === "string" ? record.ghl_synced_at : undefined,
     messaging_status:
       messagingStatus === "blocked" ? ("blocked" as const) : ("active" as const),
     pending_review: pendingReview

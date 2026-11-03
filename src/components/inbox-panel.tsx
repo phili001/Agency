@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 
+import { ContactCrmSummary } from "@/components/crm/contact-crm-summary";
 import { createClient } from "@/lib/supabase/client";
 
 /** Ritmo del polling del inbox: rapido mientras hay movimiento, lento en reposo. */
@@ -50,9 +51,6 @@ type ConversationItem = {
       by?: string | null;
       reason?: string;
     };
-    ghl_contact_id?: string;
-    ghl_last_error?: string;
-    ghl_synced_at?: string;
     messaging_status?: "active" | "blocked";
     pending_review?: {
       attempt_count: number;
@@ -457,19 +455,6 @@ export function InboxPanel({
     return `${String(date.getUTCHours()).padStart(2, "0")}:${String(
       date.getUTCMinutes(),
     ).padStart(2, "0")} UTC`;
-  }
-
-  function stableDateTime(value: string) {
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-      return "";
-    }
-
-    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
-      2,
-      "0",
-    )}-${String(date.getUTCDate()).padStart(2, "0")} ${stableTime(value)}`;
   }
 
   function stableNumber(value: number) {
@@ -1629,27 +1614,8 @@ export function InboxPanel({
               ))}
             </div>
           ) : null}
-          {selectedConversation?.contactMetadata?.ghl_contact_id ||
-          selectedConversation?.contactMetadata?.ghl_last_error ? (
-            <div className="mt-3 rounded-lg border border-[#e2e6df] p-2 text-xs text-[#647067]">
-              <p className="font-semibold text-[#20231f]">GoHighLevel</p>
-              {selectedConversation.contactMetadata.ghl_contact_id ? (
-                <p className="mt-1 break-all">
-                  ID: {selectedConversation.contactMetadata.ghl_contact_id}
-                </p>
-              ) : null}
-              {selectedConversation.contactMetadata.ghl_synced_at ? (
-                <p className="mt-1">
-                  Sync:{" "}
-                  {stableDateTime(selectedConversation.contactMetadata.ghl_synced_at)}
-                </p>
-              ) : null}
-              {selectedConversation.contactMetadata.ghl_last_error ? (
-                <p className="mt-1 text-red-700">
-                  {selectedConversation.contactMetadata.ghl_last_error}
-                </p>
-              ) : null}
-            </div>
+          {selectedConversation?.contactId ? (
+            <ContactCrmSummary contactId={selectedConversation.contactId} />
           ) : null}
         </div>
 
