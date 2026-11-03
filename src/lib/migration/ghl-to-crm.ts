@@ -145,6 +145,8 @@ export function convertFlowSteps(steps: unknown, context: FlowConversionContext 
   const list = Array.isArray(steps) ? (steps as FlowStep[]) : [];
   let converted = 0;
   const unconverted: string[] = [];
+  /** Campos personalizados que usan las acciones convertidas (hay que tenerlos en el CRM). */
+  const fieldKeys = new Set<string>();
 
   const next = list.map((step) => {
     if (!Array.isArray(step.actions) || step.actions.length === 0) return step;
@@ -156,15 +158,23 @@ export function convertFlowSteps(steps: unknown, context: FlowConversionContext 
       if (crmAction) {
         created.push(crmAction);
         converted += 1;
+        if (crmAction.type === "update_contact_field" && crmAction.fieldKey && !["company", "email", "full_name"].includes(crmAction.fieldKey)) {
+          fieldKeys.add(crmAction.fieldKey);
+        }
       } else {
         kept.push(action);
         unconverted.push(`${step.name}: ${action.label || action.type}`);
       }
     }
-    return { ...step, actions: [...crm, ...created, ...kept] as FlowStep["actions"] };
+    const actions = [...crm, ...created, ...kept] as FlowStep["actions"];
+    // Sin acciones de GHL pendientes, el paso pasa a «Acción CRM».
+    if (step.type === "ghl_action" && kept.length === 0) {
+      return { ...step, actions, name: step.name.replace(/^GHL:\s*/i, "CRM: "), type: "crm_action" as const };
+    }
+    return { ...step, actions };
   });
 
-  return { converted, steps: next, unconverted };
+  return { converted, fieldKeys: [...fieldKeys].sort(), steps: next, unconverted };
 }
 
 // --- Tools de texto -----------------------------------------------------------------

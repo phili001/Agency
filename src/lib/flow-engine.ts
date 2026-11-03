@@ -721,7 +721,8 @@ async function executeRun({
       return { handled: true, status: "waiting_for_answer" };
     }
 
-    if (currentStep.type === "ghl_action") {
+    // `crm_action` (pasos nuevos) y `ghl_action` (los guardados antes) ejecutan sus acciones igual.
+    if (currentStep.type === "ghl_action" || currentStep.type === "crm_action") {
       await runStepActions({
         contact,
         flow,

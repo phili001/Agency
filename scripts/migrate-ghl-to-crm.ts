@@ -3,6 +3,7 @@
  *
  *   node --conditions=react-server --env-file=.env scripts/migrate-ghl-to-crm.ts            # dry-run (por defecto)
  *   node --conditions=react-server --env-file=.env scripts/migrate-ghl-to-crm.ts --apply    # escribe (F7.2, con permiso)
+ *   … --sin-ghl   no llama a GHL: solo agenda (horario por defecto), tool, flujos y textos
  *
  * Qué hace (todo idempotente: se puede repetir):
  * 1. Contactos con `ghl_contact_id`: etiquetas de GHL → etiquetas del CRM; etapa
@@ -24,6 +25,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createAgenda, listAgendas } from "../src/lib/agenda/agendas.ts";
 import { bookAppointment } from "../src/lib/agenda/appointments.ts";
 import type { CrmActor, CrmClient } from "../src/lib/crm/shared.ts";
+import { createCustomField } from "../src/lib/crm/custom-fields.ts";
 import { setContactStage } from "../src/lib/crm/stages.ts";
 import { addTagToContact, createTag, listTags } from "../src/lib/crm/tags.ts";
 import { decryptSecret } from "../src/lib/integrations/crypto.ts";
@@ -41,6 +43,8 @@ import {
 
 const WORKSPACE_CODE = "AAA001";
 const APPLY = process.argv.includes("--apply");
+/** Sin acceso a GHL (decisión del usuario): no se piden etiquetas, etapas, horario ni citas. */
+const OFFLINE = process.argv.includes("--sin-ghl");
 const LIMIT = (() => {
   const index = process.argv.indexOf("--limit");
   const value = index >= 0 ? Number(process.argv[index + 1]) : NaN;
@@ -66,6 +70,11 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 type GhlContext = { apiKey: string; locationId: string };
 
 async function ghl<T>(ctx: GhlContext, path: string, query: Record<string, string>, version: string): Promise<T> {
+  if (OFFLINE) {
+    const error = new Error(`GHL ${path} → no se consulta (--sin-ghl)`) as Error & { status?: number };
+    error.status = 0;
+    throw error;
+  }
   const url = new URL(`${API}${path}`);
   for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value);
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -113,7 +122,7 @@ async function main() {
       withoutChanges: 0,
     },
     flows: [] as Array<Record<string, unknown>>,
-    mode: APPLY ? "apply" : "dry-run",
+    mode: `${APPLY ? "apply" : "dry-run"}${OFFLINE ? " sin GHL" : ""}`,
     newTags: [] as string[],
     toolProposals: [] as Array<Record<string, unknown>>,
     warnings: [] as string[],
@@ -139,8 +148,8 @@ async function main() {
   const config = asRecord(integration?.config);
   const locationId = typeof config.location_id === "string" ? config.location_id : "";
   const defaultPipelineId = typeof config.default_pipeline_id === "string" ? config.default_pipeline_id : null;
-  if (!locationId || !secret?.ciphertext) throw new Error("AAA001 no tiene una conexión de GHL con location y token.");
-  const ctx: GhlContext = { apiKey: decryptSecret(secret.ciphertext as string), locationId };
+  if (!OFFLINE && (!locationId || !secret?.ciphertext)) throw new Error("AAA001 no tiene una conexión de GHL con location y token.");
+  const ctx: GhlContext = { apiKey: OFFLINE ? "" : decryptSecret(secret?.ciphertext as string), locationId };
 
   // --- Etapas y etiquetas actuales del CRM ------------------------------------------------
   const { data: stageRows } = await supabase.from("crm_pipeline_stages").select("id, name, kind").eq("workspace_id", workspaceId);
@@ -243,7 +252,8 @@ async function main() {
   const contactByGhlId = new Map<string, string>();
   const newTagNames = new Set<string>();
 
-  for (const contact of contacts ?? []) {
+  if (OFFLINE) warn("Sin GHL: etiquetas, etapas y citas de GHL no se migran.");
+  for (const contact of OFFLINE ? [] : (contacts ?? [])) {
     const metadata = asRecord(contact.metadata);
     const ghlId = String(metadata.ghl_contact_id);
     contactByGhlId.set(ghlId, contact.id as string);
@@ -332,8 +342,7 @@ async function main() {
           )
         ).events ?? [];
     } catch (error) {
-      warn(`Citas de GHL «${calendar.name}»: HTTP ${statusOf(error) ?? "?"}. No se importan citas.`);
-      continue;
+      if (!OFFLINE) warn(`Citas de GHL «${calendar.name}»: HTTP ${statusOf(error) ?? "?"}. No se importan citas.`);
     }
 
     const { data: imported } = calendar.agendaId
@@ -391,7 +400,17 @@ async function main() {
   for (const flow of flows ?? []) {
     const result = convertFlowSteps(flow.steps, { calendarToAgenda, stageToCrm });
     if (result.converted === 0 && result.unconverted.length === 0) continue;
-    report.flows.push({ converted: result.converted, id: flow.id, name: flow.name, status: flow.status, unconverted: result.unconverted });
+    const { data: fieldRows } = await supabase.from("crm_custom_fields").select("key").eq("workspace_id", workspaceId);
+    const existingKeys = new Set((fieldRows ?? []).map((row) => row.key as string));
+    const missingFields = result.fieldKeys.filter((key) => !existingKeys.has(key));
+    report.flows.push({ converted: result.converted, fieldsToCreate: missingFields, id: flow.id, name: flow.name, status: flow.status, unconverted: result.unconverted });
+    if (APPLY) {
+      for (const key of missingFields) {
+        // Campo de texto con el nombre legible de la clave; la IA no lo lee hasta que se marque.
+        const label = key.replace(/_/g, " ").replace(/^\w/, (letter) => letter.toUpperCase()).slice(0, 80);
+        await createCustomField(client, workspaceId, { ai_readable: false, key, label, type: "text" });
+      }
+    }
     if (APPLY && result.converted > 0 && ![...calendarToAgenda.values()].some((id) => id.startsWith("("))) {
       await supabase.from("flows").update({ steps: result.steps }).eq("workspace_id", workspaceId).eq("id", flow.id as string);
     }
@@ -403,6 +422,13 @@ async function main() {
     if (asRecord(asset.metadata).type || !/go\s?high\s?level|\bghl\b|disponibilidad/i.test(text)) continue;
     const proposal = proposeToolText(String(asset.title), String(asset.content ?? ""));
     report.toolProposals.push({ id: asset.id, proposedContent: proposal.content, proposedTitle: proposal.title, title: asset.title });
+    if (APPLY && (proposal.title !== asset.title || proposal.content !== (asset.content ?? ""))) {
+      await supabase
+        .from("workspace_assets")
+        .update({ content: proposal.content, title: proposal.title })
+        .eq("workspace_id", workspaceId)
+        .eq("id", asset.id as string);
+    }
   }
 
   console.log(JSON.stringify(report, null, 2));

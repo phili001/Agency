@@ -79,7 +79,16 @@ describe("calendario → agenda", () => {
 describe("flujos y tools", () => {
   it("convierte acciones de GHL con los mapeos de la migración y deja las que no tienen equivalente", () => {
     const steps = [
-      { actions: [{ label: "Etiqueta", tag: "interesado", type: "add_tag" }, { label: "Etapa", stageId: "g-quote", type: "upsert_opportunity" }], id: "1", name: "Inicio" },
+      {
+        actions: [
+          { label: "Etiqueta", tag: "interesado", type: "add_tag" },
+          { label: "Etapa", stageId: "g-quote", type: "upsert_opportunity" },
+          { customFieldKey: "cuello", customFieldValue: "{{x}}", label: "Campo", type: "update_contact_field" },
+        ],
+        id: "1",
+        name: "GHL: inicio",
+        type: "ghl_action",
+      },
       { actions: [{ calendarId: "cal-levi", label: "Agenda", type: "set_booking_calendar" }, { label: "Etapa rara", stageId: "g-zzz", type: "upsert_opportunity" }], id: "2", name: "Agenda" },
       { id: "3", name: "Sin acciones" },
     ];
@@ -88,12 +97,17 @@ describe("flujos y tools", () => {
       stageToCrm: new Map([["g-quote", { id: "s-quote", name: "Solicitud de presupuesto" }]]),
     });
 
-    assert.equal(result.converted, 3);
+    assert.equal(result.converted, 4);
     assert.deepEqual(result.unconverted, ["Agenda: Etapa rara"]);
+    assert.deepEqual(result.fieldKeys, ["cuello"]);
     assert.deepEqual(result.steps[0].actions, [
       { engine: "crm", label: "Etiqueta", tagName: "interesado", type: "add_tag" },
       { engine: "crm", label: "Etapa", stageId: "s-quote", stageName: "Solicitud de presupuesto", type: "set_stage" },
+      { engine: "crm", fieldKey: "cuello", fieldValue: "{{x}}", label: "Campo", type: "update_contact_field" },
     ]);
+    // Sin acciones de GHL pendientes el paso pasa a «Acción CRM»; con alguna pendiente, no.
+    assert.equal(result.steps[0].type, "crm_action");
+    assert.equal(result.steps[0].name, "CRM: inicio");
     assert.deepEqual(result.steps[1].actions?.[0], { agendaId: "agenda-1", engine: "crm", label: "Agenda", type: "set_booking_agenda" });
     assert.equal(result.steps[1].actions?.length, 2);
     // Repetirla no cambia nada (idempotente).

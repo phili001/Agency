@@ -215,6 +215,18 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
     - Agenda «Consultoría Levi»: no existe aún; sin GHL se crearía con L-V 9-18, 30 min, Europe/Madrid (**revisar**).
     - Propuesta para las tools de texto: «Agendar en GoHighLevel» → **«Agendar cita»**: «Accion: crea una cita directamente en la agenda. Inputs: nombre, telefono, fecha, hora y notas.»; «Consultar disponibilidad» → «Accion: consulta horarios disponibles en la agenda antes de reservar. Inputs: rango de fechas.» (no se aplican solas; revísalas).
   - **Qué necesito:** un Private Integration Token nuevo de la subcuenta de AAA001 con permisos de contactos, oportunidades (pipelines) y calendarios/eventos, pegado en Integraciones → GoHighLevel de AAA001 (queda cifrado). Luego repito el dry-run y apunto aquí los números.
+- **F7.2 Migración de AAA001 sin GHL (2026-11-03, aprobada).**
+  - Antes: dry-run `--sin-ghl` revisado y copia de las 3 tools y del flujo tomada (en la conversación). Comando: `node --conditions=react-server --env-file=.env scripts/migrate-ghl-to-crm.ts --sin-ghl --apply`.
+  - Escrito en producción (AAA001):
+    - agenda **«Consultoría Levi»** (por defecto, activa, L-V 9-18, 30 min, Europe/Madrid, Google en `off`);
+    - la tool «Consultoría Levi» pasa a `type: "agenda"` → **el agente ya agenda en la Agenda propia** (no quedan tools `ghl_calendar`);
+    - tools de texto: «Agendar en GoHighLevel» → «Agendar cita» y «Consultar disponibilidad» con el texto nuevo;
+    - flujo «LEVY - Diagnóstico y agenda» (sigue **en pausa**): su paso de GHL pasa a «CRM: diagnóstico completado» (`crm_action`) con 2 acciones del CRM;
+    - campo de texto **`cuello_de_botella_principal`** creado (la acción lo necesita; la IA no lo lee).
+  - Comprobado en la base, y una segunda pasada no cambia nada (idempotente).
+  - **Arreglo encontrado de paso:** el motor de flujos solo ejecutaba las acciones de los pasos `ghl_action`; los pasos «Acción CRM» (`crm_action`, los que crean el editor y las plantillas) se saltaban. Ahora se ejecutan los dos. En producción no había ningún flujo con pasos `crm_action`, así que no hubo efecto. Sin prueba propia del motor (no hay `flow-engine.test`); la conversión sí está probada.
+  - Revisa en el panel: horario y duración de la agenda (Agenda → Configurar) y, si quieres, conecta su Google Calendar.
+  - Sigue activa la integración de GHL de AAA001 con un token que da 401: sus llamadas fallan sin bloquear nada. La borra F7.4.
 
 ## Tareas
 
@@ -269,7 +281,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 
 ### F7 — Migración de datos y limpieza
 - [x] F7.1 (cerrada sin datos de GHL por decisión del usuario; el script queda para la parte sin GHL) Script `scripts/migrate-ghl-to-crm.ts` (solo AAA001, idempotente, `--dry-run` por defecto): etiquetas y etapa desde GHL para los 160 contactos con `ghl_contact_id`, tool `ghl_calendar` «Consultoría Levi» → agenda, citas futuras del calendario GHL → `appointments`, el flujo con `ghl_action` → `crm_action`, y propuesta de texto nuevo para las tools «Agendar en GoHighLevel» y «Consultar disponibilidad». Ejecutar **solo en dry-run** y apuntar el resultado aquí. Necesita en local la clave de cifrado de `integration_secrets` y acceso a la API de GHL: si no están, marcar `[!]` y pedírmelas. (dep: F5.1, F2.4, F5.3)
-- [ ] **[STOP]** F7.2 Ejecutar la migración real de AAA001 (escribe en producción). **Sin GHL:** crear la agenda «Consultoría Levi» (L-V 9-18, 30 min, Europe/Madrid, a ajustar en el panel), pasar su tool a `type: "agenda"` (el agente deja de usar GHL), convertir las 2 acciones del flujo «LEVY - Diagnóstico y agenda» y poner el texto nuevo de las tools «Agendar cita» y «Consultar disponibilidad».
+- [x] **[STOP]** F7.2 (aprobada por el usuario el 2026-11-03, sin GHL) Ejecutar la migración real de AAA001 (escribe en producción). **Sin GHL:** crear la agenda «Consultoría Levi» (L-V 9-18, 30 min, Europe/Madrid, a ajustar en el panel), pasar su tool a `type: "agenda"` (el agente deja de usar GHL), convertir las 2 acciones del flujo «LEVY - Diagnóstico y agenda» y poner el texto nuevo de las tools «Agendar cita» y «Consultar disponibilidad».
 - [ ] **[STOP]** F7.3 Borrar código, rutas y variables de GHL (`ghl-agency.ts`, `webhooks/ghl/**` incluida `purchase` + `levy-purchase.ts`, `integrations/gohighlevel/**`, `cron/ghl-sync`, `vercel.json`). **Solo después de F6.3 verificada** con un pago real de prueba (hoy `webhooks/ghl/purchase` es la vía de venta). (dep: F6.3, F7.2)
 - [ ] **[STOP]** F7.4 Migración destructiva: quitar `gohighlevel` del check de `integrations`, borrar su fila y su secreto, limpiar claves `ghl_*` de `contacts.metadata`, convertir assets `ghl_calendar` restantes.
 - [ ] **[STOP]** F7.5 Orden de salida (lo hago yo contigo): merge de `crm-supabase` → F7.2 → despliegue → variables en Vercel → activar el job de `pg_cron` de F4.3 → comprobar AAA001 por WhatsApp. El merge es todo o nada: no desplegar la rama sin F7.2 hecha o la coexistencia de F5.2 probada.
@@ -316,6 +328,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-03 · F7.1 · `[!]` script de migración (dry-run por defecto, idempotente) + reglas puras con 8 pruebas; dry-run ejecutado: **GHL responde 401** con el token guardado de AAA001 (revocado o caducado), solo salen la conversión del flujo (2 acciones) y la propuesta de texto de las tools; typecheck, lint y test (328/328) en verde · commit `crm: F7.1 script de migración de GHL (bloqueado por token)`.
 - 2026-11-03 · F8.1 · `[!]` verificación final: typecheck, lint, test (328/328) y build en verde; advisors sin avisos nuevos y 14 tablas nuevas con RLS; GHL solo en lo que retiran F7.2–F7.4; **sin recorrido del panel con sesión** (necesita tu usuario); resumen final escrito · commit `crm: F8.1 verificación final y resumen`.
 - 2026-11-03 · Decisión · el usuario deja GHL: F7.1 cerrada sin datos de GHL, F7.2 reescrita sin GHL (sigue [STOP]) · sin código.
+- 2026-11-03 · F7.2 · aplicada sin GHL en AAA001 (agenda «Consultoría Levi», tool → agenda, textos de tools, flujo convertido, campo `cuello_de_botella_principal`); comprobada en la base e idempotente; arreglo del motor para ejecutar pasos `crm_action`; typecheck, lint y test en verde · commit `crm: F7.2 migración de AAA001 sin GHL`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->
