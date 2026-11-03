@@ -136,6 +136,11 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - Audiencias de flujo comparan contra marcas internas + etiquetas del CRM, sin mayúsculas.
   - Constructor: editor de acciones con desplegables (etiquetas, etapas, campos, agendas) cargados en `flujos/page.tsx`; disparador por etiqueta con selector (guarda `tagId` y `tag`). Se quitó la carga de calendarios de GHL. **No verificado en el navegador** (el panel exige iniciar sesión).
 
+- **F5.4 Webhook de YCloud y CRM (2026-11-03).**
+  - Al llegar un mensaje, `recordInboundMessage` (`crm/contacts.ts`) pone `last_message_at`, fija `source = whatsapp` si estaba vacío y apunta actividad solo en los hitos (`contact_created` si el contacto es nuevo, `message_received` si abre conversación nueva). Va en try/catch: un fallo del CRM no frena el mensaje ni la IA.
+  - `syncContactToGoHighLevel` **se queda marcado como legado** (coexistencia, como F5.2/F5.3): sin GHL activo ya no hace nada; quitarlo ahora rompería la automatización de GHL de AAA001 antes de F7.2. Se borra con el módulo en F7.3.
+  - **Decisión sobre `webhooks/ghl/send-message`: no se crea sustituto.** En producción (2026-11-03) hay 0 flujos con trigger `webhook` y 0 eventos `flow_started_from_webhook` en toda la historia; solo lo llamaría GHL. El disparo por etiqueta (F5.3) cubre lo que hacía. Se borra en F7.3. Si algún día un sistema externo necesita lanzar flujos, se crea entonces con otro nombre que no choque con `api/flows/start`.
+
 ## Tareas
 
 ### F0 — Preparación
@@ -172,7 +177,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - [x] F5.1 `lib/calendar-tools.ts` a agendas (lee formato viejo) + pruebas. (dep: F2.4)
 - [x] F5.2 Calendario del agente sobre `src/lib/agenda`, `offered_slots` por conversación, tools `reagendar_cita` y `cancelar_cita`, protecciones conservadas + pruebas. **Coexistencia**: si el workspace aún tiene una tool `ghl_calendar` activa, el agente sigue usando GHL hasta F7.2 (si no, AAA001 se queda sin agenda al desplegar). (dep: F5.0, F5.1)
 - [x] F5.3 Flujos: `crm_action` (+ conversión de `ghl_action`), flow-builder con desplegables, **implementar** el disparo `tag` en `flow-engine.ts` (hoy no existe) al etiquetar desde panel, flujo o agente + pruebas. (dep: F2.2)
-- [ ] F5.4 `ycloud-webhook` sin `syncContactToGoHighLevel`. Sustituto de `webhooks/ghl/send-message`: antes de crearlo, comprobar si alguien externo lo seguirá llamando sin GHL; si sí, crearlo con un nombre que no choque con la `api/flows/start` del panel (p. ej. `webhooks/flows/trigger`) y anotar la decisión; si no, solo se borra en F7.3. (dep: F2.2)
+- [x] F5.4 `ycloud-webhook` sin `syncContactToGoHighLevel`. Sustituto de `webhooks/ghl/send-message`: antes de crearlo, comprobar si alguien externo lo seguirá llamando sin GHL; si sí, crearlo con un nombre que no choque con la `api/flows/start` del panel (p. ej. `webhooks/flows/trigger`) y anotar la decisión; si no, solo se borra en F7.3. (dep: F2.2)
 - [ ] F5.5 Panel **Contactos** (lista, kanban, ficha, CSV, RGPD) + `sidebar-nav`. (dep: F2.2, F2.5)
 - [ ] F5.6 Panel **Agenda** (semana/día, citas, bloqueos, configuración de agendas). (dep: F2.4, F3.2)
 - [ ] F5.7 Ajustes del CRM (etapas, etiquetas, campos) e **Integraciones → Google Calendar** en lugar de GHL. (dep: F2.2, F3.2)
@@ -222,6 +227,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-03 · F5.1 · `lib/calendar-tools.ts` con tools de agenda (`agenda_id`, `booking_agenda_id`) y lectura del formato viejo de GHL (`kind`); runtime y prueba de GHL limitados a `kind = ghl`; tarjeta y flujos de GHL con las funciones/clave legacy; 4 pruebas nuevas; typecheck, lint, test (258/258) y build en verde · commit `crm: F5.1 tools de calendario a agendas`.
 - 2026-11-03 · F5.2 · agente sobre la agenda propia (`agent-agenda.ts`), motor elegido por coexistencia en `agent-tools.ts`, tools `reagendar_cita`/`cancelar_cita`, barrera de cancelación y respuestas directas en `agent-guards.ts`, integrado en `cron/buffer`; 11 pruebas nuevas con la función SQL simulada (oferta y solape): huecos ofrecidos, ISO no ofrecido rechazado, hueco calculado por el servidor, ocupado con alternativas, hora ambigua, reagendar única/varias, cancelar solo de su conversación, tools/contexto/barreras; typecheck, lint, test (269/269) y build en verde. Sin probar con WhatsApp ni OpenAI reales · commit `crm: F5.2 agente sobre la agenda propia`.
 - 2026-11-03 · F5.3 · flujos con `crm_action`, coexistencia con acciones de GHL, disparo de flujos por etiqueta, audiencias con etiquetas del CRM y constructor con desplegables; 9 pruebas nuevas (conversión, separación, plantilla Levy, disparo por id/nombre, las 7 acciones, etiqueta repetida no relanza, fallo aislado, aislamiento A/B); typecheck, lint, test (278/278) y build en verde · commit `crm: F5.3 flujos con acciones del CRM`.
+- 2026-11-03 · F5.4 · `ycloud-webhook` actualiza el CRM (`recordInboundMessage`) y deja la sincronización con GHL como legado; sin sustituto para `webhooks/ghl/send-message` (comprobado que nadie lo usa); 2 pruebas nuevas; typecheck, lint, test (280/280) y build en verde · commit `crm: F5.4 webhook de YCloud al CRM`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->

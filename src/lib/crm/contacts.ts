@@ -271,6 +271,26 @@ export async function touchContactInbound(
   }
 }
 
+/**
+ * Lo que el CRM apunta cuando llega un mensaje de WhatsApp: último mensaje,
+ * origen (si faltaba) y, solo en los hitos, actividad: contacto nuevo o
+ * conversación nueva. Cada mensaje no deja actividad (llenaría el historial).
+ */
+export async function recordInboundMessage(
+  client: CrmClient,
+  workspaceId: string,
+  contactId: string,
+  { at, newContact, newConversation }: { at: Date; newContact: boolean; newConversation: boolean },
+) {
+  await touchContactInbound(client, workspaceId, contactId, at);
+
+  if (newContact) {
+    await logActivity(client, workspaceId, contactId, "contact_created", { source: "whatsapp" }, { kind: "system" });
+  } else if (newConversation) {
+    await logActivity(client, workspaceId, contactId, "message_received", { new_conversation: true }, { kind: "system" });
+  }
+}
+
 export type ContactSearch = {
   page?: number;
   pageSize?: number;

@@ -218,3 +218,33 @@ describe("aislamiento entre empresas", () => {
     assert.deepEqual(unfiltered, []);
   });
 });
+
+describe("mensaje entrante (ycloud-webhook)", () => {
+  it("apunta último mensaje y origen, y actividad solo en los hitos", async () => {
+    const { recordInboundMessage } = await import("./contacts.ts");
+    fake.table("contacts").push({ id: "c-new", phone_e164: "+34600000500", source: null, workspace_id: A });
+    fake.table("contacts").push({ id: "c-import", phone_e164: "+34600000501", source: "import", workspace_id: A });
+    const at = new Date("2026-09-07T10:00:00Z");
+
+    await recordInboundMessage(client, A, "c-new", { at, newContact: true, newConversation: true });
+    await recordInboundMessage(client, A, "c-new", { at, newContact: false, newConversation: false });
+    await recordInboundMessage(client, A, "c-import", { at, newContact: false, newConversation: true });
+
+    const rows = fake.table("contacts");
+    assert.equal(rows.find((row) => row.id === "c-new")?.source, "whatsapp");
+    assert.equal(rows.find((row) => row.id === "c-new")?.last_message_at, at.toISOString());
+    assert.equal(rows.find((row) => row.id === "c-import")?.source, "import");
+    assert.deepEqual(
+      fake.table("crm_contact_activity").map((row) => `${row.contact_id}:${row.kind}`),
+      ["c-new:contact_created", "c-import:message_received"],
+    );
+  });
+
+  it("no toca el contacto de otra empresa", async () => {
+    const { recordInboundMessage } = await import("./contacts.ts");
+    fake.table("contacts").push({ id: "c-b", phone_e164: "+34600000600", source: null, workspace_id: B });
+    await recordInboundMessage(client, A, "c-b", { at: new Date(), newContact: false, newConversation: false });
+    assert.equal(fake.table("contacts").find((row) => row.id === "c-b")?.source, null);
+    assert.equal(fake.table("contacts").find((row) => row.id === "c-b")?.last_message_at, undefined);
+  });
+});

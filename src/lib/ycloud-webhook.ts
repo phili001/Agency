@@ -8,6 +8,7 @@ import {
   getDefaultConversationMode,
 } from "@/lib/conversation-default";
 import { handleInboundFlow } from "@/lib/flow-engine";
+import { recordInboundMessage } from "@/lib/crm/contacts";
 import { syncContactToGoHighLevel } from "@/lib/integrations/gohighlevel";
 import { secretMatchesHash } from "@/lib/integrations/secrets";
 import { findOrCreateOpenConversation } from "@/lib/conversations";
@@ -501,9 +502,10 @@ async function storeYCloudMessage({
   }
 
   if (event.direction === "inbound") {
-    // El contacto entra a GHL desde su primer mensaje. El upsert usa telefono,
-    // evita duplicados y guarda el ghl_contact_id; un fallo de GHL queda en el
-    // metadata local sin impedir que WhatsApp continue procesandose.
+    // LEGADO (se borra en F7.3): solo hace algo si el workspace aún tiene
+    // GoHighLevel activo (AAA001 hasta su migración, F7.2); sin GHL devuelve
+    // `not_configured` sin llamar a nada. El CRM propio se actualiza abajo,
+    // cuando ya se sabe la conversación.
     await syncContactToGoHighLevel({
       contactId: contact.id,
       workspaceId: resolvedWorkspaceId,
@@ -523,6 +525,20 @@ async function storeYCloudMessage({
   // Solo es "existente" si no la acabamos de crear: asi el resto del flujo
   // (modo IA por defecto, etc.) sigue viendo lo mismo que antes.
   const existingConversation = conversationCreated ? null : openConversation;
+
+  if (event.direction === "inbound") {
+    // CRM: último mensaje, origen y actividad. Un fallo aquí no puede frenar la
+    // entrega del mensaje ni la respuesta de la IA.
+    try {
+      await recordInboundMessage(supabase, resolvedWorkspaceId, contact.id, {
+        at: new Date(),
+        newContact: !existingContact,
+        newConversation: conversationCreated,
+      });
+    } catch (error) {
+      console.error("[ycloud-webhook:crm]", error);
+    }
+  }
 
   const messageProviderId = event.providerMessageId ?? event.externalId;
   let { data: existingMessage } = messageProviderId
