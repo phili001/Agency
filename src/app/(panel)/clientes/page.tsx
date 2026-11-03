@@ -1,62 +1,40 @@
+import { ContactsPanel } from "@/components/crm/contacts-panel";
+import type { ContactListItem, CrmPanelOptions } from "@/components/crm/types";
 import { PanelPage } from "@/components/panel/panel-header";
+import { searchContacts } from "@/lib/crm/contacts";
+import { listCustomFields } from "@/lib/crm/custom-fields";
+import { listStages } from "@/lib/crm/stages";
+import { listTags } from "@/lib/crm/tags";
 import { getPanelContext } from "@/lib/panel-context";
+import { createAdminClient } from "@/lib/supabase/admin";
 
+/**
+ * Clientes = CRM de la empresa: lista con filtros, vista por etapas y ficha.
+ * Se amplía esta página en vez de crear `/contactos` para no tocar el menú
+ * lateral (decisión del usuario; ver PROGRESO_CRM_SUPABASE.md, F5.5).
+ */
 export default async function ClientsPage() {
-  const { supabase, workspace, workspaceId } = await getPanelContext();
-  const { data } = workspaceId
-    ? await supabase
-        .from("contacts")
-        .select("id, full_name, phone_e164, email")
-        .eq("workspace_id", workspaceId)
-        .order("created_at", { ascending: false })
-        .limit(200)
-    : { data: [] };
-  const contacts = data ?? [];
+  const { activeRole, workspace, workspaceId } = await getPanelContext();
+  const admin = createAdminClient();
+  const [initial, stages, tags, customFields] = workspaceId
+    ? await Promise.all([
+        searchContacts(admin, workspaceId, { pageSize: 25 }),
+        listStages(admin, workspaceId),
+        listTags(admin, workspaceId),
+        listCustomFields(admin, workspaceId),
+      ])
+    : [{ contacts: [], total: 0 }, [], [], []];
+  const options: CrmPanelOptions = { customFields, stages, tags };
 
   return (
     <PanelPage hasWorkspace={Boolean(workspace)} section="clients">
-      <section
-        className="scroll-mt-5 rounded-lg border border-[#d9ded3] bg-white p-4"
-        id="clients"
-      >
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold">Clientes</h2>
-            <p className="mt-1 text-sm text-[#647067]">
-              Contactos guardados para esta empresa.
-            </p>
-          </div>
-          <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
-            {contacts.length}
-          </span>
-        </div>
-        <div className="mt-4 grid gap-2">
-          {contacts.map((contact) => (
-            <div
-              className="flex items-center justify-between gap-3 rounded-lg border border-[#e2e6df] p-3 text-sm"
-              key={contact.id}
-            >
-              <div className="min-w-0">
-                <p className="truncate font-semibold">
-                  {contact.full_name ?? "Sin nombre"}
-                </p>
-                <p className="mt-1 text-xs text-[#647067]">
-                  {contact.phone_e164}
-                </p>
-              </div>
-              <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
-                {contact.email ?? "WhatsApp"}
-              </span>
-            </div>
-          ))}
-          {contacts.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
-              Aun no hay contactos. Cuando entren mensajes por YCloud van
-              a aparecer aquí.
-            </p>
-          ) : null}
-        </div>
-      </section>
+      {workspaceId ? (
+        <ContactsPanel
+          canManage={activeRole === "owner" || activeRole === "admin"}
+          initial={{ contacts: initial.contacts as ContactListItem[], total: initial.total }}
+          options={options}
+        />
+      ) : null}
     </PanelPage>
   );
 }

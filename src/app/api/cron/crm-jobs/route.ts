@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { runCrmJobs } from "@/lib/agenda/crm-jobs";
+import { triggerDeliver } from "@/lib/deliver-trigger";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -14,18 +15,6 @@ function isAuthorized(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
 
   return Boolean(cronSecret && request.headers.get("authorization") === `Bearer ${cronSecret}`);
-}
-
-async function triggerDeliver(origin: string, targets: Array<{ conversationId: string; workspaceId: string }>) {
-  const cronSecret = process.env.CRON_SECRET;
-
-  for (const { conversationId, workspaceId } of targets.slice(0, 50)) {
-    const query = new URLSearchParams({ conversationId, workspaceId });
-    await fetch(`${origin}/api/cron/deliver?${query.toString()}`, {
-      headers: { Authorization: `Bearer ${cronSecret}` },
-      method: "POST",
-    }).catch((error) => console.error("[crm-jobs:deliver]", conversationId, error));
-  }
 }
 
 export async function POST(request: Request) {

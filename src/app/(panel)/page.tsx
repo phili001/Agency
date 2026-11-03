@@ -21,7 +21,13 @@ import { getOnboardingChecklist } from "@/lib/workspaces";
 
 const emptyResult = { data: [], error: null };
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ conversacion?: string }>;
+}) {
+  // Enlace directo a una conversación (desde la ficha del contacto en Clientes).
+  const { conversacion: initialConversationId } = await searchParams;
   const {
     activeRole,
     platformAdmin,
@@ -532,6 +538,7 @@ export default async function Home() {
         <InboxPanel
           activeRole={activeRole}
           conversations={dashboardConversations}
+          initialConversationId={initialConversationId ?? null}
           messages={displayMessages}
           usageEvents={displayUsageEvents}
           webhookEvents={displayWebhookEvents}

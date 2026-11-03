@@ -301,6 +301,8 @@ type WebhookEventItem = {
 type InboxPanelProps = {
   activeRole: string;
   conversations: ConversationItem[];
+  /** Conversación a abrir al entrar (`/?conversacion=<id>`), si está en la lista. */
+  initialConversationId?: string | null;
   messages: MessageItem[];
   usageEvents: UsageEventItem[];
   webhookEvents: WebhookEventItem[];
@@ -310,6 +312,7 @@ type InboxPanelProps = {
 export function InboxPanel({
   activeRole,
   conversations,
+  initialConversationId,
   messages,
   usageEvents,
   webhookEvents,
@@ -318,7 +321,9 @@ export function InboxPanel({
   const supabase = createClient();
   const [localConversations, setLocalConversations] = useState(conversations);
   const [selectedConversationId, setSelectedConversationId] = useState(
-    conversations[0]?.id ?? "",
+    conversations.find((conversation) => conversation.id === initialConversationId)?.id ??
+      conversations[0]?.id ??
+      "",
   );
   const [inboxView, setInboxView] = useState<InboxView>("ai");
   const [draft, setDraft] = useState("");
