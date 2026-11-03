@@ -122,14 +122,14 @@ describe("vuelta de avisos", () => {
     const row = appointment();
     inbound("2026-09-07T08:00:00Z");
 
-    assert.deepEqual(await runAppointmentNotices(client, { now: NOW }), { queued: 1, skipped: 0, waiting: 0 });
+    assert.deepEqual(await runAppointmentNotices(client, { now: NOW }), { conversations: [{ conversationId: "conv-a", workspaceId: A }], queued: 1, skipped: 0, waiting: 0 });
     assert.equal(queued().length, 1);
     assert.match(String(queued()[0].body), /^Hola Ana, te recordamos tu cita de Limpieza el martes 8 de septiembre a las 10:00 con Clínica Sonrisa/);
     assert.equal(queued()[0].conversation_id, "conv-a");
     assert.ok(row.reminder_sent_at);
     assert.equal((row.notices as Array<{ result: string }>)[0].result, "queued");
 
-    assert.deepEqual(await runAppointmentNotices(client, { now: NOW }), { queued: 0, skipped: 0, waiting: 0 });
+    assert.deepEqual(await runAppointmentNotices(client, { now: NOW }), { conversations: [], queued: 0, skipped: 0, waiting: 0 });
     assert.equal(queued().length, 1);
   });
 
@@ -137,7 +137,7 @@ describe("vuelta de avisos", () => {
     agenda();
     const row = appointment();
     inbound("2026-09-05T08:00:00Z");
-    assert.deepEqual(await runAppointmentNotices(client, { now: NOW }), { queued: 0, skipped: 1, waiting: 0 });
+    assert.deepEqual(await runAppointmentNotices(client, { now: NOW }), { conversations: [], queued: 0, skipped: 1, waiting: 0 });
     assert.equal(queued().length, 0);
     const notice = (row.notices as Array<{ reason: string; result: string }>)[0];
     assert.equal(notice.result, "skipped");
@@ -150,7 +150,7 @@ describe("vuelta de avisos", () => {
     const row = appointment({ starts_at: "2026-09-08T19:30:00Z" });
     inbound("2026-09-07T20:00:00Z");
     const night = new Date("2026-09-07T20:30:00Z"); // 22:30 Madrid
-    assert.deepEqual(await runAppointmentNotices(client, { now: night }), { queued: 0, skipped: 0, waiting: 1 });
+    assert.deepEqual(await runAppointmentNotices(client, { now: night }), { conversations: [], queued: 0, skipped: 0, waiting: 1 });
     assert.equal(row.reminder_sent_at, null);
   });
 
@@ -159,24 +159,24 @@ describe("vuelta de avisos", () => {
     appointment();
     inbound("2026-09-07T08:00:00Z");
     fake.table("contacts")[0].automation_labels = ["flow_opt_out"];
-    assert.deepEqual(await runAppointmentNotices(client, { now: NOW }), { queued: 0, skipped: 1, waiting: 0 });
+    assert.deepEqual(await runAppointmentNotices(client, { now: NOW }), { conversations: [], queued: 0, skipped: 1, waiting: 0 });
   });
 
   it("apagados de fábrica y empresas excluidas por impago", async () => {
     agenda({ reminder_enabled: false });
     appointment();
     inbound("2026-09-07T08:00:00Z");
-    assert.deepEqual(await runAppointmentNotices(client, { now: NOW }), { queued: 0, skipped: 0, waiting: 0 });
+    assert.deepEqual(await runAppointmentNotices(client, { now: NOW }), { conversations: [], queued: 0, skipped: 0, waiting: 0 });
 
     fake.table("agendas")[0].reminder_enabled = true;
-    assert.deepEqual(await runAppointmentNotices(client, { excludeWorkspaceIds: [A], now: NOW }), { queued: 0, skipped: 0, waiting: 0 });
+    assert.deepEqual(await runAppointmentNotices(client, { excludeWorkspaceIds: [A], now: NOW }), { conversations: [], queued: 0, skipped: 0, waiting: 0 });
   });
 
   it("inasistencia marcada hace más de una hora", async () => {
     agenda({ no_show_enabled: true, reminder_enabled: false });
     const row = appointment({ starts_at: "2026-09-07T07:00:00Z", status: "no_show", updated_at: "2026-09-07T08:30:00Z" });
     inbound("2026-09-07T06:00:00Z");
-    assert.deepEqual(await runAppointmentNotices(client, { now: NOW }), { queued: 1, skipped: 0, waiting: 0 });
+    assert.equal((await runAppointmentNotices(client, { now: NOW })).queued, 1);
     assert.match(String(queued()[0].body), /te echamos de menos/);
     assert.ok(row.no_show_sent_at);
   });

@@ -139,7 +139,13 @@ type CandidateRow = {
   workspace_id: string;
 };
 
-export type ReminderRunResult = { queued: number; skipped: number; waiting: number };
+export type ReminderRunResult = {
+  /** Conversaciones con un aviso recién encolado: hay que pedirle a `deliver` que las mande. */
+  conversations: Array<{ conversationId: string; workspaceId: string }>;
+  queued: number;
+  skipped: number;
+  waiting: number;
+};
 
 const SENT_COLUMN: Record<NoticeKind, "no_show_sent_at" | "reminder_sent_at"> = {
   no_show: "no_show_sent_at",
@@ -205,7 +211,7 @@ async function deliverNotice(
   kind: NoticeKind,
   businessName: string,
   now: Date,
-): Promise<{ reason: string | null; result: NoticeResult }> {
+): Promise<{ conversationId?: string; reason: string | null; result: NoticeResult }> {
   const { data: contactData } = await client
     .from("contacts")
     .select("full_name, messaging_status, automation_labels")
@@ -281,7 +287,7 @@ async function deliverNotice(
     throw new Error(`[reminders:enqueue] ${error.message}`);
   }
 
-  return { reason: null, result: "queued" };
+  return { conversationId, reason: null, result: "queued" };
 }
 
 async function processKind(
@@ -347,6 +353,12 @@ async function processKind(
       const outcome = await deliverNotice(client, row, agenda, kind, businessNames.get(row.workspace_id) ?? "", now);
       await recordOutcome(client, row, kind, outcome.result, outcome.reason, now);
       result[outcome.result] += 1;
+      if (
+        outcome.conversationId &&
+        !result.conversations.some((item) => item.conversationId === outcome.conversationId)
+      ) {
+        result.conversations.push({ conversationId: outcome.conversationId, workspaceId: row.workspace_id });
+      }
     } catch (deliverError) {
       await release(client, row, kind);
       console.error(`[reminders:${kind}]`, row.id, deliverError);
@@ -363,7 +375,7 @@ export async function runAppointmentNotices(
   client: CrmClient,
   { excludeWorkspaceIds = [], now = new Date() }: { excludeWorkspaceIds?: string[]; now?: Date } = {},
 ) {
-  const result: ReminderRunResult = { queued: 0, skipped: 0, waiting: 0 };
+  const result: ReminderRunResult = { conversations: [], queued: 0, skipped: 0, waiting: 0 };
   const { data, error } = await client
     .from("agendas")
     .select(

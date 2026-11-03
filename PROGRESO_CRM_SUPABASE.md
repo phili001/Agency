@@ -104,6 +104,12 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - Reglas de crm-levy: recordatorio solo si la cita se agendó antes del momento del aviso y quedan > 30 min; inasistencia solo si se marcó a mano, han pasado `no_show_hours_after` horas (se toma `updated_at` como momento del marcado) y la cita es de los últimos 7 días; solo se escribe de 08:00 a 21:00 en la zona de la agenda; contactos bloqueados o con `flow_opt_out` se omiten.
   - Idempotencia: `update … set reminder_sent_at = now() where reminder_sent_at is null` antes de encolar; si encolar falla se suelta. `runAppointmentNotices({ excludeWorkspaceIds })` deja fuera a las empresas bloqueadas por impago (F6.4).
 
+- **F4.2 crm-jobs (2026-11-03).**
+  - `src/lib/agenda/crm-jobs.ts` (`runCrmJobs`) con pasos aislados en orden `billing → offers → google → notices`; el informe dice cuál falló (la ruta responde 500 si alguno falla). Si `billing` falla, **no se mandan avisos** (mejor no escribir que escribir a quien no paga).
+  - El paso `billing` recibe un callback que devuelve `blockedWorkspaceIds`: **F6.4 tiene que pasarlo** en la ruta (hoy no hay ninguna empresa bloqueada).
+  - Tras encolar avisos se llama a `cron/deliver?workspaceId&conversationId` por cada conversación (máx. 50 por vuelta), igual que hace `ycloud-webhook`: el cron de `deliver` en Vercel es diario y sin parámetros solo manda 10.
+  - Ruta `POST|GET /api/cron/crm-jobs`, `maxDuration = 60`, solo `Authorization: Bearer <CRON_SECRET>` (no acepta el secreto por query, a diferencia de los otros cron, para que no quede en logs).
+
 ## Tareas
 
 ### F0 — Preparación
@@ -132,7 +138,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 
 ### F4 — Jobs y recordatorios
 - [x] F4.1 `src/lib/agenda/reminders.ts` portado de `seguimientos.py` (idempotente, ventana 24 h, plantilla o «omitido») + pruebas. (dep: F2.4)
-- [ ] F4.2 `app/api/cron/crm-jobs` (lotes: Google pendiente, borrados, recordatorios, inasistencias, purga de ofertas, gracia de facturación) + pruebas. (dep: F3.3, F4.1)
+- [x] F4.2 `app/api/cron/crm-jobs` (lotes: Google pendiente, borrados, recordatorios, inasistencias, purga de ofertas, gracia de facturación) + pruebas. (dep: F3.3, F4.1)
 - [ ] F4.3 Migración: extensiones `pg_cron` y `pg_net`; job cada 5 min llamando a `crm-jobs`, con URL y secreto en Supabase Vault. **Se crea desactivado** (`cron.alter_job(..., active := false)`) y se activa en F7.5 tras desplegar. Documentar cómo pausarlo. (dep: F4.2)
 
 ### F5 — Agente, flujos y panel sin GHL
@@ -184,6 +190,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-02 · F3.2 · rutas `api/integrations/google-calendar/{connect,callback,status,calendars,disconnect}` + `requireActiveWorkspaceRole` + `google-calendar-callback.ts` (lógica del callback probable); 5 pruebas nuevas (state de otro usuario sin canjear código, agente sin permiso, empresa ajena, cancelación, mensajes); typecheck, lint, test (216/216) y build en verde. Sin probar contra Google real (faltan credenciales) · commit `crm: F3.2 rutas de Google Calendar`.
 - 2026-11-02 · F3.3 · `src/lib/agenda/google-sync.ts` (copia por cita con control de concurrencia, barrida por empresa conectada, cola de borrados con intentos, ocupado de Google tolerante a fallos); 10 pruebas nuevas (evento con id/nombre/zona, cancelar borra, completada se queda, cambio y borrado durante la copia, barrida cortada por 503 sin tocar empresas no conectadas, intentos de borrado, ocupado solo en push_and_busy y degradado); typecheck, lint y test (226/226) en verde · commit `crm: F3.3 copia y ocupado de Google`.
 - 2026-11-03 · F4.1 · migración `agenda_reminders` aplicada (ensayo previo deshecho; advisors sin avisos nuevos) + `src/lib/agenda/reminders.ts` (recordatorio e inasistencia, ventana de 24 h, horario de envío, omitidos con motivo, idempotente); `agendaChanges` acepta los ajustes de avisos; 11 pruebas nuevas (texto, ventana, horario, cuándo toca, encolar una vez, omitido sin plantilla, espera nocturna, opt-out, apagado/excluida, inasistencia, aislamiento por empresa); typecheck, lint y test (237/237) en verde · commit `crm: F4.1 recordatorios e inasistencias`.
+- 2026-11-03 · F4.2 · `src/lib/agenda/crm-jobs.ts` + ruta `api/cron/crm-jobs`; `runAppointmentNotices` devuelve las conversaciones con avisos encolados; 4 pruebas nuevas (pasos y purga, avisar a deliver, empresas bloqueadas sin avisos, facturación caída no manda nada, paso suelto); typecheck, lint, test (241/241) y build en verde. Sin ejecutar contra producción (lo hará el cron de F4.3) · commit `crm: F4.2 crm-jobs`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->
