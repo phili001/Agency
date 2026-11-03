@@ -274,7 +274,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - [ ] **[STOP]** F7.5 Orden de salida (lo hago yo contigo): merge de `crm-supabase` → F7.2 → despliegue → variables en Vercel → activar el job de `pg_cron` de F4.3 → comprobar AAA001 por WhatsApp. El merge es todo o nada: no desplegar la rama sin F7.2 hecha o la coexistencia de F5.2 probada.
 
 ### F8 — Verificación final
-- [ ] F8.1 Ejecutar la «Verificación final» de `PROMPT_CRM_SUPABASE.md` y escribir el resumen abajo. Cuando esta tarea esté `[x]` (o solo queden tareas [STOP] o `[!]` que dependan del usuario), **detén el loop**.
+- [!] F8.1 Ejecutar la «Verificación final» de `PROMPT_CRM_SUPABASE.md` y escribir el resumen abajo. Cuando esta tarea esté `[x]` (o solo queden tareas [STOP] o `[!]` que dependan del usuario), **detén el loop**.
 
 ## Registro de iteraciones
 <!-- Una línea por iteración: fecha · tarea · resultado · commit -->
@@ -313,6 +313,91 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-03 · F6.6 · Facturación en Negocio (Pagar/reactivar + Customer Portal, solo owner), aviso con enlace, consola de empresas con exención y enlace de cliente de Stripe; variable `STRIPE_PAYMENT_LINK_URL`; typecheck, lint, test (315/315) y build en verde · commit `crm: F6.6 facturación en el panel`.
 - 2026-11-03 · F6.7 · reunión de puesta en marcha sobre la agenda de AAA001 (GHL de respaldo sin `LEVY_MEETING_AGENDA_ID`), `levy-activo` en el CRM de AAA001, asistente y tours con Google Calendar en vez de GHL; typecheck, lint, test (320/320) y build en verde · commit `crm: F6.7 onboarding sin GHL`.
 - 2026-11-03 · F7.1 · `[!]` script de migración (dry-run por defecto, idempotente) + reglas puras con 8 pruebas; dry-run ejecutado: **GHL responde 401** con el token guardado de AAA001 (revocado o caducado), solo salen la conversión del flujo (2 acciones) y la propuesta de texto de las tools; typecheck, lint y test (328/328) en verde · commit `crm: F7.1 script de migración de GHL (bloqueado por token)`.
+- 2026-11-03 · F8.1 · `[!]` verificación final: typecheck, lint, test (328/328) y build en verde; advisors sin avisos nuevos y 14 tablas nuevas con RLS; GHL solo en lo que retiran F7.2–F7.4; **sin recorrido del panel con sesión** (necesita tu usuario); resumen final escrito · commit `crm: F8.1 verificación final y resumen`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->
+**Fecha:** 2026-11-03 · rama `crm-supabase` (sin push, sin merge, sin desplegar).
+
+### Verificación final
+1. `typecheck`, `lint`, `test` (**328/328**) y `build`: **en verde**.
+2. `grep` de GHL: **530 líneas en 55 archivos**. Todas son la convivencia con GHL, que se retira en tareas [STOP] sin aprobar:
+   - código y rutas que se borran en **F7.3** (`integrations/gohighlevel/**`, `webhooks/ghl/**`, `cron/ghl-sync`, `ghl-agency`, `ghl-calendar`, `gohighlevel`, `levy-calendar`, `levy-purchase`, `vercel.json`);
+   - la convivencia de F5.2/F5.3/F6.7 (`calendar-tools`, `agent-*`, `flow-*`, `onboarding/meeting`);
+   - el check `gohighlevel` y las claves `ghl_*` que limpia **F7.4**;
+   - migraciones ya aplicadas, que no se reescriben;
+   - el script de migración de F7.1.
+3. `get_advisors`: **solo los 3 avisos previos** (`set_updated_at` sin `search_path`, protección de contraseñas filtradas apagada, `integration_secrets`/`platform_admins` sin políticas a propósito). Las **14 tablas nuevas** tienen RLS con políticas.
+4. Aislamiento entre empresas automatizado:
+   - `crm.test` (contactos, etapas, etiquetas, notas, tareas, campos);
+   - `agenda.test` («A no ve ni toca agendas, citas, ofertas ni bloqueos de B»);
+   - `google-calendar.test` (tokens propios por empresa);
+   - `google-sync.test` (citas de otra empresa);
+   - `flow-actions.test`, `billing.test`, `gate.test`, `webhook.test`, `levy-meeting.test`;
+   - SQL: `supabase/tests/*_checks.sql` (FK compuestas y RLS).
+5. **No hecho:** recorrer el panel con sesión (crear contacto, moverlo de etapa, crear agenda, ver huecos, agendar, mover y cancelar). El panel pide iniciar sesión y no introduzco contraseñas. Solo se comprobó que las rutas nuevas responden 401/403 sin sesión y que el build pasa. **Hazlo tú con tu usuario** en `npm run dev` antes del merge.
+6. Este resumen.
+
+### Qué quedó hecho
+- **CRM propio** en `/clientes`:
+  - etapas, etiquetas, campos personalizados, notas, tareas, actividad;
+  - importar/exportar CSV y borrado GDPR;
+  - ajustes del CRM;
+  - el webhook de YCloud registra cada mensaje entrante.
+- **Agenda propia:**
+  - sección nueva en el menú (D4), vista semana/día, citas, bloqueos y configuración;
+  - funciones SQL de reserva sin solapes;
+  - huecos libres, recordatorios e inasistencias;
+  - `crm-jobs` cada 5 min con pg_cron (job **apagado**).
+- **Agente:** agenda con la Agenda propia (convive con GHL mientras exista una tool `ghl_calendar`).
+- **Flujos:** acciones del CRM, disparo por etiqueta y conversión de acciones de GHL.
+- **Google Calendar** por empresa: OAuth, copia de citas, ocupado de Google, borrados pendientes.
+- **Stripe:**
+  - tablas de facturación (5 empresas exentas);
+  - webhook con dedupe y alta de empresa;
+  - correo de acceso (Resend);
+  - contacto en el CRM de AAA001;
+  - corte por impago (lo entrante se guarda);
+  - aviso «Reactiva tu suscripción»;
+  - facturación en Negocio (Payment Link + Customer Portal) y consola de empresas.
+- **Onboarding sin GHL:**
+  - reunión sobre la agenda de AAA001;
+  - `levy-activo` en su CRM;
+  - Google Calendar en el asistente.
+- **Script de migración de GHL** (dry-run por defecto).
+
+### Qué no se pudo verificar
+- **Google real:** OAuth, copia de eventos y ocupado. Probado con `fetch` simulado.
+- **Stripe real:** webhook, Payment Link y Customer Portal. Probado con eventos firmados por el SDK, sin cuenta real.
+- **Resend real.**
+- **WhatsApp real:** recordatorios, corte por impago, agente agendando en la Agenda.
+- **pg_cron → `crm-jobs`:** el job está creado pero apagado y faltan los secretos en Vault.
+- **La interfaz con sesión** (paso 5).
+- **Datos reales de GHL de AAA001:** el token guardado da 401 (F7.1 `[!]`).
+
+### Lo que necesito de ti (pasos manuales)
+1. **Token nuevo de GHL** para AAA001, con permisos de contactos, oportunidades y calendarios. Lo pegas en Integraciones. Después repito el dry-run de F7.1.
+2. **D1:** ¿agentelevy.com es esta app o una landing aparte? Desbloquea F6.5 (`/bienvenida`).
+3. **D3:** plantilla aprobada de WhatsApp para recordatorios fuera de la ventana de 24 h. Sin ella, esos avisos se omiten. **D2** sigue con los valores por defecto: sin prueba gratis y 7 días de gracia.
+4. **Variables en Vercel** (ver `DEPLOY_RUNBOOK.md`):
+   - `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`, con la URI de redirección en Google Cloud;
+   - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PAYMENT_LINK_IDS`, `STRIPE_PRICE_IDS`, `STRIPE_PAYMENT_LINK_URL`, `STRIPE_FIELD_COMPANY_NAME`, `BILLING_GRACE_DAYS`;
+   - `RESEND_API_KEY` y `EMAIL_FROM`;
+   - `LEVY_WORKSPACE_CODE` y `LEVY_MEETING_AGENDA_ID`.
+5. **En Stripe:**
+   - endpoint `/api/webhooks/stripe` con los eventos del runbook;
+   - Customer Portal activado;
+   - pedir el teléfono en el Payment Link;
+   - un pago de prueba real antes de F7.3.
+6. **En AAA001:** crear la agenda de la reunión de puesta en marcha y poner su id en `LEVY_MEETING_AGENDA_ID`.
+7. **Supabase Vault:** secretos `crm_jobs_url` y `crm_jobs_cron_secret`, y luego activar el job `levy-crm-jobs` (F7.5).
+8. **Probar el panel** con tu sesión (paso 5) y revisar estas decisiones:
+   - empresas sin suscripción quedan en «aviso», no bloqueadas;
+   - lo encolado durante un bloqueo sale al reactivar;
+   - textos propuestos para las tools de AAA001.
+9. **Tareas [STOP] cuando tú digas:**
+   - **F7.2:** migración real de AAA001;
+   - **F7.3:** borrar GHL;
+   - **F7.4:** migración destructiva;
+   - **F7.5:** orden de salida (merge → F7.2 → despliegue → variables → job de pg_cron → prueba por WhatsApp).
+10. Pendiente aparte, decisión tuya: `npm audit` avisa de vulnerabilidades en `next` y otras dependencias, anteriores a este trabajo.
