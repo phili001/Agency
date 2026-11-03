@@ -27,13 +27,112 @@ export type Database = {
       contacts: {
         Row: {
           automation_labels: string[];
+          company: string | null;
           created_at: string;
+          custom_fields: Json;
           email: string | null;
           full_name: string | null;
           id: string;
+          last_message_at: string | null;
           metadata: Json;
           messaging_status: "active" | "blocked";
           phone_e164: string;
+          source: "whatsapp" | "manual" | "import" | "stripe" | null;
+          stage_id: string | null;
+          updated_at: string;
+          workspace_id: string;
+        };
+      };
+      crm_contact_activity: {
+        Row: {
+          actor: "agent" | "operator" | "flow" | "system" | "import" | "stripe";
+          actor_user_id: string | null;
+          contact_id: string;
+          created_at: string;
+          data: Json;
+          id: string;
+          kind: string;
+          workspace_id: string;
+        };
+      };
+      crm_contact_notes: {
+        Row: {
+          author_id: string | null;
+          body: string;
+          contact_id: string;
+          created_at: string;
+          id: string;
+          updated_at: string;
+          workspace_id: string;
+        };
+      };
+      crm_contact_tags: {
+        Row: {
+          contact_id: string;
+          created_at: string;
+          tag_id: string;
+          workspace_id: string;
+        };
+      };
+      crm_contact_tasks: {
+        Row: {
+          assigned_to: string | null;
+          completed_at: string | null;
+          contact_id: string;
+          created_at: string;
+          created_by: "agent" | "operator" | "flow";
+          detail: string | null;
+          due_at: string | null;
+          id: string;
+          title: string;
+          updated_at: string;
+          workspace_id: string;
+        };
+      };
+      crm_custom_fields: {
+        Row: {
+          active: boolean;
+          ai_readable: boolean;
+          created_at: string;
+          id: string;
+          key: string;
+          label: string;
+          options: Json;
+          position: number;
+          type:
+            | "text"
+            | "long_text"
+            | "number"
+            | "money"
+            | "date"
+            | "boolean"
+            | "select"
+            | "multi"
+            | "phone"
+            | "email"
+            | "url";
+          updated_at: string;
+          workspace_id: string;
+        };
+      };
+      crm_pipeline_stages: {
+        Row: {
+          color: string;
+          created_at: string;
+          id: string;
+          kind: "open" | "won" | "lost";
+          name: string;
+          position: number;
+          updated_at: string;
+          workspace_id: string;
+        };
+      };
+      crm_tags: {
+        Row: {
+          color: string;
+          created_at: string;
+          id: string;
+          name: string;
           updated_at: string;
           workspace_id: string;
         };
