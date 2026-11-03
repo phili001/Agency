@@ -408,7 +408,7 @@ export type Database = {
           created_at: string;
           id: string;
           last_error: string | null;
-          provider: "ycloud" | "openai" | "gohighlevel";
+          provider: "ycloud" | "openai" | "gohighlevel" | "google_calendar";
           secret_ref: string | null;
           status: "pending" | "active" | "error" | "disabled";
           updated_at: string;
@@ -421,7 +421,7 @@ export type Database = {
           created_at: string;
           id: string;
           kind: string;
-          provider: "ycloud" | "openai" | "gohighlevel";
+          provider: "ycloud" | "openai" | "gohighlevel" | "google_calendar";
           updated_at: string;
           workspace_id: string;
         };

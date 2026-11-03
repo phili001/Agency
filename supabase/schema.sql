@@ -101,7 +101,7 @@ create table if not exists public.messages (
 create table if not exists public.integrations (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
-  provider text not null check (provider in ('ycloud', 'openai', 'gohighlevel')),
+  provider text not null check (provider in ('ycloud', 'openai', 'gohighlevel', 'google_calendar')),
   status text not null default 'pending' check (status in ('pending', 'active', 'error', 'disabled')),
   config jsonb not null default '{}'::jsonb,
   secret_ref text,
@@ -114,7 +114,7 @@ create table if not exists public.integrations (
 create table if not exists public.integration_secrets (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
-  provider text not null check (provider in ('ycloud', 'openai', 'gohighlevel')),
+  provider text not null check (provider in ('ycloud', 'openai', 'gohighlevel', 'google_calendar')),
   kind text not null,
   ciphertext text not null,
   created_at timestamptz not null default now(),
@@ -1530,3 +1530,18 @@ grant execute on function app_private.book_appointment(uuid, uuid, uuid, uuid, t
 grant execute on function app_private.reschedule_appointment(uuid, uuid, timestamptz, timestamptz, text, uuid, uuid) to service_role;
 grant execute on function public.book_appointment(uuid, uuid, uuid, uuid, text, timestamptz, timestamptz, text, text, uuid) to service_role;
 grant execute on function public.reschedule_appointment(uuid, uuid, timestamptz, timestamptz, text, uuid, uuid) to service_role;
+
+-- google_calendar como proveedor en tablas ya creadas (migración 20261102230000).
+alter table public.integrations drop constraint integrations_provider_check,
+--     add constraint integrations_provider_check check (provider in ('ycloud', 'openai', 'gohighlevel'));
+--   alter table public.integration_secrets drop constraint integration_secrets_provider_check,
+--     add constraint integration_secrets_provider_check check (provider in ('openai', 'ycloud', 'gohighlevel'));
+alter table public.integrations
+  drop constraint if exists integrations_provider_check,
+  add constraint integrations_provider_check
+    check (provider in ('ycloud', 'openai', 'gohighlevel', 'google_calendar'));
+
+alter table public.integration_secrets
+  drop constraint if exists integration_secrets_provider_check,
+  add constraint integration_secrets_provider_check
+    check (provider in ('openai', 'ycloud', 'gohighlevel', 'google_calendar'));
