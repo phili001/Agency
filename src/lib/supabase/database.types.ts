@@ -24,6 +24,50 @@ export type Database = {
           workspace_id: string;
         };
       };
+      agendas: {
+        Row: {
+          active: boolean;
+          closed_dates: string[];
+          created_at: string;
+          description: string;
+          google_calendar_id: string | null;
+          google_sync_mode: "off" | "push" | "push_and_busy";
+          id: string;
+          is_default: boolean;
+          max_days_ahead: number;
+          min_notice_minutes: number;
+          name: string;
+          schedule: Json;
+          services: Json;
+          slot_step_minutes: number;
+          timezone: string;
+          updated_at: string;
+          workspace_id: string;
+        };
+      };
+      appointments: {
+        Row: {
+          agenda_id: string;
+          confirmed_at: string | null;
+          contact_id: string;
+          conversation_id: string | null;
+          created_at: string;
+          created_by: "agent" | "operator" | "flow" | "import";
+          ends_at: string;
+          google_event_id: string | null;
+          google_sync_pending: boolean;
+          id: string;
+          no_show_sent_at: string | null;
+          notes: string | null;
+          notices: Json;
+          reminder_sent_at: string | null;
+          service: string;
+          starts_at: string;
+          status: "scheduled" | "rescheduled" | "cancelled" | "completed" | "no_show";
+          updated_at: string;
+          workspace_id: string;
+        };
+      };
       contacts: {
         Row: {
           automation_labels: string[];
@@ -345,6 +389,18 @@ export type Database = {
           workspace_id: string;
         };
       };
+      google_event_deletions: {
+        Row: {
+          attempts: number;
+          calendar_id: string;
+          created_at: string;
+          google_event_id: string;
+          id: string;
+          last_error: string | null;
+          updated_at: string;
+          workspace_id: string;
+        };
+      };
       integrations: {
         Row: {
           connected_at: string | null;
@@ -387,6 +443,27 @@ export type Database = {
           provider_message_id: string | null;
           role: "user" | "assistant" | "human" | "system" | "tool";
           status: "stored" | "queued" | "sent" | "delivered" | "read" | "failed";
+          workspace_id: string;
+        };
+      };
+      offered_slots: {
+        Row: {
+          agenda_id: string;
+          conversation_id: string;
+          offered_at: string;
+          starts_at: string;
+          workspace_id: string;
+        };
+      };
+      schedule_blocks: {
+        Row: {
+          agenda_id: string;
+          created_at: string;
+          ends_at: string;
+          id: string;
+          reason: string | null;
+          starts_at: string;
+          updated_at: string;
           workspace_id: string;
         };
       };

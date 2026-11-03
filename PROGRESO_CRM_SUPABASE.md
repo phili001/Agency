@@ -11,7 +11,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - Copia de seguridad previa: `~/Backups/levy/levy_20261102_1951.dump` (2026-11-02, pg_dump completo: 167 contactos, 3.565 mensajes, 6 usuarios). Se restaura con `pg_restore` sobre una base nueva, nunca encima de producción.
 - Verificación por tarea: `npm run typecheck && npm run lint && npm test` (+ `npm run build` si toca UI/rutas).
 - Historial de migraciones de Supabase: **vacío** a 2026-11-02 (`list_migrations` → `[]`). Los archivos antiguos de `supabase/migrations/` y los `.sql` sueltos (`flow_builder.sql`, `self_service_onboarding.sql`, `next_workspace_assets_and_webhooks.sql`, `set_default_handoff.sql`) ya están aplicados a mano: **no volver a aplicarlos**. El primer `apply_migration` de este plan abre el historial.
-- Extensiones a 2026-11-02: instaladas `supabase_vault` (esquema `vault`), `pgcrypto`, `uuid-ossp`, `pg_stat_statements`; disponibles sin instalar `btree_gist`, `pg_cron`, `pg_net`.
+- Extensiones a 2026-11-02: instaladas `supabase_vault` (esquema `vault`), `pgcrypto`, `uuid-ossp`, `pg_stat_statements`, `btree_gist` (esquema `extensions`, F1.3); disponibles sin instalar `pg_cron`, `pg_net` (F4.3).
 
 ## Estado real vs. inventario (F0.1, 2026-11-02)
 - `src/lib/timezones.ts` **ya existe** (utilidades de navegador: `getTimeZoneOptions`, `getBrowserTimeZone`, `getZoneOffsetLabel`). F2.1 lo amplía con las funciones puras de `ghl-calendar.ts`; no debe meter dependencias de servidor (lo importan componentes cliente).
@@ -45,6 +45,14 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - Permisos: Supabase dejó de conceder permisos del Data API a tablas nuevas el 2026-10-30 en proyectos nuevos (en este aún los da). Cada migración con tablas nuevas lleva su `grant ... to authenticated, service_role` explícito.
   - Pruebas SQL repetibles en `supabase/tests/crm_core_checks.sql` (bloques `do` que terminan en `raise` → no dejan datos).
 
+- **F1.3 Agenda (2026-11-02).**
+  - `agendas.schedule`: objeto por día ISO (`"1"` = lunes … `"7"` = domingo) → lista de tramos `{start, end}` en hora local `HH:MM`; día ausente o vacío = cerrado. Default lunes-viernes 09:00-18:00. `services`: `[{name, duration_minutes}]`. `timezone` es obligatorio y **sin default** (se valida en código con `isValidTimeZone`, F2.1). Festivos en `closed_dates date[]`.
+  - Una sola agenda por defecto por empresa (índice único parcial) y nombre único sin mayúsculas.
+  - `appointments`: anti-solape `appointments_no_overlap` (exclusion, SQLSTATE `23P01`) solo entre citas `scheduled|rescheduled` de la **misma agenda**. La FK a la agenda **no** tiene `on delete`: una agenda con citas no se borra (el panel la desactiva con `active = false`); al borrar la empresa entera la cascada se lleva todo. Conversación borrada → `conversation_id` a null (la cita se queda); contacto borrado → sus citas se borran (F2.5 debe apuntar antes sus eventos de Google en `google_event_deletions`).
+  - Se añadió `conversations_workspace_id_id_key` para las FK compuestas.
+  - `offered_slots` y `google_event_deletions` solo los escribe el servidor (sin políticas de escritura); el panel solo lee (owner/admin en los borrados pendientes).
+  - Pruebas SQL repetibles en `supabase/tests/agenda_core_checks.sql`.
+
 ## Tareas
 
 ### F0 — Preparación
@@ -55,7 +63,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 ### F1 — Modelo de datos del CRM (aditivo)
 - [x] F1.1 Decidir y anotar aquí cómo conviven `crm_tags` con `contacts.automation_labels` y `metadata.ai_tags` (sin romper triggers de flujo). Propuesta tras F0.1: `crm_tags` aparte; `automation_labels` sigue siendo marca interna del sistema (no se muestra como etiqueta); `ai_tags` se muestra como sugerencia que el operador puede convertir en etiqueta. (dep: F0.1)
 - [x] F1.2 Migración: `crm_pipeline_stages` (+ siembra para los 5 workspaces y, para los nuevos, con **trigger `after insert on workspaces`** en la base, que cubre `workspaces.ts` y `admin-companies.ts`), columnas nuevas de `contacts`, `crm_tags`, `crm_contact_tags`, `crm_custom_fields`, `crm_contact_notes`, `crm_contact_tasks`, `crm_contact_activity`, con RLS. Tipos regenerados, advisors limpios. (dep: F1.1)
-- [ ] F1.3 Migración: extensión `btree_gist`; `agendas` (con `closed_dates date[] default '{}'` para festivos), `appointments` (con exclusión anti-solape), `schedule_blocks`, `offered_slots`, `google_event_deletions`, con RLS. (dep: F0.1)
+- [x] F1.3 Migración: extensión `btree_gist`; `agendas` (con `closed_dates date[] default '{}'` para festivos), `appointments` (con exclusión anti-solape), `schedule_blocks`, `offered_slots`, `google_event_deletions`, con RLS. (dep: F0.1)
 - [ ] F1.4 Migración: funciones `book_appointment` y `reschedule_appointment` + pruebas SQL (solape rechazado, hora no ofrecida rechazada, reagendar atómico, workspace ajeno rechazado) ejecutadas con `execute_sql` dentro de una transacción con `rollback`. Las funciones `security definer` llevan `set search_path = ''` y nombres calificados. (dep: F1.3)
 - [ ] F1.5 Migración: `integrations.provider` admite `google_calendar` (sin quitar `gohighlevel`). (dep: F0.1)
 
@@ -113,6 +121,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-02 · F0.2 · `stripe@19.3.0`; Google irá por `fetch` a la API REST (sin librería); variables nuevas en `.env.example` y `DEPLOY_RUNBOOK.md` (GHL marcadas como deprecadas, se borran en F7.3); typecheck, lint y test (106/106) en verde. Nota: `npm audit` avisa de vulnerabilidades previas en `next` (crítica), `postcss`, `sharp` y `nanoid`, ajenas a esta tarea: actualizar Next queda fuera de este plan y lo decide el usuario · commit `crm: F0.2 dependencias y variables`.
 - 2026-11-02 · F1.1 · decisión de convivencia de etiquetas apuntada en «Decisiones tomadas» (sin código; typecheck, lint y test en verde) · commit `crm: F1.1 decisión de etiquetas`.
 - 2026-11-02 · F1.2 · migraciones `crm_core` y `crm_core_grants` aplicadas a producción (aditivas; ensayo previo en transacción deshecha); 7 tablas con RLS, 5 columnas nuevas en `contacts`, 30 etapas sembradas, trigger de siembra; pruebas SQL de aislamiento (FK compuestas y RLS como usuario) en verde; advisors de seguridad sin avisos nuevos (siguen los 3 previos: `set_updated_at` search_path, protección de contraseñas filtradas, 2 tablas sin políticas a propósito); `schema.sql` y `database.types.ts` actualizados; typecheck, lint y test (106/106) en verde · commit `crm: F1.2 modelo de datos del CRM`.
+- 2026-11-02 · F1.3 · migración `agenda_core` aplicada a producción (aditiva; ensayo previo en transacción deshecha): `btree_gist`, 5 tablas con RLS y grants explícitos, anti-solape por agenda; 13 comprobaciones SQL en verde antes y después de aplicar; advisors de seguridad sin avisos nuevos; `schema.sql` y `database.types.ts` actualizados; typecheck, lint y test (106/106) en verde · commit `crm: F1.3 agendas y citas`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->
