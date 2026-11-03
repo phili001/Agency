@@ -1,5 +1,7 @@
 import "server-only";
 
+import { after } from "next/server";
+
 import type { CalendarRequestMessage } from "@/lib/calendar-request";
 import {
   addDaysToDateKey,
@@ -7,6 +9,7 @@ import {
   slotMatchesRequestedTime,
 } from "@/lib/calendar-request";
 import {
+  hasLegacyGhlCalendarTools,
   parseCalendarTools,
   resolveCalendarsForAgent,
   type CalendarTool,
@@ -22,21 +25,31 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import { zonedStartOfDay } from "@/lib/timezones";
 
+import { type AgendaCalendarRuntime, buildAgendaRuntime, runAgendaTool } from "./agent-agenda";
+import { googleBusyProvider, syncAppointment } from "./google-sync";
+
 /**
- * Calendario del agente de WhatsApp: con qué calendarios trabaja este agente y
- * con este contacto (`buildCalendarRuntime`) y qué hace cada tool
- * (`runCalendarTool`). Todavía sobre GoHighLevel: movido tal cual desde
- * `app/api/cron/buffer/route.ts` (F5.0). F5.2 lo pasa a la agenda propia.
+ * Calendario del agente de WhatsApp: con qué agendas trabaja este agente y con
+ * este contacto (`buildCalendarRuntime`) y qué hace cada tool
+ * (`runCalendarTool`). Dos motores:
+ *
+ * - `agenda` (F5.2): la agenda propia, en `agent-agenda.ts`.
+ * - `ghl`: GoHighLevel, movido tal cual desde `cron/buffer` (F5.0). Se usa
+ *   mientras el workspace tenga alguna tool de calendario de GHL (coexistencia
+ *   hasta la migración de F7.2): así AAA001 no se queda sin agenda al desplegar.
  */
 
 /** Llamada a una tool tal como la devuelve la API de Responses. */
 export type CalendarToolCall = { arguments?: string; name?: string };
 
+export type CalendarRuntime = AgendaCalendarRuntime | GhlCalendarRuntime;
+
 export type CalendarRuntimeResult =
   | { reason: null; runtime: CalendarRuntime }
   | { reason: string; runtime: null };
 
-export type CalendarRuntime = {
+export type GhlCalendarRuntime = {
+  engine: "ghl";
   apiKey: string;
   calendars: Array<CalendarTool & { timezone: string }>;
   contact: {
@@ -52,6 +65,68 @@ export type CalendarRuntime = {
 };
 
 export async function buildCalendarRuntime({
+  agentName,
+  contactId,
+  conversationId,
+  enabledToolIds,
+  isBookingAgent,
+  workspaceId,
+}: {
+  agentName: string;
+  contactId: string;
+  conversationId: string | null;
+  enabledToolIds: string[];
+  isBookingAgent: boolean;
+  workspaceId: string;
+}): Promise<CalendarRuntimeResult> {
+  // Solo el agente de citas agenda. El setter y el de soporte no deben tocar
+  // el calendario aunque el workspace tenga agenda.
+  if (!isBookingAgent) {
+    return {
+      reason: `El agente "${agentName}" no esta identificado como agente de citas. Solo un agente de citas usa el calendario.`,
+      runtime: null,
+    };
+  }
+
+  const admin = createAdminClient();
+  const [{ data: contact }, { data: toolAssets }] = await Promise.all([
+    admin
+      .from("contacts")
+      .select("id, full_name, phone_e164, metadata")
+      .eq("id", contactId)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle(),
+    admin
+      .from("workspace_assets")
+      .select("id, title, content, metadata")
+      .eq("workspace_id", workspaceId)
+      .eq("kind", "tool")
+      .neq("status", "archived"),
+  ]);
+  const tools = parseCalendarTools(toolAssets ?? []);
+
+  if (hasLegacyGhlCalendarTools(tools)) {
+    return buildGhlCalendarRuntime({ agentName, contactId, enabledToolIds, isBookingAgent, workspaceId });
+  }
+
+  if (!contact?.phone_e164) {
+    return { reason: "El contacto no tiene teléfono guardado.", runtime: null };
+  }
+
+  return buildAgendaRuntime(
+    admin,
+    {
+      agentName,
+      contact: { fullName: contact.full_name, id: contact.id, metadata: contact.metadata, phone: contact.phone_e164 },
+      conversationId,
+      enabledToolIds,
+      tools,
+      workspaceId,
+    },
+  );
+}
+
+async function buildGhlCalendarRuntime({
   agentName,
   contactId,
   enabledToolIds,
@@ -190,6 +265,7 @@ export async function buildCalendarRuntime({
   return {
     reason: null,
     runtime: {
+      engine: "ghl",
       apiKey: context.apiKey,
       calendars: calendarsWithTimezone,
       contact: {
@@ -209,6 +285,30 @@ export async function buildCalendarRuntime({
 
 export async function runCalendarTool(
   runtime: CalendarRuntime,
+  call: CalendarToolCall,
+  messages: CalendarRequestMessage[],
+): Promise<Record<string, unknown>> {
+  if (runtime.engine === "agenda") {
+    const admin = createAdminClient();
+    return runAgendaTool(admin, runtime, call, messages, {
+      externalBusy: googleBusyProvider(admin, runtime.workspaceId),
+      // La copia a Google no hace esperar al cliente: va después de responder
+      // (y si falla, la barrida de crm-jobs la reintenta).
+      onAppointmentChanged: (appointmentId) =>
+        after(() =>
+          syncAppointment(admin, runtime.workspaceId, appointmentId).then(
+            () => undefined,
+            (error) => console.warn("[agent-tools:google-sync]", appointmentId, error instanceof Error ? error.message : error),
+          ),
+        ),
+    });
+  }
+
+  return runGhlCalendarTool(runtime, call, messages);
+}
+
+async function runGhlCalendarTool(
+  runtime: GhlCalendarRuntime,
   call: CalendarToolCall,
   messages: CalendarRequestMessage[],
 ): Promise<Record<string, unknown>> {

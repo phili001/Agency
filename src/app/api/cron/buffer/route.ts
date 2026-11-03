@@ -23,6 +23,7 @@ import {
   buildCalendarToolDefinitions,
   buildDirectAvailabilityAnswer,
   buildDirectBookingAnswer,
+  buildDirectCancelAnswer,
   sanitizeCalendarAnswer,
 } from "@/lib/agenda/agent-guards";
 import {
@@ -707,7 +708,9 @@ async function generateReply(
   );
   const transcript = buildTranscript(messages);
   const tools = calendarRuntime
-    ? buildCalendarToolDefinitions(calendarRuntime.calendars)
+    ? buildCalendarToolDefinitions(calendarRuntime.calendars, {
+        withChanges: calendarRuntime.engine === "agenda",
+      })
     : undefined;
   // La fecha va tambien en el turno del usuario, no solo en las instrucciones:
   // enterrada en un prompt largo el modelo la ignoraba e inventaba el mes.
@@ -792,7 +795,29 @@ async function generateReply(
   const availabilityCall = toolCalls.findLast(
     (call) => call.name === "consultar_disponibilidad",
   );
-  const bookingCall = toolCalls.findLast((call) => call.name === "agendar_cita");
+  const bookingCall = toolCalls.findLast(
+    (call) => call.name === "agendar_cita" || call.name === "reagendar_cita",
+  );
+  const cancelCall = toolCalls.findLast((call) => call.name === "cancelar_cita");
+
+  if (cancelCall) {
+    const result = cancelCall.result as Record<string, unknown>;
+
+    return {
+      answer: ensureAgentIntroduction(
+        buildDirectCancelAnswer(result, calendarRuntime!),
+        agent,
+        introduceAgent,
+      ),
+      calendarGuard:
+        result.cancelada === true ? null : "La cancelación fue rechazada o falló.",
+      timezoneWarning,
+      model: payload.model ?? model,
+      responseId: payload.id ?? null,
+      toolCalls,
+      usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+    };
+  }
 
   if (bookingCall) {
     const result = bookingCall.result as Record<string, unknown>;
@@ -1137,6 +1162,7 @@ export async function POST(request: Request) {
       const calendarResult = await buildCalendarRuntime({
         agentName: typedAgent.name,
         contactId: conversation.contact_id,
+        conversationId: conversation.id,
         enabledToolIds: getEnabledToolIds(typedAgent.config),
         isBookingAgent: isBookingAgent(typedAgent),
         workspaceId: conversation.workspace_id,

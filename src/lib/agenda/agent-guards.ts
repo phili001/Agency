@@ -16,7 +16,11 @@ import { zonedStartOfDay } from "../timezones.ts";
 export type CalendarRuntimeView = {
   calendars: Array<Pick<CalendarTool, "calendarName" | "description">>;
   contact: { fullName: string | null };
+  /** "agenda" = agenda propia (F5.2): añade reagendar/cancelar. Sin valor = GHL. */
+  engine?: "agenda" | "ghl";
   timezone: string;
+  /** Citas próximas del contacto (solo agenda propia). */
+  upcoming?: Array<{ label: string; service: string; startsAt: string }>;
 };
 
 function normalizeClaimText(value: string) {
@@ -29,6 +33,7 @@ function normalizeClaimText(value: string) {
 
 export function buildCalendarToolDefinitions(
   calendars: Array<Pick<CalendarTool, "calendarName" | "description">>,
+  { withChanges = false }: { withChanges?: boolean } = {},
 ) {
   const multiple = calendars.length > 1;
   const options = calendars
@@ -48,13 +53,20 @@ export function buildCalendarToolDefinitions(
     : {};
   const calendarRequired = multiple ? ["calendario"] : [];
 
-  return [
+  type ToolDefinition = {
+    description: string;
+    name: string;
+    parameters: { additionalProperties: false; properties: Record<string, unknown>; required: string[]; type: "object" };
+    strict: true;
+    type: "function";
+  };
+  const tools: ToolDefinition[] = [
     {
       description:
         "Consulta los horarios realmente disponibles. Usala SIEMPRE antes de proponer u ofrecer cualquier horario al cliente.",
       name: "consultar_disponibilidad",
       parameters: {
-        additionalProperties: false,
+        additionalProperties: false as const,
         properties: {
           ...calendarProperty,
           dias: {
@@ -69,17 +81,17 @@ export function buildCalendarToolDefinitions(
           },
         },
         required: [...calendarRequired, "fecha_inicio", "dias"],
-        type: "object",
+        type: "object" as const,
       },
-      strict: true,
-      type: "function",
+      strict: true as const,
+      type: "function" as const,
     },
     {
       description:
         "Crea la cita. Usala solo después de consultar disponibilidad y de que el cliente haya elegido un horario concreto de los ofrecidos.",
       name: "agendar_cita",
       parameters: {
-        additionalProperties: false,
+        additionalProperties: false as const,
         properties: {
           ...calendarProperty,
           horario_iso: {
@@ -97,12 +109,68 @@ export function buildCalendarToolDefinitions(
           },
         },
         required: [...calendarRequired, "horario_iso", "nombre", "motivo"],
-        type: "object",
+        type: "object" as const,
       },
-      strict: true,
-      type: "function",
+      strict: true as const,
+      type: "function" as const,
     },
   ];
+
+  if (!withChanges) {
+    return tools;
+  }
+
+  // Agenda propia: el servicio decide la duración, y se puede mover o cancelar.
+  const consult = tools[0].parameters;
+  consult.properties.servicio = {
+    description: "Servicio que quiere el cliente (decide la duración). null si no lo ha dicho.",
+    type: ["string", "null"],
+  };
+  consult.required.push("servicio");
+  const currentAppointment = {
+    description:
+      "El 'inicio' exacto de la cita que se quiere cambiar, de la lista de citas próximas. null si solo tiene una.",
+    type: ["string", "null"],
+  };
+
+  tools.push(
+    {
+      description:
+        "Mueve una cita existente del cliente a otro horario. Usala solo después de consultar disponibilidad y de que el cliente elija el nuevo horario.",
+      name: "reagendar_cita",
+      parameters: {
+        additionalProperties: false as const,
+        properties: {
+          cita_actual_inicio: currentAppointment,
+          horario_iso: {
+            description: "El nuevo horario, copiado tal cual del campo 'inicio' que devolvió consultar_disponibilidad.",
+            type: "string",
+          },
+        },
+        required: ["cita_actual_inicio", "horario_iso"],
+        type: "object" as const,
+      },
+      strict: true as const,
+      type: "function" as const,
+    },
+    {
+      description: "Cancela una cita existente del cliente. Usala solo si el cliente pide cancelar de forma clara.",
+      name: "cancelar_cita",
+      parameters: {
+        additionalProperties: false as const,
+        properties: {
+          cita_actual_inicio: currentAppointment,
+          motivo: { description: "Por qué cancela, en pocas palabras. null si no lo dijo.", type: ["string", "null"] },
+        },
+        required: ["cita_actual_inicio", "motivo"],
+        type: "object" as const,
+      },
+      strict: true as const,
+      type: "function" as const,
+    },
+  );
+
+  return tools;
 }
 
 /**
@@ -156,7 +224,23 @@ export function buildCalendarContext(calendarRuntime: CalendarRuntimeView | null
 - Si agendar_cita devuelve un error, o no devuelve "cita_id", la cita NO existe.
   Dilo con claridad, discupate y ofrece reintentar u otro horario. Nunca digas
   que quedo agendada, ni prometas recordatorios de una cita que fallo.
-- Si una tool devuelve un error, no lo repitas literal: explica el problema en palabras simples y ofrece otra opcion.`;
+- Si una tool devuelve un error, no lo repitas literal: explica el problema en palabras simples y ofrece otra opcion.${
+    calendarRuntime.engine === "agenda" ? buildChangesContext(calendarRuntime) : ""
+  }`;
+}
+
+function buildChangesContext(calendarRuntime: CalendarRuntimeView) {
+  const upcoming = calendarRuntime.upcoming ?? [];
+  const list =
+    upcoming.length > 0
+      ? upcoming.map((item) => `  - ${item.label}${item.service ? ` (${item.service})` : ""} -> inicio: ${item.startsAt}`).join("\n")
+      : "  - (ninguna)";
+
+  return `
+- Citas próximas de este cliente:
+${list}
+- Para mover una cita: consultar_disponibilidad y, cuando elija, reagendar_cita. SOLO puedes decir que quedó cambiada si reagendar_cita respondió "confirmada": true y un "cita_id".
+- Para cancelar: cancelar_cita, solo si el cliente lo pide claramente. SOLO puedes decir que quedó cancelada si cancelar_cita respondió "cancelada": true.`;
 }
 
 export function buildDirectBookingAnswer(
@@ -179,7 +263,9 @@ export function buildDirectBookingAnswer(
     }).format(new Date(result.inicio));
     const firstName = runtime.contact.fullName?.trim().split(/\s+/)[0];
 
-    return `Listo${firstName ? `, ${firstName}` : ""}. Tu cita quedo agendada para ${when}.`;
+    return result.reagendada === true
+      ? `Listo${firstName ? `, ${firstName}` : ""}. Tu cita quedo cambiada para ${when}.`
+      : `Listo${firstName ? `, ${firstName}` : ""}. Tu cita quedo agendada para ${when}.`;
   }
 
   const alternatives = Array.isArray(result.horarios_libres)
@@ -200,7 +286,24 @@ export function buildDirectBookingAnswer(
     return `Ese horario ya no está libre. Para ese mismo dia tengo:\n${alternatives.map((time) => `- ${time}`).join("\n")}\nCual prefieres?`;
   }
 
-  return "No pude registrar la cita en GHL en este momento y no quedo agendada. Intenta de nuevo en un momento para volver a validarla.";
+  return "No pude registrar la cita en la agenda en este momento y no quedo agendada. Intenta de nuevo en un momento para volver a validarla.";
+}
+
+/** Respuesta a cancelar_cita, redactada por el servidor. */
+export function buildDirectCancelAnswer(result: Record<string, unknown>, runtime: CalendarRuntimeView) {
+  if (result.cancelada === true && typeof result.inicio === "string") {
+    const timezone = typeof result.zona_horaria === "string" ? result.zona_horaria : runtime.timezone;
+    const when = new Intl.DateTimeFormat("es-CO", { dateStyle: "full", timeStyle: "short", timeZone: timezone }).format(
+      new Date(result.inicio),
+    );
+    return `Listo, cancelé tu cita del ${when}. Si quieres otra fecha, dime y la buscamos.`;
+  }
+
+  if (Array.isArray(result.citas) && result.citas.length > 1) {
+    return "Tienes varias citas próximas. ¿Cuál quieres cancelar?";
+  }
+
+  return "No pude cancelar la cita en este momento, así que sigue en pie. Intenta de nuevo en un momento o dime y lo revisa el equipo.";
 }
 
 export function buildDirectAvailabilityAnswer(
@@ -208,7 +311,7 @@ export function buildDirectAvailabilityAnswer(
   runtime: CalendarRuntimeView,
 ) {
   if (typeof result.error === "string") {
-    return "No pude consultar la agenda real en este momento. Intenta de nuevo en un momento y la reviso directamente en GHL.";
+    return "No pude consultar la agenda real en este momento. Intenta de nuevo en un momento y la reviso directamente.";
   }
 
   const timezone =
@@ -250,12 +353,12 @@ export function buildDirectAvailabilityAnswer(
   if (requestedTime && requestedAvailable === false) {
     return slots.length > 0
       ? `${requestedTime} no está disponible el ${dateLabel}. Los horarios libres reales son:\n${slots.map((time) => `- ${time}`).join("\n")}\nCual prefieres?`
-      : `${requestedTime} no está disponible el ${dateLabel} y GHL no devolvió otros horarios libres para ese dia.`;
+      : `${requestedTime} no está disponible el ${dateLabel} y no quedan otros horarios libres para ese dia.`;
   }
 
   return slots.length > 0
     ? `Para el ${dateLabel}, los horarios libres reales son:\n${slots.map((time) => `- ${time}`).join("\n")}\nCual prefieres?`
-    : `GHL no devolvió horarios libres para el ${dateLabel}. ¿Quieres que revise otro día?`;
+    : `No hay horarios libres para el ${dateLabel}. ¿Quieres que revise otro día?`;
 }
 
 export function textLooksLikeBookingClaim(text: string) {
@@ -291,11 +394,31 @@ export function hasConfirmedAppointment(toolCalls: Array<Record<string, unknown>
         : {};
 
     return (
-      call.name === "agendar_cita" &&
+      (call.name === "agendar_cita" || call.name === "reagendar_cita") &&
       result.confirmada === true &&
       typeof result.cita_id === "string" &&
       result.cita_id.trim().length > 0
     );
+  });
+}
+
+export function textLooksLikeCancellationClaim(text: string) {
+  const normalized = normalizeClaimText(text);
+
+  return [
+    /\b(cita|llamada|sesion|reunion|consulta)\b.*\b(cancelad[ao]s?|anulad[ao]s?)\b/,
+    /\b(cancele|he cancelado|hemos cancelado|anule|ya cancele)\b/,
+  ].some((pattern) => pattern.test(normalized));
+}
+
+export function hasConfirmedCancellation(toolCalls: Array<Record<string, unknown>>) {
+  return toolCalls.some((call) => {
+    const result =
+      call.result && typeof call.result === "object" && !Array.isArray(call.result)
+        ? (call.result as Record<string, unknown>)
+        : {};
+
+    return call.name === "cancelar_cita" && result.cancelada === true;
   });
 }
 
@@ -344,6 +467,14 @@ export function sanitizeCalendarAnswer({
     };
   }
 
+  if (textLooksLikeCancellationClaim(answer) && !hasConfirmedCancellation(toolCalls)) {
+    return {
+      answer:
+        "Todavía no puedo darte la cita por cancelada porque no tengo la confirmación de la agenda. Lo reviso y te confirmo en cuanto quede cancelada.",
+      blockedReason: "Respuesta bloqueada: decía que la cita estaba cancelada sin cancelar_cita confirmada.",
+    };
+  }
+
   if (
     calendarRuntime &&
     textLooksLikeAvailabilityClaim(answer) &&
@@ -353,7 +484,7 @@ export function sanitizeCalendarAnswer({
       answer:
         "No pude consultar la agenda real en este momento, así que no voy a inventarte un horario. Intenta de nuevo en un momento y lo reviso directamente en el calendario.",
       blockedReason:
-        "Respuesta bloqueada: mencionaba disponibilidad sin una consulta valida a GHL.",
+        "Respuesta bloqueada: mencionaba disponibilidad sin una consulta valida a la agenda.",
     };
   }
 
