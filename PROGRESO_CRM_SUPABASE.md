@@ -25,7 +25,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - CRM de referencia: tiene festivos (`calendar.holidays` en `schedule_config.py`, test `test_huecos_respetan_bloqueos_y_festivos.py`), que la especificación no recogía → añadidos en F1.3/F2.3.
 
 ## Decisiones pendientes (las responde el usuario; mientras, sigue con otras tareas)
-- **D1** ¿`agentelevy.com` es esta app o una landing aparte? → afecta a F6.5 (`/bienvenida`).
+- ~~**D1**~~ **Resuelta (2026-11-03):** `agentelevi.com` es **esta app** (el panel), y `/bienvenida` vive aquí. La landing es aparte, en `activa.agentelevi.com`, y no se toca. El Payment Link redirige a `https://agentelevi.com/bienvenida?session_id={CHECKOUT_SESSION_ID}`. Ojo: el dominio es `agentelevi.com` (con i), como en `src/lib/app-url.ts`; corregir donde la documentación ponga `agentelevy.com`.
 - **D2** Precios (mensual/anual), prueba gratis y días de gracia → por defecto: sin prueba, 7 días de gracia; los ids de precio van por variable de entorno.
 - ~~**D4**~~ **Resuelta (2026-11-03):** «Agenda» va como **sección nueva en el menú lateral**, igual que Flujos o Automatizaciones (respuesta del usuario). F5.6 la añade al menú.
 - **D3** Plantilla de WhatsApp aprobada para recordatorios fuera de la ventana de 24 h (nombre por workspace) → mientras, se registran como omitidos.
@@ -276,7 +276,15 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - [x] F6.2 `src/lib/billing/` (cliente Stripe, `getWorkspaceBillingState`) + `src/lib/email.ts` (Resend) + pruebas. (dep: F6.1, F0.2)
 - [x] F6.3 `app/api/webhooks/stripe` completo + contacto en el CRM de AAA001 + pruebas con eventos firmados. (dep: F6.2, F2.2)
 - [x] F6.4 Bloqueo por impago en ycloud-webhook, buffer, flows, deliver y crm-jobs + pantalla «Reactiva tu suscripción» + banner de aviso. (dep: F6.2)
-- [ ] F6.5 Página `/bienvenida` con «Reenviar». **Requiere D1.** (dep: F6.3)
+- [ ] F6.5 Página `/bienvenida` con «Reenviar» en esta app (D1 resuelta). Que respete el aspecto de la landing `activa.agentelevi.com`: logo, colores y tono. Se pueden copiar de ella, pero sin traer scripts ni recursos de terceros. (dep: F6.3)
+- [ ] F6.8 **Correo con la cuenta de Google** (petición del usuario, 2026-11-03): los correos salen por **Gmail de la cuenta de Google conectada**, usando la API de Gmail por `fetch`, en lugar de Resend.
+  - Scope `https://www.googleapis.com/auth/gmail.send` pedido **aparte y opcional**, con autorización incremental (botón «Conectar correo» en Integraciones → Google). Conectar el calendario no debe exigir Gmail, ni al revés.
+  - Mismos tokens cifrados por workspace y mismo manejo de errores permanentes que Calendar. Se guarda qué scopes se concedieron y desde qué dirección se envía.
+  - `src/lib/email.ts` elige el remitente: correos del sistema de Levy (acceso tras el pago, reenvío desde `/bienvenida`) por el Gmail conectado de **AAA001**; Resend solo como respaldo si `RESEND_API_KEY` existe; si no hay ninguno, error claro y el evento queda registrado.
+  - Cada empresa puede enviar correos a sus contactos con su propio Gmail: botón «Enviar correo» en la ficha del contacto y acción `send_email` en `crm_action` de flujos (asunto y cuerpo con variables `{{...}}`). Todo queda en la actividad del contacto. Respeta el bloqueo por impago y nunca usa el Gmail de otra empresa.
+  - Pruebas con `fetch` simulado: mensaje MIME/base64url correcto con UTF-8 en asunto, renovación de token, scope no concedido, aislamiento A/B, respaldo a Resend.
+  - Documentar en `DEPLOY_RUNBOOK.md` que hay que añadir el scope en la pantalla de consentimiento de Google Cloud y activar la Gmail API (scope sensible: verificación de Google para producción).
+  - (dep: F3.1, F6.2, F5.3)
 - [x] F6.6 Facturación en el panel (Customer Portal, botón de pago con `client_reference_id`) y consola de empresas. (dep: F6.3)
 - [x] F6.7 Reunión de puesta en marcha sobre la agenda de AAA001; wizard y tours sin GHL; `markAgencyContactActive` → etiqueta `levy-activo` en AAA001. (dep: F2.4, F2.2)
 
