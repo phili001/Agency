@@ -92,6 +92,12 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - Desconectar no toca las agendas (conservan calendario y modo); sin conexión, la copia simplemente no se hace (F3.3).
   - La página `/integraciones` todavía no lee `?google=…`: lo hace F5.7.
 
+- **F3.3 Copia a Google (2026-11-02).**
+  - `src/lib/agenda/google-sync.ts`: `syncAppointment` (activa → crea/actualiza evento con id fijo; cancelada con evento → lo borra; completada/no asistió → deja el evento; agenda sin calendario o en `off` → solo baja la marca). La marca `google_sync_pending` se baja con `.eq("updated_at", …)`: si la cita cambió durante la copia, sigue pendiente; si se borró, el evento recién creado se apunta en `google_event_deletions`.
+  - `sweepGoogleSync` (para crm-jobs): solo empresas con la integración `active`; por empresa, primero `processGoogleDeletions` (máx. 10 intentos por evento, registra `last_error`) y luego hasta 50 citas pendientes; un fallo de Google corta esa empresa, no las demás. Sin `GOOGLE_CLIENT_ID/SECRET` no hace nada.
+  - `googleBusyProvider(client, workspaceId)` es el `ExternalBusyProvider` de F2.4: freeBusy del calendario de la agenda solo si la empresa está conectada; si Google falla, devuelve vacío (se ofrece igual, como en crm-levy).
+  - Pendiente para quien use la agenda (F5.2/F5.6): pasar `externalBusy: googleBusyProvider(...)` a `getAgendaFreeSlots` y, tras agendar/mover/cancelar, llamar a `syncAppointment` en `after()` para no esperar a la barrida.
+
 ## Tareas
 
 ### F0 — Preparación
@@ -116,7 +122,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 ### F3 — Google Calendar por workspace
 - [x] F3.1 `src/lib/integrations/google-calendar.ts`: OAuth (state firmado con workspace y caducidad), tokens cifrados, refresco, error permanente, listCalendars, freeBusy, eventos con id determinista + pruebas con fetch simulado. (dep: F1.5)
 - [x] F3.2 Rutas `app/api/integrations/google-calendar/{connect,callback,status,calendars,disconnect}` (owner/admin) + pruebas. (dep: F3.1)
-- [ ] F3.3 Copia a Google (`push`) y ocupado (`push_and_busy`) integrados en `src/lib/agenda` + cola de pendientes y borrados. (dep: F3.1, F2.4)
+- [x] F3.3 Copia a Google (`push`) y ocupado (`push_and_busy`) integrados en `src/lib/agenda` + cola de pendientes y borrados. (dep: F3.1, F2.4)
 
 ### F4 — Jobs y recordatorios
 - [ ] F4.1 `src/lib/agenda/reminders.ts` portado de `seguimientos.py` (idempotente, ventana 24 h, plantilla o «omitido») + pruebas. (dep: F2.4)
@@ -170,6 +176,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-02 · F2.5 · `crm/csv.ts`, `crm/import-export.ts` (importar/exportar) y `crm/erasure.ts` (borrado RGPD); 9 pruebas nuevas (CSV con `;`, BOM y comillas, anti-fórmulas, importación con 6 motivos de salto, exportar→importar sin duplicar, aislamiento A/B en importación y borrado, cola de borrado en Google); typecheck, lint y test (196/196) en verde · commit `crm: F2.5 CSV y borrado RGPD`.
 - 2026-11-02 · F3.1 · `src/lib/integrations/google-calendar.ts` (OAuth con state firmado, tokens cifrados, renovación, error permanente vs. pasajero, calendarios, freeBusy, eventos con id fijo, desconectar con revocación); 15 pruebas con fetch simulado (state falsificado/caducado/de otro usuario, scopes, refresh conservado, 401→renovar, 409→actualizar, 410 en borrado, tokens por empresa); typecheck, lint y test (211/211) en verde · commit `crm: F3.1 cliente de Google Calendar`.
 - 2026-11-02 · F3.2 · rutas `api/integrations/google-calendar/{connect,callback,status,calendars,disconnect}` + `requireActiveWorkspaceRole` + `google-calendar-callback.ts` (lógica del callback probable); 5 pruebas nuevas (state de otro usuario sin canjear código, agente sin permiso, empresa ajena, cancelación, mensajes); typecheck, lint, test (216/216) y build en verde. Sin probar contra Google real (faltan credenciales) · commit `crm: F3.2 rutas de Google Calendar`.
+- 2026-11-02 · F3.3 · `src/lib/agenda/google-sync.ts` (copia por cita con control de concurrencia, barrida por empresa conectada, cola de borrados con intentos, ocupado de Google tolerante a fallos); 10 pruebas nuevas (evento con id/nombre/zona, cancelar borra, completada se queda, cambio y borrado durante la copia, barrida cortada por 503 sin tocar empresas no conectadas, intentos de borrado, ocupado solo en push_and_busy y degradado); typecheck, lint y test (226/226) en verde · commit `crm: F3.3 copia y ocupado de Google`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->
