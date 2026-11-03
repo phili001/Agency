@@ -172,6 +172,11 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - RLS: solo lectura para owner/admin de la empresa; escribe únicamente el servidor (`service_role`).
   - Comprobaciones `supabase/tests/billing_checks.sql`: exentas, cliente único, estado válido, dedupe de eventos y RLS del owner (DRYRUN_OK). El caso «agent no ve nada» se salta: hoy no hay ningún miembro que solo sea agent/viewer.
   - Advisors: solo los 3 avisos previos.
+- **F6.2 Librería de facturación y correo (2026-11-03).**
+  - `src/lib/billing/`: `config.ts` (variables de Stripe; gracia por defecto 7 días según D2, `isLevyPurchase` por Payment Link o precio), `state.ts` (reglas puras `computeBillingState` y textos del panel), `workspace-billing.ts` (`getWorkspaceBillingState`, `isWorkspaceBlocked`, `listBlockedWorkspaceIds` para el paso `billing` de `crm-jobs`, que conecta F6.4) y `stripe.ts` (cliente del SDK, solo servidor).
+  - Reglas: exenta → ok; **sin fila o sin suscripción → aviso, no bloqueo** (para no cortar a nadie por un registro que falte; las altas por Stripe tendrán fila desde el webhook); active/trialing → ok (aviso si se cancela al final del periodo); incomplete → aviso; past_due → aviso hasta `past_due_since` + gracia, luego bloqueado; canceled/unpaid/paused/incomplete_expired → bloqueado. ⚠️ Revisar: si se prefiere bloquear a las empresas sin suscripción, es cambiar una línea.
+  - `src/lib/email.ts`: Resend por `fetch` a su API (sin librería nueva), `buildWelcomeEmail` con el nombre del negocio escapado; los errores no incluyen la clave.
+  - Pruebas: configuración, todas las reglas, aislamiento por empresa en la base y envío de correo con `fetch` simulado (15 nuevas).
 
 ## Tareas
 
@@ -217,7 +222,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 
 ### F6 — Stripe y onboarding de Levy
 - [x] F6.1 Migración: `workspace_billing` (5 workspaces actuales con `billing_exempt = true`) y `billing_events`. (dep: F0.1)
-- [ ] F6.2 `src/lib/billing/` (cliente Stripe, `getWorkspaceBillingState`) + `src/lib/email.ts` (Resend) + pruebas. (dep: F6.1, F0.2)
+- [x] F6.2 `src/lib/billing/` (cliente Stripe, `getWorkspaceBillingState`) + `src/lib/email.ts` (Resend) + pruebas. (dep: F6.1, F0.2)
 - [ ] F6.3 `app/api/webhooks/stripe` completo + contacto en el CRM de AAA001 + pruebas con eventos firmados. (dep: F6.2, F2.2)
 - [ ] F6.4 Bloqueo por impago en ycloud-webhook, buffer, flows, deliver y crm-jobs + pantalla «Reactiva tu suscripción» + banner de aviso. (dep: F6.2)
 - [ ] F6.5 Página `/bienvenida` con «Reenviar». **Requiere D1.** (dep: F6.3)
@@ -265,6 +270,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-03 · F5.6 · sección Agenda en el menú + página `/agenda` (semana/día, citas, bloqueos, configuración) + API `api/agenda/**` con sync a Google en `after()`; typecheck, lint, test (280/280) y build en verde · commit `crm: F5.6 panel de agenda`.
 - 2026-11-03 · F5.8 · métrica «Citas agendadas» desde `appointments`, lateral de Chats con etapa/etiquetas/próxima cita, portada y readiness sin GHL (Google y Stripe recomendados); typecheck, lint, test (281/281) y build en verde · commit `crm: F5.8 métricas y paneles sin GHL`.
 - 2026-11-03 · F6.1 · migración `billing` aplicada (dry-run previo en transacción deshecha): `workspace_billing` + `billing_events`, 5/5 empresas exentas, RLS solo lectura owner/admin; `schema.sql` y `database.types.ts` al día; checks SQL DRYRUN_OK; typecheck, lint y test (281/281) en verde · commit `crm: F6.1 tablas de facturación`.
+- 2026-11-03 · F6.2 · `lib/billing` (config, reglas `ok|aviso|bloqueado`, lectura por empresa, lista de bloqueadas, cliente Stripe) + `lib/email.ts` (Resend por `fetch`); typecheck, lint y test (296/296) en verde · commit `crm: F6.2 librería de facturación y correo`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->
