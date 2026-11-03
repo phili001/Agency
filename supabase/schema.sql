@@ -101,7 +101,7 @@ create table if not exists public.messages (
 create table if not exists public.integrations (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
-  provider text not null check (provider in ('ycloud', 'openai', 'gohighlevel', 'google_calendar')),
+  provider text not null check (provider in ('ycloud', 'openai', 'gohighlevel', 'google_calendar', 'gmail')),
   status text not null default 'pending' check (status in ('pending', 'active', 'error', 'disabled')),
   config jsonb not null default '{}'::jsonb,
   secret_ref text,
@@ -114,7 +114,7 @@ create table if not exists public.integrations (
 create table if not exists public.integration_secrets (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
-  provider text not null check (provider in ('ycloud', 'openai', 'gohighlevel', 'google_calendar')),
+  provider text not null check (provider in ('ycloud', 'openai', 'gohighlevel', 'google_calendar', 'gmail')),
   kind text not null,
   ciphertext text not null,
   created_at timestamptz not null default now(),
@@ -1539,12 +1539,12 @@ alter table public.integrations drop constraint integrations_provider_check,
 alter table public.integrations
   drop constraint if exists integrations_provider_check,
   add constraint integrations_provider_check
-    check (provider in ('ycloud', 'openai', 'gohighlevel', 'google_calendar'));
+    check (provider in ('ycloud', 'openai', 'gohighlevel', 'google_calendar', 'gmail'));
 
 alter table public.integration_secrets
   drop constraint if exists integration_secrets_provider_check,
   add constraint integration_secrets_provider_check
-    check (provider in ('openai', 'ycloud', 'gohighlevel', 'google_calendar'));
+    check (provider in ('openai', 'ycloud', 'gohighlevel', 'google_calendar', 'gmail'));
 
 -- Recordatorios e inasistencias (migración 20261103000000_agenda_reminders).
 alter table public.agendas drop column if exists reminder_enabled,

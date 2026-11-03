@@ -176,6 +176,19 @@ describe("checkout.session.completed", () => {
     assert.equal(fake.tables.billing_events[0]?.result, "processed");
   });
 
+  it("si el correo falla, el evento sigue procesado y el motivo queda registrado", async () => {
+    const outcome = await processStripeEvent(signedEvent("evt_1", "checkout.session.completed", session("cs_1")), {
+      ...deps(),
+      sendWelcome: async () => {
+        throw new Error("No hay correo configurado.");
+      },
+    });
+
+    assert.equal(outcome.result, "processed");
+    assert.equal(fake.tables.billing_events[0].result, "processed");
+    assert.equal(fake.tables.billing_events[0].error, "correo no enviado: No hay correo configurado.");
+  });
+
   it("reintento duplicado: no crea otra empresa ni reenvía el correo", async () => {
     const event = signedEvent("evt_1", "checkout.session.completed", session("cs_1"));
     await processStripeEvent(event, deps());

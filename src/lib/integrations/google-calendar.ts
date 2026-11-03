@@ -37,6 +37,10 @@ const EXPIRY_MARGIN_MS = 60_000;
 const SECRET_KIND = "oauth_tokens";
 const PROVIDER = "google_calendar";
 
+/** Cada conexión guarda sus propios tokens: se conectan y desconectan por separado. */
+export type GoogleProvider = "gmail" | "google_calendar";
+export type GoogleOAuthPurpose = "calendar" | "gmail";
+
 export type GoogleCalendarErrorCode =
   | "api_error"
   | "invalid_state"
@@ -79,6 +83,12 @@ export const RECONNECT_MESSAGES = {
   refresh_rejected:
     "Google ha retirado el acceso (permiso revocado o contraseña cambiada). Vuelve a conectar Google Calendar.",
 } as const;
+
+function reconnectMessage(key: keyof typeof RECONNECT_MESSAGES, provider: GoogleProvider) {
+  return provider === "gmail"
+    ? RECONNECT_MESSAGES[key].replace("Google Calendar", "el correo de Google")
+    : RECONNECT_MESSAGES[key];
+}
 
 export type GoogleDeps = {
   env?: Record<string, string | undefined>;
@@ -133,12 +143,12 @@ function sign(payload: string, env: Record<string, string | undefined>) {
 }
 
 export function createOAuthState(
-  { userId, workspaceId }: { userId: string; workspaceId: string },
+  { purpose = "calendar", userId, workspaceId }: { purpose?: GoogleOAuthPurpose; userId: string; workspaceId: string },
   deps: GoogleDeps = {},
 ) {
   const { env, now } = depsOf(deps);
   const payload = Buffer.from(
-    JSON.stringify({ exp: now().getTime() + STATE_TTL_MS, n: randomBytes(12).toString("base64url"), u: userId, w: workspaceId }),
+    JSON.stringify({ exp: now().getTime() + STATE_TTL_MS, n: randomBytes(12).toString("base64url"), p: purpose, u: userId, w: workspaceId }),
   ).toString("base64url");
 
   return `${payload}.${sign(payload, env)}`;
@@ -161,7 +171,7 @@ export function verifyOAuthState(state: string | null | undefined, expectedUserI
     throw invalid();
   }
 
-  let data: { exp?: number; u?: string; w?: string };
+  let data: { exp?: number; p?: string; u?: string; w?: string };
   try {
     data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
   } catch {
@@ -172,10 +182,10 @@ export function verifyOAuthState(state: string | null | undefined, expectedUserI
     throw invalid();
   }
 
-  return { userId: data.u, workspaceId: data.w };
+  return { purpose: (data.p === "gmail" ? "gmail" : "calendar") as GoogleOAuthPurpose, userId: data.u, workspaceId: data.w };
 }
 
-export function buildAuthUrl(state: string, deps: GoogleDeps = {}) {
+export function buildAuthUrl(state: string, deps: GoogleDeps = {}, scopes: string[] = GOOGLE_SCOPES) {
   const config = requireConfig(depsOf(deps).env);
   const url = new URL(AUTH_URL);
 
@@ -186,7 +196,7 @@ export function buildAuthUrl(state: string, deps: GoogleDeps = {}) {
     prompt: "consent",
     redirect_uri: config.redirectUri,
     response_type: "code",
-    scope: GOOGLE_SCOPES.join(" "),
+    scope: scopes.join(" "),
     state,
   }).toString();
 
@@ -242,7 +252,15 @@ async function tokenRequest(body: Record<string, string>, deps: GoogleDeps) {
   } satisfies GoogleTokens;
 }
 
-export async function exchangeCode(code: string, deps: GoogleDeps = {}) {
+export async function exchangeCode(
+  code: string,
+  deps: GoogleDeps = {},
+  {
+    missingMessage = "Hay que conceder acceso para ver y crear eventos del calendario. Vuelve a conectar y marca todas las casillas.",
+    provider = PROVIDER,
+    requiredScopes = GOOGLE_SCOPES,
+  }: { missingMessage?: string; provider?: GoogleProvider; requiredScopes?: string[] } = {},
+) {
   const config = requireConfig(depsOf(deps).env);
   const tokens = await tokenRequest(
     { code, grant_type: "authorization_code", redirect_uri: config.redirectUri },
@@ -255,19 +273,19 @@ export async function exchangeCode(code: string, deps: GoogleDeps = {}) {
   });
   const granted = tokens.scope.split(/\s+/);
 
-  if (!GOOGLE_SCOPES.every((scope) => granted.includes(scope))) {
-    throw new GoogleCalendarError("missing_scope", "Hay que conceder acceso para ver y crear eventos del calendario. Vuelve a conectar y marca todas las casillas.");
+  if (!requiredScopes.every((scope) => granted.includes(scope))) {
+    throw new GoogleCalendarError("missing_scope", missingMessage);
   }
   if (!tokens.refreshToken) {
-    throw new GoogleCalendarError("reconnect_required", RECONNECT_MESSAGES.no_refresh_token);
+    throw new GoogleCalendarError("reconnect_required", reconnectMessage("no_refresh_token", provider));
   }
 
   return tokens;
 }
 
-async function saveTokens(client: CrmClient, workspaceId: string, tokens: GoogleTokens) {
+export async function saveTokens(client: CrmClient, workspaceId: string, tokens: GoogleTokens, provider: GoogleProvider = PROVIDER) {
   const { error } = await client.from("integration_secrets").upsert(
-    { ciphertext: encryptSecret(JSON.stringify(tokens)), kind: SECRET_KIND, provider: PROVIDER, workspace_id: workspaceId },
+    { ciphertext: encryptSecret(JSON.stringify(tokens)), kind: SECRET_KIND, provider, workspace_id: workspaceId },
     { onConflict: "workspace_id,provider,kind" },
   );
 
@@ -276,14 +294,15 @@ async function saveTokens(client: CrmClient, workspaceId: string, tokens: Google
   }
 }
 
-async function setIntegration(
+export async function setIntegration(
   client: CrmClient,
   workspaceId: string,
   changes: { config?: Record<string, unknown>; last_error: string | null; status: "active" | "disabled" | "error" },
+  provider: GoogleProvider = PROVIDER,
 ) {
   const { error } = await client
     .from("integrations")
-    .upsert({ provider: PROVIDER, workspace_id: workspaceId, ...changes }, { onConflict: "workspace_id,provider" });
+    .upsert({ provider, workspace_id: workspaceId, ...changes }, { onConflict: "workspace_id,provider" });
 
   if (error) {
     throw new Error(`[google:setIntegration] ${error.message}`);
@@ -291,8 +310,8 @@ async function setIntegration(
 }
 
 /** Fallo definitivo: la integración queda en `error` con el motivo para el panel. */
-async function markReconnectRequired(client: CrmClient, workspaceId: string, message: string) {
-  await setIntegration(client, workspaceId, { last_error: message, status: "error" });
+export async function markReconnectRequired(client: CrmClient, workspaceId: string, message: string, provider: GoogleProvider = PROVIDER) {
+  await setIntegration(client, workspaceId, { last_error: message, status: "error" }, provider);
   return new GoogleCalendarError("reconnect_required", message);
 }
 
@@ -319,12 +338,12 @@ export async function saveConnection(client: CrmClient, workspaceId: string, tok
   return { accountEmail };
 }
 
-async function readTokens(client: CrmClient, workspaceId: string) {
+export async function readTokens(client: CrmClient, workspaceId: string, provider: GoogleProvider = PROVIDER) {
   const { data, error } = await client
     .from("integration_secrets")
     .select("ciphertext")
     .eq("workspace_id", workspaceId)
-    .eq("provider", PROVIDER)
+    .eq("provider", provider)
     .eq("kind", SECRET_KIND)
     .maybeSingle();
 
@@ -332,13 +351,16 @@ async function readTokens(client: CrmClient, workspaceId: string) {
     throw new Error(`[google:readTokens] ${error.message}`);
   }
   if (!data) {
-    throw new GoogleCalendarError("not_connected", "Google Calendar no está conectado.");
+    throw new GoogleCalendarError(
+      "not_connected",
+      provider === "gmail" ? "El correo de Google no está conectado." : "Google Calendar no está conectado.",
+    );
   }
 
   try {
     return JSON.parse(decryptSecret((data as { ciphertext: string }).ciphertext)) as GoogleTokens;
   } catch {
-    throw await markReconnectRequired(client, workspaceId, RECONNECT_MESSAGES.decrypt_failed);
+    throw await markReconnectRequired(client, workspaceId, reconnectMessage("decrypt_failed", provider), provider);
   }
 }
 
@@ -347,16 +369,16 @@ export async function getAccessToken(
   client: CrmClient,
   workspaceId: string,
   deps: GoogleDeps = {},
-  { forceRefresh = false } = {},
+  { forceRefresh = false, provider = PROVIDER }: { forceRefresh?: boolean; provider?: GoogleProvider } = {},
 ) {
   const { now } = depsOf(deps);
-  const tokens = await readTokens(client, workspaceId);
+  const tokens = await readTokens(client, workspaceId, provider);
 
   if (!forceRefresh && new Date(tokens.expiresAt).getTime() - EXPIRY_MARGIN_MS > now().getTime()) {
     return tokens.accessToken;
   }
   if (!tokens.refreshToken) {
-    throw await markReconnectRequired(client, workspaceId, RECONNECT_MESSAGES.no_refresh_token);
+    throw await markReconnectRequired(client, workspaceId, reconnectMessage("no_refresh_token", provider), provider);
   }
 
   let fresh: GoogleTokens;
@@ -364,13 +386,19 @@ export async function getAccessToken(
     fresh = await tokenRequest({ grant_type: "refresh_token", refresh_token: tokens.refreshToken }, deps);
   } catch (error) {
     if (error instanceof GoogleCalendarError && error.code === "reconnect_required") {
-      throw await markReconnectRequired(client, workspaceId, RECONNECT_MESSAGES.refresh_rejected);
+      throw await markReconnectRequired(client, workspaceId, reconnectMessage("refresh_rejected", provider), provider);
     }
     throw error;
   }
 
-  await saveTokens(client, workspaceId, { ...fresh, refreshToken: fresh.refreshToken ?? tokens.refreshToken });
-  await setIntegration(client, workspaceId, { last_error: null, status: "active" }).catch(() => undefined);
+  // Google puede renovar sin repetir `scope`: se conserva lo concedido.
+  await saveTokens(
+    client,
+    workspaceId,
+    { ...fresh, refreshToken: fresh.refreshToken ?? tokens.refreshToken, scope: fresh.scope || tokens.scope },
+    provider,
+  );
+  await setIntegration(client, workspaceId, { last_error: null, status: "active" }, provider).catch(() => undefined);
 
   return fresh.accessToken;
 }
@@ -398,14 +426,27 @@ export async function getConnectionStatus(client: CrmClient, workspaceId: string
   };
 }
 
-/** Revoca en Google (si se puede), borra los tokens y desactiva la integración. */
-export async function disconnect(client: CrmClient, workspaceId: string, deps: GoogleDeps = {}) {
+/**
+ * Revoca en Google (si se puede), borra los tokens y desactiva la integración.
+ * Revocar quita a la app todo el acceso de esa cuenta, así que si la otra
+ * conexión de Google de la empresa sigue activa solo se borran los tokens.
+ */
+export async function disconnect(client: CrmClient, workspaceId: string, deps: GoogleDeps = {}, provider: GoogleProvider = PROVIDER) {
   const { fetch: doFetch } = depsOf(deps);
 
   try {
-    const tokens = await readTokens(client, workspaceId);
-    const token = tokens.refreshToken ?? tokens.accessToken;
-    await doFetch(`${REVOKE_URL}?token=${encodeURIComponent(token)}`, { method: "POST" }).catch(() => undefined);
+    const { data: other } = await client
+      .from("integrations")
+      .select("status")
+      .eq("workspace_id", workspaceId)
+      .eq("provider", provider === "gmail" ? PROVIDER : "gmail")
+      .maybeSingle();
+
+    if ((other as { status: string } | null)?.status !== "active") {
+      const tokens = await readTokens(client, workspaceId, provider);
+      const token = tokens.refreshToken ?? tokens.accessToken;
+      await doFetch(`${REVOKE_URL}?token=${encodeURIComponent(token)}`, { method: "POST" }).catch(() => undefined);
+    }
   } catch {
     // Sin tokens legibles no hay nada que revocar.
   }
@@ -414,13 +455,13 @@ export async function disconnect(client: CrmClient, workspaceId: string, deps: G
     .from("integration_secrets")
     .delete()
     .eq("workspace_id", workspaceId)
-    .eq("provider", PROVIDER);
+    .eq("provider", provider);
 
   if (error) {
     throw new Error(`[google:disconnect] ${error.message}`);
   }
 
-  await setIntegration(client, workspaceId, { last_error: null, status: "disabled" });
+  await setIntegration(client, workspaceId, { last_error: null, status: "disabled" }, provider);
 }
 
 // --- API de Calendar ------------------------------------------------------------------

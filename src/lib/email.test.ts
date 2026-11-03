@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { EmailError, buildWelcomeEmail, isEmailConfigured, sendEmail } from "./email.ts";
+import { EmailError, buildWelcomeEmail, isEmailConfigured, sendViaResend } from "./email.ts";
 
 const ENV = { EMAIL_FROM: "Levy <hola@levy.test>", RESEND_API_KEY: "re_test_key" };
 
@@ -14,10 +14,10 @@ function recorder(status = 200, body: unknown = { id: "email_1" }) {
   return { calls, fetcher };
 }
 
-describe("sendEmail", () => {
+describe("sendViaResend", () => {
   it("manda a Resend con la clave en la cabecera y el destinatario normalizado", async () => {
     const { calls, fetcher } = recorder();
-    const result = await sendEmail({ html: "<p>x</p>", subject: "Hola", text: "x", to: " Ana@Example.com " }, { env: ENV, fetch: fetcher });
+    const result = await sendViaResend({ html: "<p>x</p>", subject: "Hola", text: "x", to: " Ana@Example.com " }, { env: ENV, fetch: fetcher });
 
     assert.deepEqual(result, { id: "email_1" });
     assert.equal(calls[0].url, "https://api.resend.com/emails");
@@ -30,14 +30,14 @@ describe("sendEmail", () => {
   it("no envía sin configuración ni a un correo no válido", async () => {
     const { calls, fetcher } = recorder();
     assert.equal(isEmailConfigured({}), false);
-    await assert.rejects(sendEmail({ html: "", subject: "", text: "", to: "a@b.co" }, { env: {}, fetch: fetcher }), (error: unknown) => error instanceof EmailError && error.code === "not_configured");
-    await assert.rejects(sendEmail({ html: "", subject: "", text: "", to: "no-es-correo" }, { env: ENV, fetch: fetcher }), (error: unknown) => error instanceof EmailError && error.code === "invalid");
+    await assert.rejects(sendViaResend({ html: "", subject: "", text: "", to: "a@b.co" }, { env: {}, fetch: fetcher }), (error: unknown) => error instanceof EmailError && error.code === "not_configured");
+    await assert.rejects(sendViaResend({ html: "", subject: "", text: "", to: "no-es-correo" }, { env: ENV, fetch: fetcher }), (error: unknown) => error instanceof EmailError && error.code === "invalid");
     assert.equal(calls.length, 0);
   });
 
   it("un error de Resend no filtra la clave en el mensaje", async () => {
     const { fetcher } = recorder(422, { message: "bad" });
-    await assert.rejects(sendEmail({ html: "", subject: "", text: "", to: "a@b.co" }, { env: ENV, fetch: fetcher }), (error: unknown) => {
+    await assert.rejects(sendViaResend({ html: "", subject: "", text: "", to: "a@b.co" }, { env: ENV, fetch: fetcher }), (error: unknown) => {
       assert.ok(error instanceof EmailError);
       assert.equal(error.code, "failed");
       assert.doesNotMatch(error.message, /re_test_key/);

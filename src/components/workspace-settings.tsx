@@ -33,6 +33,7 @@ import {
 } from "@/lib/business-profile";
 import type { Json } from "@/lib/supabase/database.types";
 import type { DefaultConversationMode } from "@/lib/conversation-default";
+import { GmailCard } from "@/components/crm/gmail-card";
 import { GoogleCalendarCard } from "@/components/crm/google-calendar-card";
 import { createClient } from "@/lib/supabase/client";
 import { getTimeZoneOptions } from "@/lib/timezones";
@@ -1693,6 +1694,7 @@ export function WorkspaceSettings({
         {activeTab === "integrations" ? (
           <div className="grid gap-3 xl:grid-cols-3">
             <GoogleCalendarCard canManage={activeRole === "owner" || activeRole === "admin"} />
+            <GmailCard canManage={activeRole === "owner" || activeRole === "admin"} />
             {/* GoHighLevel solo aparece donde ya estaba configurado (AAA001 hasta
                 su migración, F7.2): el CRM y la agenda propios lo sustituyen. */}
             {providers

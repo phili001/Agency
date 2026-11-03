@@ -50,6 +50,8 @@ export type StripeEventOutcome = {
   detail?: string;
   duplicate?: boolean;
   result: "failed" | "ignored" | "processed";
+  /** Algo salió mal sin tumbar el evento (p. ej. el correo): queda en `billing_events.error`. */
+  warning?: string;
   workspaceId?: string | null;
 };
 
@@ -83,7 +85,7 @@ function planOf(subscription: Stripe.Subscription | null, fallback: string | nul
 async function recordEvent(client: CrmClient, event: Stripe.Event, outcome: StripeEventOutcome, now: Date) {
   const { error } = await client.from("billing_events").upsert(
     {
-      error: outcome.result === "failed" ? (outcome.detail ?? "error").slice(0, 2000) : null,
+      error: outcome.result === "failed" ? (outcome.detail ?? "error").slice(0, 2000) : (outcome.warning?.slice(0, 2000) ?? null),
       processed_at: now.toISOString(),
       result: outcome.result,
       stripe_event_id: event.id,
@@ -213,11 +215,13 @@ async function handleCheckout(event: Stripe.Event, deps: StripeWebhookDeps, now:
   if (subscription) await deps.stripe.subscriptions.update(subscription.id, { metadata: { workspace_id: workspaceId } });
 
   const notes: string[] = [created ? "empresa creada" : "empresa existente"];
+  let warning: string | undefined;
   try {
     await deps.sendWelcome({ companyName: (await workspaceInfo(deps.client, workspaceId))?.name ?? companyName, email });
     notes.push("correo enviado");
   } catch (error) {
-    notes.push(`correo no enviado: ${error instanceof Error ? error.message : "error"}`);
+    warning = `correo no enviado: ${error instanceof Error ? error.message : "error"}`;
+    notes.push(warning);
   }
 
   const info = await workspaceInfo(deps.client, workspaceId);
@@ -232,7 +236,7 @@ async function handleCheckout(event: Stripe.Event, deps: StripeWebhookDeps, now:
   });
   notes.push(crm.ok ? "contacto en AAA001" : `AAA001: ${crm.reason}`);
 
-  return { detail: notes.join("; "), result: "processed", workspaceId };
+  return { detail: notes.join("; "), result: "processed", warning, workspaceId };
 }
 
 /** Empresa de una suscripción: por los ids guardados y, si no, por `metadata.workspace_id`. */

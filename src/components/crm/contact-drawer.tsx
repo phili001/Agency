@@ -19,6 +19,8 @@ const ACTIVITY_LABELS: Record<string, string> = {
   appointment_rescheduled: "Cita cambiada",
   contact_created: "Contacto creado",
   contact_updated: "Datos actualizados",
+  email_failed: "Correo no enviado",
+  email_sent: "Correo enviado",
   message_received: "Nueva conversación",
   no_show_sent: "Aviso de inasistencia enviado",
   no_show_skipped: "Aviso de inasistencia omitido",
@@ -63,6 +65,8 @@ function activityDetail(entry: ContactCard["activity"][number]) {
   const data = entry.data && typeof entry.data === "object" ? (entry.data as Record<string, unknown>) : {};
   if (entry.kind === "stage_changed") return `${data.from ?? "—"} → ${data.to ?? ""}`;
   if (entry.kind === "tag_added" || entry.kind === "tag_removed") return String(data.tag_name ?? "");
+  if (entry.kind === "email_sent") return String(data.subject ?? "");
+  if (entry.kind === "email_failed") return `${data.subject ?? ""}: ${data.error ?? ""}`;
   if (typeof data.reason === "string" && data.reason) return data.reason;
   if (typeof data.title === "string") return data.title;
   return "";
@@ -160,6 +164,8 @@ export function ContactDrawer({
   const [fields, setFields] = useState<Record<string, unknown>>({});
   const [noteDraft, setNoteDraft] = useState("");
   const [taskDraft, setTaskDraft] = useState({ dueAt: "", title: "" });
+  const [emailDraft, setEmailDraft] = useState({ body: "", subject: "" });
+  const [emailSent, setEmailSent] = useState(false);
 
   const load = useCallback(async () => {
     const response = await fetch(`/api/crm/contacts/${contactId}`);
@@ -410,6 +416,50 @@ export function ContactDrawer({
         >
           Guardar nota
         </button>
+      </Block>
+
+      <Block title="Enviar correo">
+        {card.contact.email ? (
+          <div className="grid gap-2">
+            <p className="text-xs text-[#647067]">
+              Para {card.contact.email}. Sale del correo de Google de tu empresa (Integraciones).
+            </p>
+            <input
+              className={inputClass}
+              maxLength={200}
+              onChange={(event) => setEmailDraft({ ...emailDraft, subject: event.target.value })}
+              placeholder="Asunto"
+              value={emailDraft.subject}
+            />
+            <textarea
+              className="min-h-24 w-full rounded-lg border border-[#cbd2c6] px-3 py-2 text-sm outline-none"
+              onChange={(event) => setEmailDraft({ ...emailDraft, body: event.target.value })}
+              placeholder="Escribe el correo…"
+              value={emailDraft.body}
+            />
+            <div className="flex items-center gap-2">
+              <button
+                className={primaryButton}
+                disabled={!emailDraft.subject.trim() || !emailDraft.body.trim() || busy === "email"}
+                onClick={async () => {
+                  setEmailSent(false);
+                  const ok = await call("email", `/api/crm/contacts/${contactId}/email`, { body: JSON.stringify(emailDraft), method: "POST" }, "No se pudo enviar el correo.");
+                  if (ok) {
+                    setEmailDraft({ body: "", subject: "" });
+                    setEmailSent(true);
+                  }
+                }}
+                type="button"
+              >
+                {busy === "email" ? <Loader2 className="animate-spin" size={15} /> : null}
+                Enviar correo
+              </button>
+              {emailSent ? <span className="text-sm text-[#31521d]">Correo enviado.</span> : null}
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-[#647067]">Añade un correo en los datos del contacto para poder escribirle.</p>
+        )}
       </Block>
 
       <Block title="Actividad">
