@@ -6,7 +6,7 @@ import { CalendarDays, Loader2 } from "lucide-react";
 import { readApiError } from "@/components/onboarding/shared";
 
 /**
- * Tarjeta de Google Calendar en Integraciones (sustituye a la de GoHighLevel).
+ * Tarjeta de Google Calendar en Integraciones.
  * Conectar va a Google y vuelve a `/integraciones?google=conectado` o
  * `?google=error&motivo=…`; aquí se lee ese resultado para mostrarlo.
  */

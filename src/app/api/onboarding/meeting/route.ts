@@ -1,41 +1,43 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { apiErrorResponse, badRequest } from "@/lib/api-error";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { isValidTimeZone } from "@/lib/timezones";
-import {
-  bookLevyMeeting,
-  cancelLevyMeeting,
-  getLevyCalendar,
-  getLevyMeetingDays,
-} from "@/lib/integrations/levy-calendar";
 import { syncAfterResponse } from "@/lib/agenda/after-change";
 import { googleBusyProvider } from "@/lib/agenda/google-sync";
 import { bookMeeting, cancelMeeting, getMeetingDays, resolveMeetingAgenda, type MeetingTarget } from "@/lib/agenda/levy-meeting";
+import { sendMeetingEmail, type MeetingEmailInput } from "@/lib/agenda/levy-meeting-email";
 import { getBookedMeeting, type BookedMeeting } from "@/lib/onboarding-meeting";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-/**
- * Motor de la reunión: la agenda de AAA001 si `LEVY_MEETING_AGENDA_ID` apunta
- * a una agenda activa suya; si no, el calendario de GoHighLevel (hasta F7.2).
- */
+/** La reunión vive en la agenda de AAA001 (`LEVY_MEETING_AGENDA_ID`). */
 async function meetingEngine() {
   const admin = createAdminClient();
   const target = await resolveMeetingAgenda(admin);
   return { admin, target };
 }
 
+/** Devuelve si de verdad se canceló: si ya no estaba activa, no hay nada que avisar. */
 async function cancelExisting(meeting: BookedMeeting, target: MeetingTarget | null) {
-  if (meeting.engine === "agenda") {
-    if (target) {
-      const admin = createAdminClient();
-      if (await cancelMeeting(admin, target, meeting.appointmentId)) {
-        syncAfterResponse(admin, target.workspaceId, [meeting.appointmentId]);
-      }
-    }
-    return;
+  if (!target) {
+    return false;
   }
-  await cancelLevyMeeting(meeting.appointmentId);
+
+  const admin = createAdminClient();
+  const cancelled = await cancelMeeting(admin, target, meeting.appointmentId);
+
+  if (cancelled) {
+    syncAfterResponse(admin, target.workspaceId, [meeting.appointmentId]);
+  }
+
+  return cancelled;
+}
+
+/** El correo va después de responder: ni lo espera el cliente ni puede tumbar la reserva. */
+function emailAfterResponse(target: MeetingTarget, input: MeetingEmailInput) {
+  after(async () => {
+    await sendMeetingEmail(createAdminClient(), target, input);
+  });
 }
 
 /** Guarda (o borra) la reunión dentro de workspaces.onboarding_state. */
@@ -110,42 +112,23 @@ export async function GET(request: Request) {
     await requireWorkspaceRole(workspaceId, ["owner", "admin"]);
     const { admin, target } = await meetingEngine();
 
-    if (target) {
-      const workspace = await readWorkspace(workspaceId);
-      const meeting = getBookedMeeting(workspace?.onboarding_state);
-      try {
-        return NextResponse.json({
-          available: true,
-          days: await getMeetingDays(admin, target, timeZone, { externalBusy: googleBusyProvider(admin, target.workspaceId) }),
-          meeting,
-        });
-      } catch (error) {
-        console.error("[onboarding/meeting] Agenda de AAA001 sin huecos:", error instanceof Error ? error.message : error);
-        return NextResponse.json({ available: true, days: [], error: "calendar", meeting });
-      }
-    }
-
-    const [calendar, workspace] = await Promise.all([
-      getLevyCalendar(),
-      readWorkspace(workspaceId),
-    ]);
-
-    if (!calendar) {
+    if (!target) {
       return NextResponse.json({ available: false, days: [], meeting: null });
     }
 
+    const workspace = await readWorkspace(workspaceId);
     const meeting = getBookedMeeting(workspace?.onboarding_state);
 
     try {
       return NextResponse.json({
         available: true,
-        days: await getLevyMeetingDays(timeZone),
+        days: await getMeetingDays(admin, target, timeZone, { externalBusy: googleBusyProvider(admin, target.workspaceId) }),
         meeting,
       });
-    } catch {
-      // GoHighLevel caído o mal configurado: el paso sigue abierto, pero sin
-      // horas. La pantalla enseña el contacto de soporte. El motivo real ya
-      // quedó en el log del servidor, con el nombre de la variable a revisar.
+    } catch (error) {
+      // Agenda caída: el paso sigue abierto, pero sin horas. La pantalla enseña
+      // el contacto de soporte.
+      console.error("[onboarding/meeting] Agenda de AAA001 sin huecos:", error instanceof Error ? error.message : error);
       return NextResponse.json({ available: true, days: [], error: "calendar", meeting });
     }
   } catch (error) {
@@ -174,8 +157,18 @@ export async function POST(request: Request) {
 
     if (action === "cancel") {
       if (current) {
-        await cancelExisting(current, target);
+        const cancelled = await cancelExisting(current, target);
         await saveMeeting(workspaceId, null);
+
+        if (cancelled && target) {
+          emailAfterResponse(target, {
+            companyName: workspace?.name ?? "",
+            kind: "cancelled",
+            startTime: current.startTime,
+            timezone: current.timezone,
+            to: current.email || user.email,
+          });
+        }
       }
 
       return NextResponse.json({ meeting: null, ok: true });
@@ -200,72 +193,44 @@ export async function POST(request: Request) {
       typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : null;
     const timezoneToSave = isValidTimeZone(zone) ? zone : "Europe/Madrid";
 
-    if (target) {
-      if (!cleanPhone.startsWith("+")) {
-        throw badRequest("Escribe el teléfono con el prefijo de país, por ejemplo +34 600 000 000.");
-      }
-      // Primero la nueva (comprueba que el hueco sigue libre) y luego se libera la anterior.
-      const { appointmentId } = await bookMeeting(admin, target, {
-        companyName: workspace?.name ?? "Cliente Levy",
-        email: user.email,
-        externalBusy: googleBusyProvider(admin, target.workspaceId),
-        fullName,
-        phone: cleanPhone.replace(/[\s-]/g, ""),
-        startTime,
-        workspaceCode: await readWorkspaceCode(workspaceId),
-      });
-      if (current) {
-        await cancelExisting(current, target);
-      }
-      syncAfterResponse(admin, target.workspaceId, [appointmentId]);
-      const meeting = {
-        appointmentId,
-        bookedAt: new Date().toISOString(),
-        engine: "agenda",
-        phone: cleanPhone,
-        startTime,
-        timezone: timezoneToSave,
-      };
-      await saveMeeting(workspaceId, meeting);
-      return NextResponse.json({ meeting, ok: true });
+    if (!target) {
+      throw badRequest("La reunión no se puede reservar ahora mismo. Escríbenos y la agendamos contigo.");
     }
 
-    // Solo horas que el calendario ofrece ahora mismo: evita colar una hora
-    // suelta y acabar con una cita fuera del horario del equipo.
-    const days = await getLevyMeetingDays(zone);
-    const offered = days.some((day) =>
-      day.slots.some((slot) => new Date(slot.iso).getTime() === new Date(startTime).getTime()),
-    );
-
-    if (!offered) {
-      throw badRequest("Esa hora acaba de ocuparse. Elige otra de la lista.");
+    if (!cleanPhone.startsWith("+")) {
+      throw badRequest("Escribe el teléfono con el prefijo de país, por ejemplo +34 600 000 000.");
     }
 
-    // Si ya tenía una, se cambia: primero se libera la anterior.
-    if (current) {
-      await cancelExisting(current, target);
-    }
-
-    const appointmentId = await bookLevyMeeting({
+    // Primero la nueva (comprueba que el hueco sigue libre) y luego se libera la anterior.
+    const { appointmentId } = await bookMeeting(admin, target, {
       companyName: workspace?.name ?? "Cliente Levy",
       email: user.email,
-      fullName:
-        typeof user.user_metadata?.full_name === "string"
-          ? user.user_metadata.full_name
-          : null,
-      phone: cleanPhone,
+      externalBusy: googleBusyProvider(admin, target.workspaceId),
+      fullName,
+      phone: cleanPhone.replace(/[\s-]/g, ""),
       startTime,
+      workspaceCode: await readWorkspaceCode(workspaceId),
     });
+    const moved = current ? await cancelExisting(current, target) : false;
+    syncAfterResponse(admin, target.workspaceId, [appointmentId]);
     const meeting = {
       appointmentId,
       bookedAt: new Date().toISOString(),
-      engine: "ghl",
+      email: user.email ?? "",
       phone: cleanPhone,
       startTime,
       timezone: timezoneToSave,
     };
 
     await saveMeeting(workspaceId, meeting);
+    emailAfterResponse(target, {
+      companyName: workspace?.name ?? "",
+      kind: moved ? "moved" : "confirmed",
+      previousStartTime: moved ? current?.startTime : null,
+      startTime,
+      timezone: timezoneToSave,
+      to: user.email,
+    });
 
     return NextResponse.json({ meeting, ok: true });
   } catch (error) {

@@ -12,7 +12,6 @@ import {
   setActiveWorkspaceId,
 } from "@/lib/workspaces";
 import { markAgencyContactActiveInCrm } from "@/lib/billing/agency-crm";
-import { markAgencyContactActive } from "@/lib/integrations/ghl-agency";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 function asStateRecord(value: unknown) {
@@ -126,8 +125,6 @@ export async function POST(request: Request) {
           } catch (crmError) {
             console.error("[workspaces] No se pudo marcar levy-activo en el CRM de AAA001:", crmError);
           }
-          // GoHighLevel de la agencia, mientras exista (se borra en F7.3).
-          await markAgencyContactActive(owner.user?.email);
         });
       }
 

@@ -76,7 +76,7 @@ describe("barrera: no inventar disponibilidad", () => {
     const failedLookup = sanitizeCalendarAnswer({
       answer: "Tengo libre el jueves a las 10.",
       calendarRuntime: runtime,
-      toolCalls: [{ name: "consultar_disponibilidad", result: { error: "GHL caído" } }],
+      toolCalls: [{ name: "consultar_disponibilidad", result: { error: "Agenda caída" } }],
     });
     assert.ok(failedLookup.blockedReason);
   });

@@ -244,6 +244,17 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - Revisa en el panel: horario y duración de la agenda (Agenda → Configurar) y, si quieres, conecta su Google Calendar.
   - Sigue activa la integración de GHL de AAA001 con un token que da 401: sus llamadas fallan sin bloquear nada. La borra F7.4.
   - Producción (`master`) no reconoce tools `type: "agenda"`: hasta desplegar la rama, el agente de AAA001 no ofrece citas (con GHL en 401 tampoco podía). **El usuario decidió dejarlo así** (2026-11-03) en vez de revertir la tool.
+- **Rearme de tools y reunión en AAA001 (2026-11-04, aprobado).**
+  - Borradas las tools de texto «Agendar cita» y «Consultar disponibilidad» y quitadas de las tools asignadas de Sofía (eran su única referencia). Sofía se queda con «Consultoría Levi». La descripción de esa tool sigue con el texto de ejemplo: hay una propuesta pendiente de que el usuario la apruebe.
+  - Agenda **«Puesta en marcha»** creada en AAA001 (`8c84ef58-d7f2-4d93-a7d4-88605d1a67e5`): activa, no es la de por defecto, L-V 9-18, 30 min, Europe/Madrid, Google en `off`. Sin tool, así que el agente no la ofrece.
+  - Correos de la reunión (`lib/agenda/levy-meeting-email.ts`): confirmada, movida y cancelada, **solo por el Gmail de AAA001** (sin Resend, a petición del usuario), en `after()` y sin lanzar nunca: sin Gmail la reserva sigue. Mover es «movida» solo si de verdad se canceló la anterior; si no, «confirmada».
+  - También cuando el equipo mueve o cancela desde el panel de Agenda (`handlePanelMeetingChange`): actualiza `onboarding_state.meeting` del cliente, que si no se quedaba con la hora vieja, y le avisa. Solo para citas guardadas como reunión de un cliente: las demás de esa agenda no mandan nada.
+  - Las agendas no comparten ocupación: una reunión y una consultoría pueden coincidir salvo que ambas usen el mismo Google Calendar en `push_and_busy`.
+- **F7.3 Borrado de GHL (2026-11-04, aprobada).**
+  - Comprobado antes en producción: 0 tools `ghl_calendar`, 0 flujos con acciones de GHL, 0 contactos con `booking_calendar_id`, 0 reuniones guardadas. Por eso se quita **toda la convivencia**, no solo los módulos: motor `ghl` del agente, `kind` de las tools, pasos `ghl_action`, conversión de acciones y `engine` de la reunión.
+  - Borrados: `ghl-agency`, `ghl-calendar`, `gohighlevel`, `levy-calendar`, `levy-purchase`, `lib/migration`, `scripts/migrate-ghl-to-crm.ts`, `webhooks/ghl/**`, `integrations/gohighlevel/**`, `cron/ghl-sync` y su entrada de `vercel.json`, variables de `.env.example`.
+  - **Arreglo necesario:** la lista de «Calendarios de agendamiento» en Tools salía de GHL; sin él no se podía habilitar ni describir ninguna agenda. Ahora sale de las agendas de la empresa (`/api/agenda/agendas`) y guarda tools `type: "agenda"`. También se quitan los dos preajustes de texto de GHL. **No visto con sesión.**
+  - Se queda para F7.4: `gohighlevel` en `database.types.ts`, `schema.sql` y el check de la base, la fila y el secreto de AAA001 y las claves `ghl_*` de `contacts.metadata`. Las migraciones ya aplicadas no se reescriben. `PROMPT_CRM_SUPABASE.md` y `COURSE_*.md` no se tocan: son históricos.
 
 ## Tareas
 
@@ -307,7 +318,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 ### F7 — Migración de datos y limpieza
 - [x] F7.1 (cerrada sin datos de GHL por decisión del usuario; el script queda para la parte sin GHL) Script `scripts/migrate-ghl-to-crm.ts` (solo AAA001, idempotente, `--dry-run` por defecto): etiquetas y etapa desde GHL para los 160 contactos con `ghl_contact_id`, tool `ghl_calendar` «Consultoría Levi» → agenda, citas futuras del calendario GHL → `appointments`, el flujo con `ghl_action` → `crm_action`, y propuesta de texto nuevo para las tools «Agendar en GoHighLevel» y «Consultar disponibilidad». Ejecutar **solo en dry-run** y apuntar el resultado aquí. Necesita en local la clave de cifrado de `integration_secrets` y acceso a la API de GHL: si no están, marcar `[!]` y pedírmelas. (dep: F5.1, F2.4, F5.3)
 - [x] **[STOP]** F7.2 (aprobada por el usuario el 2026-11-03, sin GHL) Ejecutar la migración real de AAA001 (escribe en producción). **Sin GHL:** crear la agenda «Consultoría Levi» (L-V 9-18, 30 min, Europe/Madrid, a ajustar en el panel), pasar su tool a `type: "agenda"` (el agente deja de usar GHL), convertir las 2 acciones del flujo «LEVY - Diagnóstico y agenda» y poner el texto nuevo de las tools «Agendar cita» y «Consultar disponibilidad».
-- [ ] **[STOP]** F7.3 Borrar código, rutas y variables de GHL (`ghl-agency.ts`, `webhooks/ghl/**` incluida `purchase` + `levy-purchase.ts`, `integrations/gohighlevel/**`, `cron/ghl-sync`, `vercel.json`). **Solo después de F6.3 verificada** con un pago real de prueba (hoy `webhooks/ghl/purchase` es la vía de venta). (dep: F6.3, F7.2)
+- [x] **[STOP]** F7.3 (aprobada por el usuario el 2026-11-04, **sin el pago real de prueba** de F6.3: hacerlo antes de desplegar) Borrar código, rutas y variables de GHL (`ghl-agency.ts`, `webhooks/ghl/**` incluida `purchase` + `levy-purchase.ts`, `integrations/gohighlevel/**`, `cron/ghl-sync`, `vercel.json`). **Solo después de F6.3 verificada** con un pago real de prueba (hoy `webhooks/ghl/purchase` es la vía de venta). (dep: F6.3, F7.2)
 - [ ] **[STOP]** F7.4 Migración destructiva: quitar `gohighlevel` del check de `integrations`, borrar su fila y su secreto, limpiar claves `ghl_*` de `contacts.metadata`, convertir assets `ghl_calendar` restantes.
 - [ ] **[STOP]** F7.5 Orden de salida (lo hago yo contigo): merge de `crm-supabase` → F7.2 → despliegue → variables en Vercel → activar el job de `pg_cron` de F4.3 → comprobar AAA001 por WhatsApp. El merge es todo o nada: no desplegar la rama sin F7.2 hecha o la coexistencia de F5.2 probada.
 
@@ -356,6 +367,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-03 · F7.2 · aplicada sin GHL en AAA001 (agenda «Consultoría Levi», tool → agenda, textos de tools, flujo convertido, campo `cuello_de_botella_principal`); comprobada en la base e idempotente; arreglo del motor para ejecutar pasos `crm_action`; typecheck, lint y test en verde · commit `crm: F7.2 migración de AAA001 sin GHL`.
 - 2026-11-03 · F6.5 · página `/bienvenida` + reenviar (3/hora) + logo y estilo de la landing; 15 pruebas nuevas; typecheck, lint, test (343/343) y build en verde; migración `welcome_resend` aplicada con aprobación del usuario (comprobaciones y advisors sin avisos nuevos). Sin probar con Stripe real · commits `crm: F6.5 página de bienvenida (migración pendiente)` y `crm: F6.5 migración aplicada`.
 - 2026-11-03 · F6.8 · correo por Gmail (conexión aparte, remitente de AAA001 con respaldo de Resend, envío desde ficha y flujo con actividad); 30 pruebas nuevas; typecheck, lint, test (373/373) y build en verde; migración `integrations_gmail` aplicada con aprobación del usuario (comprobaciones y advisors sin avisos nuevos). Sin probar con Google real ni con sesión · commits `crm: F6.8 correo por Gmail (migración pendiente)` y `crm: F6.8 migración aplicada`.
+- 2026-11-04 · Rearme de AAA001 y F7.3 · tools de texto borradas, agenda «Puesta en marcha» creada, correos de la reunión por Gmail con pruebas, panel de Tools sobre agendas y todo GHL fuera del código (código, rutas, variables, script y convivencia); typecheck, lint, test y build en verde. Sin push ni despliegue; F7.4 sin hacer · commit `crm: F7.3 sin GHL y correos de la reunión`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->
@@ -431,7 +443,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
    - Customer Portal activado;
    - pedir el teléfono en el Payment Link;
    - un pago de prueba real antes de F7.3.
-6. **En AAA001:** crear la agenda de la reunión de puesta en marcha y poner su id en `LEVY_MEETING_AGENDA_ID`.
+6. **En AAA001:** ~~crear la agenda de la reunión~~ hecho (2026-11-04). Falta poner `LEVY_MEETING_AGENDA_ID=8c84ef58-d7f2-4d93-a7d4-88605d1a67e5` en Vercel y en `.env`.
 7. **Supabase Vault:** secretos `crm_jobs_url` y `crm_jobs_cron_secret`, y luego activar el job `levy-crm-jobs` (F7.5).
 8. **Probar el panel** con tu sesión (paso 5) y revisar estas decisiones:
    - empresas sin suscripción quedan en «aviso», no bloqueadas;

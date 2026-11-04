@@ -4,9 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   BookOpenText,
   BriefcaseBusiness,
-  CalendarCheck,
   Check,
-  CircleX,
   ClipboardList,
   KeyRound,
   Loader2,
@@ -21,7 +19,7 @@ import {
 
 import { AgentSettings } from "@/components/agent-settings";
 import {
-  buildGhlCalendarToolMetadata,
+  buildCalendarToolMetadata,
   isCalendarTool,
   parseCalendarTools,
 } from "@/lib/calendar-tools";
@@ -42,22 +40,23 @@ type IntegrationItem = {
   config: Json;
   id: string;
   last_error: string | null;
-  provider: "ycloud" | "openai" | "gohighlevel";
+  provider: "ycloud" | "openai";
   secret_ref: string | null;
   status: "pending" | "active" | "error" | "disabled";
   workspace_id: string;
+};
+
+type AgendaOption = {
+  active: boolean;
+  description: string | null;
+  id: string;
+  name: string;
 };
 
 type IntegrationTestResult = {
   error?: string;
   message?: string;
   ok: boolean;
-  steps?: Array<{
-    detail?: string;
-    key: string;
-    label: string;
-    status: "failed" | "passed";
-  }>;
 };
 
 type WorkspaceAsset = {
@@ -153,28 +152,9 @@ const providers = [
     label: "OpenAI",
     provider: "openai",
   },
-  {
-    description: "Conecta tu CRM para que los contactos de WhatsApp entren solos.",
-    fields: [
-      ["location_id", "Location ID"],
-      ["api_key", "GoHighLevel API key"],
-    ],
-    label: "GoHighLevel",
-    provider: "gohighlevel",
-  },
 ] as const;
 
 const toolPresets = [
-  {
-    content:
-      "Acción: crea una cita directamente en GoHighLevel. Inputs: nombre, teléfono, fecha, hora, calendario y notas. Requiere GoHighLevel conectado en esta empresa.",
-    title: "Agendar en GoHighLevel",
-  },
-  {
-    content:
-      "Acción: consulta horarios disponibles en el calendario de GoHighLevel antes de reservar. Inputs: rango de fechas y calendario.",
-    title: "Consultar disponibilidad",
-  },
   {
     content:
       "Acción: devuelve el link de agenda para que el contacto reserve por su cuenta. Es una tool de lectura.",
@@ -269,22 +249,6 @@ function fieldHelp(provider: string, key: string) {
     return helpers[key];
   }
 
-  if (provider === "gohighlevel" && key === "location_id") {
-    return {
-      help: "En GoHighLevel: Settings > Business Profile. Es el ID de la subcuenta de tu negocio.",
-      placeholder: "location_id",
-    };
-  }
-
-  if (provider === "gohighlevel" && key === "api_key") {
-    return {
-      // Debe ser Private Integration Token (API v2). La "API Key" de Settings >
-      // API Keys es la v1, descontinuada, y no sirve para calendarios ni citas.
-      help: "En GoHighLevel: Settings > Private Integrations > Create new Integration. NO uses la API Key vieja. Habilita View/Edit Contacts, View Calendars, View/Edit Calendar Events y View Locations.",
-      placeholder: "Private Integration Token",
-    };
-  }
-
   if (provider === "openai" && key === "api_key") {
     return {
       help: "Se cifra en el backend y se usa solo para los agentes de esta empresa.",
@@ -351,9 +315,6 @@ export function WorkspaceSettings({
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState("");
   const [savingKey, setSavingKey] = useState("");
-  const [integrationTestResults, setIntegrationTestResults] = useState<
-    Partial<Record<IntegrationItem["provider"], IntegrationTestResult>>
-  >({});
   const canChangeMemberRoles = activeRole === "owner";
 
   const ycloudSecretValue = integrationDrafts.ycloud.config.webhook_secret?.trim();
@@ -363,18 +324,8 @@ export function WorkspaceSettings({
   const webhookUrl = workspaceId
     ? `${appUrl}/api/webhooks/ycloud/${workspaceCode ?? workspaceId}/${webhookSecretParam}`
     : "";
-  // El secreto de GHL viaja en la cabecera Authorization, no en la URL, y solo
-  // está disponible en claro justo despues de generarlo.
-  const ghlWebhookUrl = `${appUrl}/api/webhooks/ghl/send-message`;
-  const ghlSecretValue = integrationDrafts.gohighlevel.config.ghl_webhook_secret?.trim();
-  const ghlSecretMask = asRecord(
-    localIntegrations.find((integration) => integration.provider === "gohighlevel")
-      ?.config ?? {},
-  ).ghl_webhook_secret_mask;
-  const [ghlCalendars, setGhlCalendars] = useState<
-    Array<{ id: string; name: string }>
-  >([]);
-  const [ghlCalendarsError, setGhlCalendarsError] = useState("");
+  const [agendaOptions, setAgendaOptions] = useState<AgendaOption[]>([]);
+  const [agendaOptionsError, setAgendaOptionsError] = useState("");
   const timeZoneOptions = useMemo(() => getTimeZoneOptions(), []);
   const assetsByKind = useMemo(
     () =>
@@ -453,25 +404,16 @@ export function WorkspaceSettings({
   }, [localIntegrations, workspaceId, ycloudSecretValue]);
 
   useEffect(() => {
-    const ghlActive = localIntegrations.some(
-      (integration) =>
-        integration.provider === "gohighlevel" && integration.status === "active",
-    );
-
-    if (!workspaceId || !ghlActive) {
+    if (!workspaceId) {
       return;
     }
 
     let cancelled = false;
 
-    async function loadCalendars() {
-      const response = await fetch(
-        `/api/integrations/gohighlevel/calendars?workspaceId=${encodeURIComponent(
-          workspaceId!,
-        )}`,
-      );
+    async function loadAgendas() {
+      const response = await fetch("/api/agenda/agendas");
       const payload = (await response.json()) as {
-        calendars?: Array<{ id: string; name: string }>;
+        agendas?: AgendaOption[];
         error?: string;
       };
 
@@ -480,161 +422,85 @@ export function WorkspaceSettings({
       }
 
       if (!response.ok) {
-        setGhlCalendarsError(payload.error ?? "No se pudieron cargar los calendarios.");
+        setAgendaOptionsError(payload.error ?? "No se pudieron cargar las agendas.");
         return;
       }
 
-      setGhlCalendarsError("");
-      setGhlCalendars(payload.calendars ?? []);
+      setAgendaOptionsError("");
+      setAgendaOptions((payload.agendas ?? []).filter((agenda) => agenda.active));
     }
 
-    void loadCalendars();
+    void loadAgendas();
 
     return () => {
       cancelled = true;
     };
-  }, [localIntegrations, workspaceId]);
+  }, [workspaceId]);
 
-  async function saveIntegration(
-    provider: IntegrationItem["provider"],
-    { regenerateWebhookSecret = false } = {},
-  ) {
+  async function saveIntegration(provider: IntegrationItem["provider"]) {
     if (!workspaceId) {
       setStatus("Primero necesitas un workspace activo.");
       return;
     }
 
-    setSavingKey(regenerateWebhookSecret ? `${provider}:secret` : provider);
+    setSavingKey(provider);
     setStatus("");
 
     const draft = integrationDrafts[provider];
+    const endpoint = provider === "openai" ? "/api/integrations/openai" : "/api/integrations/ycloud";
+    const requestBody =
+      provider === "openai"
+        ? {
+            apiKey: draft.config.api_key,
+            defaultModel: draft.config.default_model,
+            workspaceId,
+          }
+        : {
+            apiKey: draft.config.api_key,
+            phoneE164: draft.config.phone_e164,
+            phoneId: draft.config.phone_id,
+            wabaId: draft.config.waba_id,
+            webhookSecret: draft.config.webhook_secret,
+            workspaceId,
+          };
+    const response = await fetch(endpoint, {
+      body: JSON.stringify(requestBody),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    const payload = (await response.json()) as {
+      error?: string;
+      integration?: IntegrationItem;
+      webhookSecret?: string;
+      webhookUrl?: string;
+    };
 
-    if (provider === "openai" || provider === "ycloud" || provider === "gohighlevel") {
-      const endpoint =
-        provider === "openai"
-          ? "/api/integrations/openai"
-          : provider === "ycloud"
-            ? "/api/integrations/ycloud"
-            : "/api/integrations/gohighlevel";
-      const requestBody =
-        provider === "openai"
-          ? {
-              apiKey: draft.config.api_key,
-              defaultModel: draft.config.default_model,
-              workspaceId,
-            }
-          : provider === "ycloud"
-            ? {
-                apiKey: draft.config.api_key,
-                phoneE164: draft.config.phone_e164,
-                phoneId: draft.config.phone_id,
-                wabaId: draft.config.waba_id,
-                webhookSecret: draft.config.webhook_secret,
-                workspaceId,
-              }
-            : {
-                apiKey: draft.config.api_key,
-                calendarId: draft.config.calendar_id,
-                locationId: draft.config.location_id,
-                regenerateWebhookSecret,
-                workspaceId,
-              };
-      const response = await fetch(endpoint, {
-        body: JSON.stringify(requestBody),
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-      });
-      const payload = (await response.json()) as {
-        error?: string;
-        integration?: IntegrationItem;
-        webhookSecret?: string;
-        webhookUrl?: string;
-      };
-
-      if (!response.ok || !payload.integration) {
-        setStatus(payload.error ?? "No se pudo guardar la integración.");
-        setSavingKey("");
-        return;
-      }
-
-      if (payload.webhookSecret && provider === "ycloud") {
-        setIntegrationDrafts((current) => ({
-          ...current,
-          ycloud: {
-            ...current.ycloud,
-            config: {
-              ...current.ycloud.config,
-              webhook_secret: payload.webhookSecret ?? "",
-            },
-          },
-        }));
-      }
-
-      if (payload.webhookSecret && provider === "gohighlevel") {
-        setIntegrationDrafts((current) => ({
-          ...current,
-          gohighlevel: {
-            ...current.gohighlevel,
-            config: {
-              ...current.gohighlevel.config,
-              ghl_webhook_secret: payload.webhookSecret ?? "",
-            },
-          },
-        }));
-      }
-
-      setLocalIntegrations((current) => {
-        const withoutProvider = current.filter(
-          (integration) => integration.provider !== provider,
-        );
-        return [...withoutProvider, payload.integration!];
-      });
-      setStatus(
-        regenerateWebhookSecret
-          ? "Secreto nuevo generado. Copialo ahora: no se vuelve a mostrar."
-          : "Integración conectada.",
-      );
+    if (!response.ok || !payload.integration) {
+      setStatus(payload.error ?? "No se pudo guardar la integración.");
       setSavingKey("");
       return;
     }
 
-    const existing = localIntegrations.find(
-      (integration) => integration.provider === provider,
-    );
-    const payload = {
-      config: draft.config,
-      provider,
-      status: draft.status,
-      workspace_id: workspaceId,
-    };
-    const query = existing
-      ? supabase
-          .from("integrations")
-          .update(payload)
-          .eq("id", existing.id)
-          .select("id, workspace_id, provider, status, config, secret_ref, last_error")
-          .single()
-      : supabase
-          .from("integrations")
-          .insert(payload)
-          .select("id, workspace_id, provider, status, config, secret_ref, last_error")
-          .single();
-
-    const { data, error } = await query;
-
-    if (error) {
-      setStatus(error.message);
-      setSavingKey("");
-      return;
+    if (payload.webhookSecret && provider === "ycloud") {
+      setIntegrationDrafts((current) => ({
+        ...current,
+        ycloud: {
+          ...current.ycloud,
+          config: {
+            ...current.ycloud.config,
+            webhook_secret: payload.webhookSecret ?? "",
+          },
+        },
+      }));
     }
 
     setLocalIntegrations((current) => {
       const withoutProvider = current.filter(
         (integration) => integration.provider !== provider,
       );
-      return [...withoutProvider, data as IntegrationItem];
+      return [...withoutProvider, payload.integration!];
     });
-    setStatus("Integración guardada.");
+    setStatus("Integración conectada.");
     setSavingKey("");
   }
 
@@ -646,10 +512,6 @@ export function WorkspaceSettings({
 
     setSavingKey(`${provider}:test`);
     setStatus("");
-    setIntegrationTestResults((current) => ({
-      ...current,
-      [provider]: undefined,
-    }));
 
     const response = await fetch(`/api/integrations/${provider}/test`, {
       body: JSON.stringify({ workspaceId }),
@@ -657,7 +519,6 @@ export function WorkspaceSettings({
       method: "POST",
     });
     const payload = (await response.json()) as IntegrationTestResult;
-    setIntegrationTestResults((current) => ({ ...current, [provider]: payload }));
 
     if (!response.ok || !payload.ok) {
       setStatus(payload.error ?? `No se pudo probar ${provider}.`);
@@ -666,7 +527,6 @@ export function WorkspaceSettings({
     }
 
     const successMessages: Record<IntegrationItem["provider"], string> = {
-      gohighlevel: "GoHighLevel respondió correctamente. La conexión está lista.",
       openai: "OpenAI respondió correctamente.",
       ycloud: "YCloud respondió correctamente.",
     };
@@ -817,29 +677,27 @@ export function WorkspaceSettings({
       return;
     }
 
-    const calendar = ghlCalendars.find((item) => item.id === calendarId);
+    const agenda = agendaOptions.find((item) => item.id === calendarId);
 
-    if (!calendar) {
-      setStatus("Elige un calendario de la lista.");
+    if (!agenda) {
+      setStatus("Elige una agenda de la lista.");
       return;
     }
 
     setSavingKey(`calendar:${calendarId}`);
     setStatus("");
 
-    const metadata = buildGhlCalendarToolMetadata({
-      calendarId: calendar.id,
-      calendarName: calendar.name,
+    const metadata = buildCalendarToolMetadata({
+      agendaId: agenda.id,
+      agendaName: agenda.name,
       isDefault: makeDefault,
     });
     const payload = {
-      content:
-        description ??
-        `Citas de ${calendar.name}. Describe aqui cuando usar esta agenda.`,
+      content: description ?? (agenda.description?.trim() || `Citas de ${agenda.name}.`),
       kind: "tool" as const,
       metadata,
       status: "active" as const,
-      title: calendar.name,
+      title: agenda.name,
       workspace_id: workspaceId,
     };
     const { data, error } = assetId
@@ -895,8 +753,8 @@ export function WorkspaceSettings({
     });
     setStatus(
       makeDefault
-        ? `"${calendar.name}" es ahora el calendario del agente de citas.`
-        : "Calendario guardado.",
+        ? `"${agenda.name}" es ahora la agenda preferida del agente de citas.`
+        : "Agenda guardada.",
     );
     setSavingKey("");
   }
@@ -1254,7 +1112,7 @@ export function WorkspaceSettings({
         <div>
           <h3 className="text-sm font-semibold">Info del negocio</h3>
           <p className="mt-1 text-sm text-[#647067]">
-            Completa estos datos como en GHL. Cada campo se puede usar como
+            Completa estos datos. Cada campo se puede usar como
             variable en los prompts de agentes.
           </p>
         </div>
@@ -1695,15 +1553,7 @@ export function WorkspaceSettings({
           <div className="grid gap-3 xl:grid-cols-3">
             <GoogleCalendarCard canManage={activeRole === "owner" || activeRole === "admin"} />
             <GmailCard canManage={activeRole === "owner" || activeRole === "admin"} />
-            {/* GoHighLevel solo aparece donde ya estaba configurado (AAA001 hasta
-                su migración, F7.2): el CRM y la agenda propios lo sustituyen. */}
-            {providers
-              .filter(
-                (provider) =>
-                  provider.provider !== "gohighlevel" ||
-                  localIntegrations.some((integration) => integration.provider === "gohighlevel"),
-              )
-              .map((provider) => {
+            {providers.map((provider) => {
               const draft = integrationDrafts[provider.provider];
               const connected = localIntegrations.find(
                 (integration) => integration.provider === provider.provider,
@@ -1774,51 +1624,6 @@ export function WorkspaceSettings({
                       </label>
                     );
                   })}
-                  {provider.provider === "gohighlevel" && connected ? (
-                    // El calendario se elige en Tools, no aqui: tenerlo en dos
-                    // sitios creaba dos fuentes de verdad para lo mismo.
-                    <p className="rounded-lg border border-dashed border-[#cbd2c6] bg-[#fafbf8] p-2 text-xs text-[#4d5a51]">
-                      Los calendarios de agendamiento se configuran en la pestana{" "}
-                      <span className="font-semibold">Tools</span>, y se asignan a
-                      cada agente en <span className="font-semibold">Agentes</span>.
-                    </p>
-                  ) : null}
-                  {provider.provider === "gohighlevel" && connected ? (
-                    <div className="rounded-lg border border-dashed border-[#cbd2c6] bg-[#fafbf8] p-2 text-xs text-[#4d5a51]">
-                      <p className="font-semibold">Webhook para pegar en GoHighLevel</p>
-                      <p className="mt-1 break-all">{ghlWebhookUrl}</p>
-                      <p className="mt-2">
-                        En GoHighLevel: Settings &gt; Webhooks. Agrega la cabecera{" "}
-                        <span className="font-semibold">Authorization: Bearer</span> con
-                        este secreto:
-                      </p>
-                      <p className="mt-1 break-all font-semibold">
-                        {ghlSecretValue || ghlSecretMask || "Sin secreto"}
-                      </p>
-                      <p className="mt-2">
-                        {ghlSecretValue
-                          ? "Copialo ahora: por seguridad no se vuelve a mostrar completo."
-                          : "Solo se guarda cifrado. Si lo perdiste, genera uno nuevo (el anterior deja de servir)."}
-                      </p>
-                      <button
-                        className="mt-2 inline-flex h-8 items-center gap-2 rounded-lg border border-[#cbd2c6] px-2 text-xs font-medium text-[#10231c] disabled:text-[#9aa59e]"
-                        disabled={savingKey === "gohighlevel:secret"}
-                        onClick={() =>
-                          saveIntegration("gohighlevel", {
-                            regenerateWebhookSecret: true,
-                          })
-                        }
-                        type="button"
-                      >
-                        {savingKey === "gohighlevel:secret" ? (
-                          <Loader2 className="animate-spin" size={13} />
-                        ) : (
-                          <KeyRound size={13} />
-                        )}
-                        Generar secreto nuevo
-                      </button>
-                    </div>
-                  ) : null}
                   <div className="flex flex-wrap gap-2">
                     <button
                       className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]"
@@ -1841,45 +1646,12 @@ export function WorkspaceSettings({
                     >
                       {savingKey === `${provider.provider}:test` ? (
                         <Loader2 className="animate-spin" size={16} />
-                      ) : provider.provider === "gohighlevel" ? (
-                        <CalendarCheck size={16} />
                       ) : (
                         <PlugZap size={16} />
                       )}
-                      {provider.provider === "gohighlevel"
-                        ? "Probar citas"
-                        : "Probar conexión"}
+                      Probar conexión
                     </button>
                   </div>
-                  {provider.provider === "gohighlevel" &&
-                  integrationTestResults.gohighlevel ? (
-                    <div className="grid gap-1 border-t border-[#e2e6df] pt-3">
-                      <p className="text-xs font-semibold text-[#4d5a51]">
-                        Resultado de la prueba
-                      </p>
-                      {(integrationTestResults.gohighlevel.steps ?? []).map((step) => (
-                        <div
-                          className="grid min-h-7 grid-cols-[18px_minmax(0,1fr)] items-start gap-2 text-xs"
-                          key={step.key}
-                        >
-                          {step.status === "passed" ? (
-                            <Check className="mt-0.5 text-[#35735b]" size={15} />
-                          ) : (
-                            <CircleX className="mt-0.5 text-[#b42318]" size={15} />
-                          )}
-                          <p className="min-w-0 text-[#334139]">
-                            <span className="font-medium">{step.label}</span>
-                            {step.detail ? `: ${step.detail}` : ""}
-                          </p>
-                        </div>
-                      ))}
-                      {integrationTestResults.gohighlevel.error ? (
-                        <p className="text-xs text-[#b42318]">
-                          {integrationTestResults.gohighlevel.error}
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : null}
                 </div>
               );
             })}
@@ -1901,20 +1673,20 @@ export function WorkspaceSettings({
               <div>
                 <h3 className="text-sm font-semibold">Calendarios de agendamiento</h3>
                 <p className="mt-1 text-sm text-[#647067]">
-                  Habilita los calendarios y describe cuando usar cada uno. El
+                  Habilita las agendas y describe cuando usar cada uno. El
                   agente elige según lo que pida el cliente. Asignaselos en la
                   pestana Agentes.
                 </p>
               </div>
 
-              {ghlCalendars.length === 0 ? (
+              {agendaOptions.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-[#d9ded3] bg-white p-3 text-sm text-[#647067]">
-                  {ghlCalendarsError ||
-                    "Conecta GoHighLevel en Integraciones para ver tus calendarios."}
+                  {agendaOptionsError ||
+                    "Crea una agenda en la sección Agenda para poder asignarla a tus agentes."}
                 </p>
               ) : (
                 <div className="grid gap-2">
-                  {ghlCalendars.map((calendar) => {
+                  {agendaOptions.map((calendar) => {
                     const tool = calendarTools.find(
                       (item) => item.calendarId === calendar.id,
                     );
@@ -2282,7 +2054,7 @@ export function WorkspaceSettings({
             <h3 className="text-sm font-semibold">Automatizaciones</h3>
             <p className="mt-1 text-sm text-[#647067]">
               Aquí vamos a conectar reglas como buffer IA, entrega de mensajes,
-              recordatorios y sincronización con GHL. Por ahora quedan listas las
+              recordatorios y sincronización con tu calendario. Por ahora quedan listas las
               bases para configurar agentes, tools y conocimiento.
             </p>
           </div>

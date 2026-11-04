@@ -710,7 +710,7 @@ async function generateReply(
   const transcript = buildTranscript(messages);
   const tools = calendarRuntime
     ? buildCalendarToolDefinitions(calendarRuntime.calendars, {
-        withChanges: calendarRuntime.engine === "agenda",
+        withChanges: true,
       })
     : undefined;
   // La fecha va tambien en el turno del usuario, no solo en las instrucciones:
@@ -792,7 +792,7 @@ async function generateReply(
 
   // La disponibilidad se redacta con datos estructurados del servidor. Dejar
   // esta parte al modelo permitia que un ISO de 01:00 AM terminara anunciado
-  // como 1 PM aunque la consulta a GHL hubiera sido correcta.
+  // como 1 PM aunque la consulta a la agenda hubiera sido correcta.
   const availabilityCall = toolCalls.findLast(
     (call) => call.name === "consultar_disponibilidad",
   );
@@ -852,7 +852,7 @@ async function generateReply(
       ),
       calendarGuard:
         typeof result.error === "string"
-          ? "La consulta de disponibilidad fallo en GHL."
+          ? "La consulta de disponibilidad fallo en la agenda."
           : null,
       timezoneWarning,
       model: payload.model ?? model,
@@ -864,7 +864,7 @@ async function generateReply(
 
   // Cuando el cliente elige una hora ya ofrecida, la reserva no depende de que
   // el modelo conserve el ISO de una tool anterior. El servidor vuelve a
-  // validar esa fecha/hora en GHL y crea la cita con el slot real.
+  // validar esa fecha/hora en la agenda y crea la cita con el slot real.
   if (
     explicitBookingRequest &&
     calendarRuntime &&

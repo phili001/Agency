@@ -10,7 +10,7 @@ import { createTask } from "./tasks.ts";
 
 /**
  * Acciones del CRM que ejecuta un paso de flujo (`crm_action`, o las acciones
- * de GHL convertidas). Cada acción va por separado: una que falla no impide las
+ * convertidas). Cada acción va por separado: una que falla no impide las
  * demás, y el resultado dice cuál falló y por qué.
  *
  * `addedTagIds` son las etiquetas que el contacto NO tenía y ahora sí: con

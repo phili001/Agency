@@ -16,8 +16,8 @@ import { zonedStartOfDay } from "../timezones.ts";
 export type CalendarRuntimeView = {
   calendars: Array<Pick<CalendarTool, "calendarName" | "description">>;
   contact: { fullName: string | null };
-  /** "agenda" = agenda propia (F5.2): añade reagendar/cancelar. Sin valor = GHL. */
-  engine?: "agenda" | "ghl";
+  /** "agenda" añade las instrucciones de reagendar y cancelar. */
+  engine?: "agenda";
   timezone: string;
   /** Citas próximas del contacto (solo agenda propia). */
   upcoming?: Array<{ label: string; service: string; startsAt: string }>;
@@ -175,7 +175,7 @@ export function buildCalendarToolDefinitions(
 
 /**
  * Barrera anti-alucinacion para agentes sin calendario. Sin esto un agente
- * afirmaba haber agendado citas que nunca existieron en GoHighLevel.
+ * afirmaba haber agendado citas que nunca existieron.
  */
 export function buildNoCalendarContext() {
   return `Agenda -- NO tienes acceso:

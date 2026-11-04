@@ -7,7 +7,6 @@ export type FlowStepType =
   | "condition"
   | "crm_action"
   | "finish"
-  | "ghl_action"
   | "human"
   | "message"
   | "options"
@@ -15,31 +14,7 @@ export type FlowStepType =
   | "wait"
   | "webhook";
 
-export type FlowGhlAction = {
-  /** Calendario que usara el agente de citas para este contacto. */
-  calendarId?: string;
-  customFieldKey?: string;
-  customFieldValue?: string;
-  label: string;
-  pipelineId?: string;
-  stageId?: string;
-  tag?: string;
-  taskTitle?: string;
-  type:
-    | "add_tag"
-    | "create_task"
-    | "remove_tag"
-    | "set_booking_calendar"
-    | "upsert_opportunity"
-    | "update_contact_field";
-};
-
-/**
- * Acción del CRM propio (F5.3). Sustituye a `FlowGhlAction`: los flujos
- * guardados con acciones de GoHighLevel se siguen leyendo; mientras el
- * workspace tenga GHL conectado se ejecutan en GHL y, si no, se convierten
- * (`convertGhlActionToCrm`) y van al CRM.
- */
+/** Acción del CRM propio. */
 export type FlowCrmActionType =
   | "add_note"
   | "add_tag"
@@ -64,7 +39,7 @@ export type FlowCrmAction = {
   label: string;
   noteBody?: string;
   stageId?: string;
-  /** Nombre de la etapa (lo que deja la conversión desde GHL). */
+  /** Nombre de la etapa, si no se guarda por id. */
   stageName?: string;
   tagId?: string;
   /** Nombre de la etiqueta (si no existe, `add_tag` la crea). */
@@ -74,7 +49,7 @@ export type FlowCrmAction = {
   type: FlowCrmActionType;
 };
 
-export type FlowAction = FlowCrmAction | FlowGhlAction;
+export type FlowAction = FlowCrmAction;
 
 export const crmActionTypes: Array<{ label: string; value: FlowCrmActionType }> = [
   { label: "Poner etiqueta", value: "add_tag" },
@@ -91,42 +66,14 @@ export function isCrmAction(action: unknown): action is FlowCrmAction {
   return Boolean(action) && typeof action === "object" && (action as { engine?: unknown }).engine === "crm";
 }
 
-/**
- * Acción de GHL → acción del CRM. Las etiquetas, campos y tareas pasan tal
- * cual (por nombre/clave). `upsert_opportunity` y `set_booking_calendar` usan
- * ids de GoHighLevel que no existen en el CRM: devuelven null (hay que
- * rehacerlas a mano con una etapa o agenda del CRM).
- */
-export function convertGhlActionToCrm(action: FlowGhlAction): FlowCrmAction | null {
-  const label = action.label || "Acción";
-
-  switch (action.type) {
-    case "add_tag":
-    case "remove_tag":
-      return action.tag?.trim() ? { engine: "crm", label, tagName: action.tag.trim(), type: action.type } : null;
-    case "update_contact_field":
-      return action.customFieldKey?.trim()
-        ? { engine: "crm", fieldKey: action.customFieldKey.trim(), fieldValue: action.customFieldValue ?? "", label, type: "update_contact_field" }
-        : null;
-    case "create_task":
-      return action.taskTitle?.trim() ? { engine: "crm", label, taskTitle: action.taskTitle.trim(), type: "create_task" } : null;
-    default:
-      return null;
-  }
-}
-
-/** Acciones de un paso, separadas en las del CRM y las viejas de GHL. */
-export function splitStepActions(actions: unknown) {
-  const list = Array.isArray(actions) ? actions : [];
-  return {
-    crm: list.filter(isCrmAction),
-    legacy: list.filter((action): action is FlowGhlAction => !isCrmAction(action) && Boolean(action) && typeof action === "object"),
-  };
+/** Acciones del CRM de un paso; lo que no lo sea se ignora. */
+export function stepCrmActions(actions: unknown) {
+  return (Array.isArray(actions) ? actions : []).filter(isCrmAction);
 }
 
 /**
  * ¿Dispara este flujo (trigger `tag`) alguna de estas etiquetas recién puestas?
- * Por id (`tagId`) o por nombre (`tag`, sin mayúsculas: flujos viejos o de GHL).
+ * Por id (`tagId`) o por nombre (`tag`, sin mayúsculas).
  */
 export function flowMatchesTags(
   triggerConfig: unknown,

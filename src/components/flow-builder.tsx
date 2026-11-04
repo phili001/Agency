@@ -11,20 +11,18 @@ import {
   Plus,
   Save,
   Trash2,
-  UserRound,
   Workflow,
   ArrowDown,
   ArrowUp,
 } from "lucide-react";
 
 import {
-  convertGhlActionToCrm,
   createBlankStep,
   crmActionTypes,
   defaultFlowStages,
   flowStepTypes,
   parseFlowSteps,
-  splitStepActions,
+  stepCrmActions,
   type FlowAction,
   type FlowCrmAction,
   type FlowAudience,
@@ -48,12 +46,6 @@ type FlowRunItem = {
   status: string;
 };
 
-type IntegrationItem = {
-  config: Json;
-  provider: "gohighlevel" | "openai" | "ycloud";
-  status: string;
-};
-
 /** Opciones del CRM del workspace para los desplegables de acciones y disparadores. */
 export type FlowCrmOptions = {
   agendas: Array<{ id: string; name: string }>;
@@ -66,7 +58,6 @@ type FlowBuilderProps = {
   agents: AgentItem[];
   crm: FlowCrmOptions;
   flows: FlowRecord[];
-  integrations: IntegrationItem[];
   runs: FlowRunItem[];
   workspaceCode?: string | null;
   workspaceId: string | null;
@@ -86,16 +77,6 @@ const triggers: Array<{ label: string; value: FlowTriggerType }> = [
   { label: "Manual", value: "manual" },
 ];
 
-
-function asConfigRecord(value: Json): Record<string, string> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  return Object.fromEntries(
-    Object.entries(value).map(([key, item]) => [key, String(item ?? "")]),
-  );
-}
 
 function getFlowCounts(runs: FlowRunItem[], flowId: string) {
   const flowRuns = runs.filter((run) => run.flow_id === flowId);
@@ -494,19 +475,14 @@ function ActionsEditor({
   crm: FlowCrmOptions;
   onChange: (actions: FlowAction[]) => void;
 }) {
-  const { crm: crmActions, legacy } = splitStepActions(actions);
+  const crmActions = stepCrmActions(actions);
 
   function replaceCrm(next: FlowCrmAction[]) {
-    onChange([...next, ...legacy]);
+    onChange(next);
   }
 
   function patchAction(index: number, patch: Partial<FlowCrmAction>) {
     replaceCrm(crmActions.map((action, actionIndex) => (actionIndex === index ? { ...action, ...patch } : action)));
-  }
-
-  function convertLegacy() {
-    const converted = legacy.map((action) => convertGhlActionToCrm(action));
-    onChange([...crmActions, ...converted.filter((action): action is FlowCrmAction => action !== null)]);
   }
 
   return (
@@ -522,22 +498,6 @@ function ActionsEditor({
           Acción
         </button>
       </div>
-      {legacy.length > 0 ? (
-        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-          <p>
-            Este paso tiene {legacy.length} acción(es) antiguas de GoHighLevel. Se siguen ejecutando en
-            GoHighLevel mientras esté conectado; si no, se convierten solas al CRM. Las de oportunidad y
-            calendario de GHL no tienen equivalente: rehazlas con «Cambiar etapa» o «Cambiar agenda».
-          </p>
-          <button
-            className="mt-2 inline-flex h-8 items-center rounded-lg border border-amber-300 bg-white px-2 font-medium"
-            onClick={convertLegacy}
-            type="button"
-          >
-            Convertir a acciones del CRM
-          </button>
-        </div>
-      ) : null}
       <div className="mt-3 grid gap-2">
         {crmActions.map((action, index) => (
           <div className="grid gap-2 rounded-lg border border-[#e2e6df] bg-white p-3" key={index}>
@@ -1011,7 +971,6 @@ export function FlowBuilder({
   agents,
   crm,
   flows,
-  integrations,
   runs,
   workspaceCode,
   workspaceId,
@@ -1025,9 +984,6 @@ export function FlowBuilder({
   const [selectedStepId, setSelectedStepId] = useState(selectedFlow?.steps[0]?.id ?? "");
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState("");
-  const ghlConfig = asConfigRecord(
-    integrations.find((integration) => integration.provider === "gohighlevel")?.config ?? {},
-  );
   const activeFlows = localFlows.filter((flow) => flow.status === "active").length;
 
   function updateDraft(patch: Partial<FlowRecord>) {
@@ -1492,10 +1448,6 @@ export function FlowBuilder({
                 <span className="inline-flex items-center gap-1 rounded-lg bg-[#eef2eb] px-2 py-1">
                   <MessageSquareText size={13} />
                   WhatsApp por YCloud
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-lg bg-[#eef2eb] px-2 py-1">
-                  <UserRound size={13} />
-                  GHL: {ghlConfig.location_id ? "conectado" : "sin Location ID"}
                 </span>
                 {counts ? (
                   <span className="inline-flex items-center gap-1 rounded-lg bg-[#eef2eb] px-2 py-1">

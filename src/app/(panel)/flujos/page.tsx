@@ -15,16 +15,11 @@ export default async function FlujosPage() {
       )
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false });
-  const [syncedAgents, agentsResult, integrationsResult, flowsResult, flowRunsResult] =
+  const [syncedAgents, agentsResult, flowsResult, flowRunsResult] =
     workspaceId
       ? await Promise.all([
           syncDefaultAgentPrompts(supabase, workspaceId),
           loadAgents(),
-          supabase
-            .from("integrations")
-            .select("id, workspace_id, provider, status, config, secret_ref, last_error")
-            .eq("workspace_id", workspaceId)
-            .order("created_at", { ascending: false }),
           supabase
             .from("flows")
             .select("*")
@@ -41,7 +36,7 @@ export default async function FlujosPage() {
             .order("updated_at", { ascending: false })
             .limit(500),
         ])
-      : [0, emptyResult, emptyResult, emptyResult, emptyResult];
+      : [0, emptyResult, emptyResult, emptyResult];
   // Opciones del CRM para los desplegables de acciones y del disparador por etiqueta.
   const [tagsResult, stagesResult, fieldsResult, agendasResult] = workspaceId
     ? await Promise.all([
@@ -81,7 +76,6 @@ export default async function FlujosPage() {
         agents={agents}
         crm={crm}
         flows={(flowsResult.data ?? []) as never}
-        integrations={(integrationsResult.data ?? []) as never}
         runs={(flowRunsResult.data ?? []) as never}
         workspaceCode={workspaceCode}
         workspaceId={workspaceId ?? null}

@@ -23,7 +23,7 @@ describe("getBusinessMetrics", () => {
         { created_at: iso(20), id: "a4", status: "scheduled", workspace_id: A },
         { created_at: iso(1), id: "b1", status: "scheduled", workspace_id: B },
       ],
-      contacts: [{ id: "c1", metadata: { ghl_appointment_id: "x" }, workspace_id: A }],
+      contacts: [{ id: "c1", workspace_id: A }],
       conversations: [],
       messages: [],
     });

@@ -8,8 +8,7 @@ import { isValidTimeZone } from "../timezones.ts";
 
 /**
  * Reunión de puesta en marcha sobre la **agenda propia de AAA001**
- * (`LEVY_MEETING_AGENDA_ID`), en lugar del calendario de GoHighLevel. Si la
- * variable no está, `api/onboarding/meeting` sigue con GHL hasta F7.2.
+ * (`LEVY_MEETING_AGENDA_ID`). Sin esa variable, el asistente no ofrece horas.
  *
  * El cliente que agenda queda como contacto en el CRM de AAA001 (por su
  * teléfono personal) y la cita la ve el equipo en la Agenda de AAA001.

@@ -132,7 +132,14 @@ class FakeQuery implements PromiseLike<Result> {
   }
 
   eq(column: string, value: unknown) {
-    this.filters.push((row) => row[column] === value);
+    const path = column.split(/->>?/);
+    this.filters.push((row) => {
+      let current: unknown = row;
+      for (const key of path) {
+        current = current && typeof current === "object" ? (current as Record<string, unknown>)[key] : undefined;
+      }
+      return current === value;
+    });
     return this;
   }
 

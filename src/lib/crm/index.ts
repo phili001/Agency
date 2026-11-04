@@ -1,5 +1,5 @@
 /**
- * CRM propio (sustituye a GoHighLevel). Lógica sobre las tablas de
+ * CRM propio. Lógica sobre las tablas de
  * `crm_core`; las funciones reciben el cliente (service_role) y el
  * `workspaceId` de la sesión o de un webhook verificado, nunca del navegador.
  */

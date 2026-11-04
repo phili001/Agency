@@ -10,7 +10,6 @@ import {
 import { handleInboundFlow } from "@/lib/flow-engine";
 import { isWorkspaceBlockedOrNot } from "@/lib/billing/gate";
 import { recordInboundMessage } from "@/lib/crm/contacts";
-import { syncContactToGoHighLevel } from "@/lib/integrations/gohighlevel";
 import { secretMatchesHash } from "@/lib/integrations/secrets";
 import { findOrCreateOpenConversation } from "@/lib/conversations";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -500,17 +499,6 @@ async function storeYCloudMessage({
 
   if (contactError) {
     throw contactError;
-  }
-
-  if (event.direction === "inbound") {
-    // LEGADO (se borra en F7.3): solo hace algo si el workspace aún tiene
-    // GoHighLevel activo (AAA001 hasta su migración, F7.2); sin GHL devuelve
-    // `not_configured` sin llamar a nada. El CRM propio se actualiza abajo,
-    // cuando ya se sabe la conversación.
-    await syncContactToGoHighLevel({
-      contactId: contact.id,
-      workspaceId: resolvedWorkspaceId,
-    });
   }
 
   const newConversationUsesAi =

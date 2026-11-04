@@ -8,7 +8,7 @@ import { NextResponse } from "next/server";
  * Todo lo que no sea un ApiError se considera un fallo inesperado: se registra
  * en el servidor y al cliente le llega un mensaje generico. Sin esta separacion
  * las rutas devolvian `error.message` crudo y filtraban detalles internos de
- * Supabase, OpenAI o GoHighLevel al navegador.
+ * Supabase u OpenAI al navegador.
  */
 export class ApiError extends Error {
   readonly status: number;

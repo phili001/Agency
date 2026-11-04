@@ -9,7 +9,7 @@ import type { StripeSubscriptionStatus } from "./state.ts";
 /**
  * El comprador de Levy como contacto en el CRM de la agencia (AAA001,
  * `LEVY_WORKSPACE_CODE`). Solo se escribe en ese CRM; nunca se leen datos del
- * CRM del cliente. Sustituye a las etiquetas que antes se ponían en GHL.
+ * CRM del cliente.
  */
 
 export const LEVY_TAGS = { active: "cliente-levy", canceled: "levy-cancelado", pastDue: "levy-impago" } as const;

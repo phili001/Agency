@@ -55,7 +55,7 @@ describe("plantilla Levy", () => {
   });
 
   it("las opciones guardan valores sin tildes ni espacios", () => {
-    // El valor se guarda como respuesta del contacto y viaja a GHL; una tilde
+    // El valor se guarda como respuesta del contacto ; una tilde
     // o un espacio ahi rompe los filtros que se construyen sobre el.
     for (const step of defaultLevyFlowSteps) {
       for (const option of step.options ?? []) {

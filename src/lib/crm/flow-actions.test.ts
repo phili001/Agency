@@ -2,11 +2,9 @@ import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 
 import {
-  type FlowGhlAction,
-  convertGhlActionToCrm,
   defaultLevyFlowSteps,
   flowMatchesTags,
-  splitStepActions,
+  stepCrmActions,
 } from "../flow-definitions.ts";
 import { createCrmFake, type FakeSupabase } from "../testing/fake-supabase.ts";
 import { createContact } from "./contacts.ts";
@@ -33,38 +31,20 @@ beforeEach(() => {
 });
 
 describe("definiciones", () => {
-  it("convierte acciones de GHL que tienen equivalente", () => {
-    const actions: FlowGhlAction[] = [
-      { label: "Tag", tag: " vip ", type: "add_tag" },
-      { label: "Campo", customFieldKey: "presupuesto", customFieldValue: "{{monto}}", type: "update_contact_field" },
-      { label: "Tarea", taskTitle: "Llamar", type: "create_task" },
-      { label: "Oportunidad", pipelineId: "p", stageId: "s", type: "upsert_opportunity" },
-      { calendarId: "KBt3", label: "Calendario", type: "set_booking_calendar" },
-    ];
-    assert.deepEqual(actions.map(convertGhlActionToCrm), [
-      { engine: "crm", label: "Tag", tagName: "vip", type: "add_tag" },
-      { engine: "crm", fieldKey: "presupuesto", fieldValue: "{{monto}}", label: "Campo", type: "update_contact_field" },
-      { engine: "crm", label: "Tarea", taskTitle: "Llamar", type: "create_task" },
-      null,
-      null,
-    ]);
-  });
-
-  it("separa acciones del CRM y viejas de GHL", () => {
-    const { crm, legacy } = splitStepActions([
+  it("un paso solo ejecuta acciones del CRM", () => {
+    const actions = stepCrmActions([
       { engine: "crm", label: "x", type: "add_note" },
       { label: "y", tag: "t", type: "add_tag" },
       null,
     ]);
-    assert.equal(crm.length, 1);
-    assert.equal(legacy.length, 1);
-    assert.deepEqual(splitStepActions(undefined), { crm: [], legacy: [] });
+    assert.equal(actions.length, 1);
+    assert.deepEqual(stepCrmActions(undefined), []);
   });
 
   it("la plantilla de Levy ya usa acciones del CRM", () => {
     const step = defaultLevyFlowSteps.find((item) => item.id === "tag_diagnostico");
     assert.equal(step?.type, "crm_action");
-    assert.equal(splitStepActions(step?.actions).crm.length, 1);
+    assert.equal(stepCrmActions(step?.actions).length, 1);
   });
 
   it("disparo por etiqueta: por id o por nombre sin mayúsculas", () => {

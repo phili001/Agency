@@ -13,9 +13,9 @@ con traspaso a una persona cuando la IA no debe seguir.
   información, el de ventas (setter) y el de citas. Cada uno con su prompt,
   reglas, restricciones y herramientas.
 - **Flujos conversacionales.** Constructor de pasos (mensaje, pregunta con
-  validación por IA, opciones, espera, acción en GoHighLevel, webhook, traspaso)
+  validación por IA, opciones, espera, acción del CRM, webhook, traspaso)
   con revisión humana de las respuestas que la IA marca como dudosas.
-- **Integraciones por empresa.** YCloud (WhatsApp), OpenAI y GoHighLevel, con las
+- **Integraciones por empresa.** YCloud (WhatsApp), OpenAI, Google Calendar y Gmail, con las
   claves cifradas en base de datos (AES-256-GCM), nunca en variables globales.
 - **Handoff automático.** Si el contacto lo pide, si la IA no sabe responder o si
   promete un humano, la conversación pasa sola a la bandeja de personas.
@@ -23,7 +23,7 @@ con traspaso a una persona cuando la IA no debe seguir.
 ## Stack
 
 Next.js 16 (App Router, Server Components) · React 19 · Tailwind v4 ·
-Supabase (Postgres + Auth + RLS) · OpenAI · YCloud · GoHighLevel.
+Supabase (Postgres + Auth + RLS) · OpenAI · YCloud · Stripe · Google Calendar.
 
 > Esta versión de Next.js trae cambios de API respecto a versiones anteriores.
 > Antes de tocar código, lee la guía correspondiente en
@@ -68,8 +68,8 @@ Vercel, URL del webhook de YCloud y comprobación previa.
 
 ```
 src/app/            Rutas (App Router) y endpoints de API
-  api/cron/         Procesos periódicos: buffer IA, entrega, flujos, GHL
-  api/webhooks/     Entrada de YCloud y GoHighLevel
+  api/cron/         Procesos periódicos: buffer IA, entrega, flujos, CRM
+  api/webhooks/     Entrada de YCloud y Stripe
 src/components/     UI de cliente (inbox, constructor de flujos, ajustes)
 src/lib/            Dominio: motor de flujos, handoff, integraciones, auth
 supabase/           Esquema SQL y migraciones

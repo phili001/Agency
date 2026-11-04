@@ -30,7 +30,7 @@ todas son obligatorias:
 | `NEXT_PUBLIC_APP_URL` | Dominio público, sin barra final |
 | `SUPERADMIN_EMAILS` | Correos con acceso a `/admin` |
 
-Las claves de OpenAI, YCloud y GoHighLevel **no** son variables de entorno: se
+Las claves de OpenAI y YCloud **no** son variables de entorno: se
 guardan cifradas por empresa desde *Integraciones*, así cada cliente usa las
 suyas.
 
@@ -39,7 +39,7 @@ suyas.
 
 ### CRM, Agenda, Google Calendar y Stripe
 
-Necesarias para el CRM propio (sustituye a GoHighLevel). Mientras no estén, la
+Necesarias para el CRM propio. Mientras no estén, la
 app arranca, pero no se puede conectar Google Calendar ni vender con Stripe.
 
 | Variable | Para qué |
@@ -85,8 +85,9 @@ Tras el pago, el Payment Link tiene que redirigir a
 `https://agentelevi.com/bienvenida?session_id={CHECKOUT_SESSION_ID}` (la landing,
 `activa.agentelevi.com`, no interviene). Esa página solo lee: la cuenta la crea el webhook.
 
-`LEVY_PURCHASE_WEBHOOK_SECRET`, `GHL_AGENCY_*` y `LEVY_MEETING_*GHL*` quedan
-deprecadas: se borran cuando el webhook de Stripe esté verificado.
+Si vienes de la versión con GoHighLevel, borra de Vercel `LEVY_PURCHASE_WEBHOOK_SECRET`,
+`GHL_AGENCY_TOKEN`, `GHL_AGENCY_LOCATION_ID`, `LEVY_MEETING_CALENDAR_ID`,
+`LEVY_MEETING_GHL_TOKEN` y `LEVY_MEETING_GHL_LOCATION_ID`: ya nada las lee.
 
 ## 3. Comprobación previa
 
@@ -111,7 +112,6 @@ jobs"). Eso dejó producción congelada varios commits sin que se notara.
 | --- | --- | --- |
 | `/api/cron/flows` | diario 07:00 | Reanuda pasos de espera de los flujos |
 | `/api/cron/deliver` | diario 07:30 | Red de seguridad: envía lo que quedó en cola |
-| `/api/cron/ghl-sync` | diario 08:00 | Sincroniza contactos con GoHighLevel |
 
 Vercel manda el `CRON_SECRET` como `Authorization: Bearer` automáticamente si la
 variable existe en el proyecto.
@@ -207,77 +207,33 @@ Para forzar una conversación a mano:
 {NEXT_PUBLIC_APP_URL}/api/cron/deliver?secret={CRON_SECRET}&conversationId={ID}&workspaceId={ID}
 ```
 
-## 7. GoHighLevel
-
-En *Workspace > Integraciones > GoHighLevel* se guardan el `location_id` y el
-token de la empresa (cifrado). El botón de prueba crea un contacto y una cita
-temporales y los borra al terminar; si el test se corta a la mitad, revisa que
-no quede nada llamado `Prueba técnica Levy`.
+## 7. Onboarding de Levy
 
 ### Alta automática tras el pago
 
-Quien paga Levy en el funnel de la agencia recibe la cuenta solo:
-
-1. El workflow **Crear cuenta** de GHL (formulario de bienvenida enviado) hace
-   `POST {NEXT_PUBLIC_APP_URL}/api/webhooks/ghl/purchase` con
-   `Authorization: Bearer {LEVY_PURCHASE_WEBHOOK_SECRET}` y, en *customData*,
-   `ghlContactId`, `email`, `companyName`, `firstName` y `phone`.
-2. La ruta lee el contacto en GHL y **solo sigue si tiene la etiqueta
-   `cliente-levy`** (la pone el workflow de pago). Si el correo ya tiene
-   empresa, no crea otra: solo genera un acceso nuevo.
-3. Crea usuario (contraseña aleatoria que nadie conoce), empresa y agentes, y
-   escribe en el contacto `levy_link_acceso` y `levy_workspace_id` y la
-   etiqueta `levy-acceso-listo`, que dispara el correo de acceso en GHL.
-4. El enlace pasa por `/auth/confirm` y abre **Crea tu contraseña**; al
-   guardarla, el cliente entra directo a la configuración guiada.
-5. Al terminar la configuración, Levy pone `levy-activo` en el contacto.
-
-Requisitos: las tres variables de la sección *Alta automática* de
-`.env.example`, los campos `levy_link_acceso`, `levy_workspace_id` y
-`nombre_del_negocio` creados en GHL, y en Supabase *Auth > Email OTP
-Expiration* a 86400 (24 h): el enlace de acceso usa esa caducidad.
+La cuenta la crea el webhook de Stripe (sección 2). En Supabase, *Auth > Email OTP
+Expiration* tiene que estar a 86400 (24 h): el enlace de acceso usa esa caducidad.
 
 ### Reunión de puesta en marcha (paso 3 del onboarding)
 
-Antes de pedirle las llaves, el cliente puede agendar 30 minutos con nosotros.
-Ese calendario es **propio del onboarding**: no es el que AAA001 usa para
-atender a sus clientes, así que hay que decir cuál es.
+Antes de pedirle las llaves, el cliente puede agendar una reunión con nosotros.
+Va en una **agenda aparte de AAA001**, cuyo id se pone en `LEVY_MEETING_AGENDA_ID`:
+no es la que usa el agente de WhatsApp. Su horario y duración se cambian en
+*Agenda > Configurar*.
 
-| Variable | Cuándo se pone |
-| --- | --- |
-| `LEVY_MEETING_CALENDAR_ID` | **Siempre.** Id del calendario de puesta en marcha. Sin él, el paso no ofrece horas. |
-| `LEVY_MEETING_GHL_TOKEN` | Solo si ese calendario vive en otra subcuenta de GHL. |
-| `LEVY_MEETING_GHL_LOCATION_ID` | Igual que el anterior: la location de esa subcuenta. |
+- Agenda actual: «Puesta en marcha», `8c84ef58-d7f2-4d93-a7d4-88605d1a67e5`.
+- Si falta la variable, o la agenda no es de AAA001 o está inactiva, el paso no
+  desaparece: muestra el WhatsApp de soporte y deja seguir.
+- `LEVY_WORKSPACE_CODE` (por defecto `AAA001`) solo hace falta si la empresa
+  creadora de Levy tuviera otro código.
+- Las agendas no comparten ocupación entre sí: si el mismo equipo atiende esta
+  agenda y la del agente, conecta ambas al mismo Google Calendar en modo
+  `push_and_busy` para que no se solapen.
 
-Si no se ponen token y location, se heredan de `GHL_AGENCY_TOKEN` /
-`GHL_AGENCY_LOCATION_ID` (el GoHighLevel del funnel de compra) y, si tampoco
-están, de la conexión de GoHighLevel guardada en AAA001.
-
-El id del calendario sale de GHL: *Calendars > el calendario > Settings*, o del
-final de su enlace de reservas.
-
-**Permisos del token.** El token tiene que ser de una *Private Integration* con
-estos scopes, o GHL responde `The token is not authorized for this scope` y no
-cargan las horas:
-
-- View Calendars
-- View Calendar Events y Edit Calendar Events
-- View Contacts y Edit Contacts (la cita se crea sobre un contacto)
-- View Locations
-
-Ojo: `GHL_AGENCY_TOKEN` se creó para el funnel de compra (contactos y campos
-personalizados) y **no suele tener los de calendario**. Si al heredarlo falla,
-añádeselos en GHL o crea un token aparte y ponlo en `LEVY_MEETING_GHL_TOKEN`.
-Cuando GHL rechaza por permisos, el log del servidor dice qué variable revisar:
-`[levy-calendar] El token de ... no tiene permisos de calendario`.
-
-Si falta `LEVY_MEETING_CALENDAR_ID`, el paso no desaparece: muestra el WhatsApp
-de soporte y deja seguir. `LEVY_WORKSPACE_CODE` (por defecto `AAA001`) solo hace
-falta si la empresa creadora de Levy tuviera otro código.
-
-Los huecos libres se piden a GHL una vez por minuto y se guardan en memoria, y
-la pantalla del onboarding los recibe ya pintados desde el servidor; si GHL
-tarda más de 2,5 s, la página no espera y los carga la pantalla por su cuenta.
+**Correos.** Al reservar, mover o cancelar (desde el asistente o desde *Agenda*
+en el panel) el cliente recibe un aviso desde el **Gmail conectado de AAA001**.
+Sin Gmail conectado, o si falla, la reserva sigue adelante sin correo y queda en
+el log (`[levy-meeting-email]`). Estos avisos no usan Resend.
 
 ## 8. Antes de dar acceso a un cliente
 

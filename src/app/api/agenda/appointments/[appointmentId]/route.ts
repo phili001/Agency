@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { syncAfterResponse } from "@/lib/agenda/after-change";
 import {
@@ -7,6 +7,7 @@ import {
   markAppointment,
   rescheduleAppointment,
 } from "@/lib/agenda/appointments";
+import { handlePanelMeetingChange } from "@/lib/agenda/levy-meeting-email";
 import { apiErrorResponse, badRequest } from "@/lib/api-error";
 import { requireActiveWorkspaceRole } from "@/lib/authz";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -27,6 +28,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ap
       case "reschedule": {
         const appointment = await rescheduleAppointment(admin, workspaceId, { appointmentId, startsAt: String(body.startsAt ?? "") }, actor);
         syncAfterResponse(admin, workspaceId, [appointmentId, appointment.id]);
+        after(async () => {
+          await handlePanelMeetingChange(admin, workspaceId, { appointment, kind: "moved", previousAppointmentId: appointmentId });
+        });
         return NextResponse.json({ appointment });
       }
       case "cancel": {
@@ -34,6 +38,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ap
           reason: typeof body.reason === "string" ? body.reason : null,
         });
         syncAfterResponse(admin, workspaceId, [appointment.id]);
+        after(async () => {
+          await handlePanelMeetingChange(admin, workspaceId, { appointment, kind: "cancelled", previousAppointmentId: appointmentId });
+        });
         return NextResponse.json({ appointment });
       }
       case "confirm":

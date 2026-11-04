@@ -48,7 +48,7 @@ describe("pasos del onboarding", () => {
     assert.equal(getPendingSteps(checklist).length, 0);
   });
 
-  it("el equipo y GoHighLevel no cuentan como pendientes", () => {
+  it("el equipo y los extras no cuentan como pendientes", () => {
     const pending = getPendingSteps(empty).map((step) => step.id);
     assert.ok(!pending.includes("extras"));
     assert.equal(pending.length, 5);

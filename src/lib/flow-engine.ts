@@ -4,17 +4,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { FlowStage, FlowStep } from "@/lib/flow-definitions";
 import {
-  convertGhlActionToCrm,
   flowMatchesTags,
   parseFlowSteps,
-  splitStepActions,
+  stepCrmActions,
 } from "@/lib/flow-definitions";
 import { runCrmFlowActions } from "@/lib/crm/flow-actions";
 import { contactAudienceLabels } from "@/lib/crm/tags";
 import { badRequest, notFound } from "@/lib/api-error";
 import { getBusinessVariables } from "@/lib/business-profile";
 import { verifyFlowAnswer } from "@/lib/flow-answer-verifier";
-import { runGoHighLevelFlowActions } from "@/lib/integrations/gohighlevel";
 import type { Database, Json } from "@/lib/supabase/database.types";
 
 type AdminClient = SupabaseClient;
@@ -448,101 +446,30 @@ async function updateRun(
     .eq("workspace_id", run.workspace_id);
 }
 
-async function isGoHighLevelActive(supabase: AdminClient, workspaceId: string) {
-  const { data } = await supabase
-    .from("integrations")
-    .select("status")
-    .eq("workspace_id", workspaceId)
-    .eq("provider", "gohighlevel")
-    .maybeSingle();
-
-  return (data as { status?: string } | null)?.status === "active";
-}
-
 /**
- * Acciones de un paso. Las del CRM (`engine: "crm"`) van al CRM. Las viejas de
- * GoHighLevel van a GHL mientras el workspace lo tenga conectado (coexistencia
- * hasta F7.2) y, si no, se convierten y van al CRM. Las etiquetas recién
- * puestas disparan los flujos con trigger `tag`.
+ * Acciones de un paso, en el CRM. Las etiquetas recién puestas disparan los
+ * flujos con trigger `tag`.
  */
 async function runStepActions({
   answers,
-  contact,
   flow,
   run,
   step,
   supabase,
 }: {
   answers?: Record<string, Json>;
-  contact: ContactRow;
   flow: FlowRow;
   run: FlowRunRow;
   step: FlowStep;
   supabase: AdminClient;
 }) {
-  const { crm, legacy } = splitStepActions(step.actions);
-
-  if (crm.length === 0 && legacy.length === 0) {
-    return;
-  }
-
-  const flowAnswers = answers ?? getAnswers(run.answers);
-  const ghlActive = legacy.length > 0 && (await isGoHighLevelActive(supabase, run.workspace_id));
-  const converted = ghlActive ? [] : legacy.map((action) => convertGhlActionToCrm(action));
-  const crmActions = [...crm, ...converted.filter((action) => action !== null)];
-  const skipped = converted.filter((action) => action === null).length;
-
-  if (ghlActive) {
-    try {
-      const results = await runGoHighLevelFlowActions({
-        actions: legacy,
-        answers: flowAnswers,
-        contact,
-        workspaceId: run.workspace_id,
-      });
-
-      await logFlowEvent({
-        contactId: run.contact_id,
-        conversationId: run.conversation_id,
-        eventType: "flow_ghl_actions_completed",
-        flowId: flow.id,
-        flowRunId: run.id,
-        payload: {
-          results: results as Json,
-          stepId: step.id,
-        },
-        supabase,
-        workspaceId: run.workspace_id,
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Error desconocido en acción GHL.";
-
-      await logFlowEvent({
-        contactId: run.contact_id,
-        conversationId: run.conversation_id,
-        error: message,
-        eventType: "flow_ghl_actions_failed",
-        flowId: flow.id,
-        flowRunId: run.id,
-        payload: {
-          actions: legacy as Json,
-          stepId: step.id,
-        },
-        status: "error",
-        supabase,
-        workspaceId: run.workspace_id,
-      });
-
-      await updateRun(supabase, run, {
-        last_error: message,
-      });
-    }
-  }
+  const crmActions = stepCrmActions(step.actions);
 
   if (crmActions.length === 0) {
     return;
   }
+
+  const flowAnswers = answers ?? getAnswers(run.answers);
 
   const { addedTagIds, results } = await runCrmFlowActions(
     supabase,
@@ -562,7 +489,6 @@ async function runStepActions({
     flowRunId: run.id,
     payload: {
       results: results as unknown as Json,
-      skippedLegacyActions: skipped,
       stepId: step.id,
     },
     status: failed.length > 0 ? "error" : undefined,
@@ -628,7 +554,6 @@ async function executeRun({
       }
       await runStepActions({
         answers,
-        contact,
         flow,
         run,
         step: currentStep,
@@ -721,10 +646,8 @@ async function executeRun({
       return { handled: true, status: "waiting_for_answer" };
     }
 
-    // `crm_action` (pasos nuevos) y `ghl_action` (los guardados antes) ejecutan sus acciones igual.
-    if (currentStep.type === "ghl_action" || currentStep.type === "crm_action") {
+    if (currentStep.type === "crm_action") {
       await runStepActions({
-        contact,
         flow,
         run,
         step: currentStep,
@@ -738,7 +661,6 @@ async function executeRun({
 
     if (currentStep.type === "webhook" && currentStep.webhookUrl) {
       await runStepActions({
-        contact,
         flow,
         run,
         step: currentStep,
@@ -764,7 +686,6 @@ async function executeRun({
 
     if (currentStep.type === "wait") {
       await runStepActions({
-        contact,
         flow,
         run,
         step: currentStep,
@@ -786,7 +707,6 @@ async function executeRun({
 
     if (currentStep.type === "agent") {
       await runStepActions({
-        contact,
         flow,
         run,
         step: currentStep,
@@ -824,7 +744,6 @@ async function executeRun({
 
     if (currentStep.type === "human") {
       await runStepActions({
-        contact,
         flow,
         run,
         step: currentStep,
@@ -861,7 +780,6 @@ async function executeRun({
 
     if (currentStep.type === "finish") {
       await runStepActions({
-        contact,
         flow,
         run,
         step: currentStep,
@@ -1712,7 +1630,6 @@ export async function handleInboundFlow({
       answers = completeCheckpoint(answers, flow, currentStep, steps);
       await runStepActions({
         answers,
-        contact: { ...contact, metadata: { ...getRecord(contact.metadata), flow_answers: answers } },
         flow,
         run: activeRun,
         step: currentStep,
@@ -1953,7 +1870,6 @@ export async function decideFlowAnswerReview({
   ]);
   await runStepActions({
     answers,
-    contact,
     flow: flow as FlowRow,
     run: run as FlowRunRow,
     step,

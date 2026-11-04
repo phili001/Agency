@@ -4,10 +4,6 @@ import { OnboardingWizard } from "@/components/onboarding/wizard";
 import { normalizeAppUrl } from "@/lib/app-url";
 import { getDefaultConversationMode } from "@/lib/conversation-default";
 import { isValidTimeZone } from "@/lib/timezones";
-import {
-  getLevyCalendar,
-  getLevyMeetingDays,
-} from "@/lib/integrations/levy-calendar";
 import { getIntegrationSecret } from "@/lib/integrations/secrets";
 import { getBusinessProfileMetadata } from "@/lib/business-profile";
 import { googleBusyProvider } from "@/lib/agenda/google-sync";
@@ -106,23 +102,17 @@ export default async function OnboardingPage({
   const timeZone =
     profileTimeZone && isValidTimeZone(profileTimeZone) ? profileTimeZone : "Europe/Madrid";
   const meeting = getBookedMeeting(workspace.onboarding_state);
-  // La reunión va en la agenda de AAA001 si está configurada; si no, en GHL (hasta F7.2).
   const adminClient = createAdminClient();
   const meetingAgenda = await resolveMeetingAgenda(adminClient).catch(() => null);
-  const meetingCalendar = meetingAgenda ? null : await getLevyCalendar();
   // Los huecos se adelantan aquí para que el paso de la reunión aparezca ya
   // pintado. Si tardan, la pantalla los pide por su cuenta en vez de retrasar
   // todo el onboarding.
-  const loadDays = meetingAgenda
-    ? () =>
-        getMeetingDays(adminClient, meetingAgenda, timeZone, {
-          externalBusy: googleBusyProvider(adminClient, meetingAgenda.workspaceId),
-        })
-    : () => getLevyMeetingDays(timeZone);
   const meetingDays =
-    (meetingAgenda || meetingCalendar) && !meeting
+    meetingAgenda && !meeting
       ? await Promise.race([
-          loadDays().catch(() => []),
+          getMeetingDays(adminClient, meetingAgenda, timeZone, {
+            externalBusy: googleBusyProvider(adminClient, meetingAgenda.workspaceId),
+          }).catch(() => []),
           new Promise<never[]>((resolve) => setTimeout(() => resolve([]), 2500)),
         ])
       : [];
@@ -145,7 +135,7 @@ export default async function OnboardingPage({
       initialStep={requestedStep ?? getFirstPendingStep(checklist).index}
       integrations={(integrations ?? []) as never}
       meeting={meeting}
-      meetingAvailable={Boolean(meetingAgenda || meetingCalendar)}
+      meetingAvailable={Boolean(meetingAgenda)}
       meetingDays={meetingDays}
       memberCount={members?.length ?? 1}
       timeZone={timeZone}

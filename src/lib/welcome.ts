@@ -1,6 +1,6 @@
 /**
  * Piezas del alta de una empresa tras pagar Levy que no dependen de dónde se
- * vendió (antes GHL, ahora Stripe).
+ * vendió.
  */
 
 /**

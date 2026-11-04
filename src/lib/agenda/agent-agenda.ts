@@ -22,7 +22,7 @@ import { type AgendaService, type Slot, distributeSlots, formatSlotLabel, resolv
 
 /**
  * Calendario del agente sobre la agenda propia (F5.2). Mismas tools y mismas
- * reglas que con GoHighLevel, más `reagendar_cita` y `cancelar_cita`:
+ * reglas de siempre, más `reagendar_cita` y `cancelar_cita`:
  *
  * - Lo que devuelve `consultar_disponibilidad` se apunta en `offered_slots` de
  *   esta conversación. Agendar como agente exige que la hora se ofreciera en
@@ -92,12 +92,12 @@ export async function buildAgendaRuntime(
   },
   deps: AgendaRuntimeDeps = {},
 ): Promise<{ reason: null; runtime: AgendaCalendarRuntime } | { reason: string; runtime: null }> {
-  const agendaTools = input.tools.filter((tool) => tool.kind === "agenda");
+  const agendaTools = input.tools;
   const resolved = resolveCalendarsForAgent({
     contactMetadata: input.contact.metadata as never,
     enabledToolIds: input.enabledToolIds,
     tools: agendaTools,
-  }).filter((tool) => tool.kind === "agenda");
+  });
   const agendas = await listAgendas(client, input.workspaceId, { activeOnly: true });
   const byId = new Map(agendas.map((agenda) => [agenda.id, agenda]));
   let chosen = resolved.flatMap((tool) => {
@@ -105,8 +105,8 @@ export async function buildAgendaRuntime(
     return agenda ? [{ agenda, description: tool.description || agenda.description, name: tool.calendarName }] : [];
   });
 
-  // Sin tools de agenda en el workspace, la agenda por defecto (como hacía la
-  // tarjeta de Integraciones con GHL). Con tools pero ninguna asignada, nada.
+  // Sin tools de agenda en el workspace, la agenda por defecto. Con tools pero
+  // ninguna asignada, nada.
   if (chosen.length === 0 && agendaTools.length === 0) {
     const fallback = await getDefaultAgenda(client, input.workspaceId);
     chosen = fallback ? [{ agenda: fallback, description: fallback.description, name: fallback.name }] : [];

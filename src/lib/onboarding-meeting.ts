@@ -1,13 +1,12 @@
 import type { Json } from "@/lib/supabase/database.types";
 
 /**
- * Reunión de puesta en marcha con el equipo de Levy. Se agenda en la agenda
- * propia de AAA001 (`LEVY_MEETING_AGENDA_ID`, `lib/agenda/levy-meeting.ts`) o,
- * mientras no esté configurada, en su calendario de GoHighLevel. Se guarda en
- * `workspaces.onboarding_state.meeting` con el motor que la creó.
+ * Reunión de puesta en marcha con el equipo de Levy, en la agenda propia de
+ * AAA001 (`LEVY_MEETING_AGENDA_ID`, `lib/agenda/levy-meeting.ts`). Se guarda en
+ * `workspaces.onboarding_state.meeting`.
  */
 export type MeetingSlot = {
-  /** Inicio en ISO, tal como lo devuelve GoHighLevel. */
+  /** Inicio en ISO. */
   iso: string;
   /** "10:00", ya en la zona horaria del cliente. */
   label: string;
@@ -24,8 +23,8 @@ export type MeetingDay = {
 export type BookedMeeting = {
   appointmentId: string;
   bookedAt: string;
-  /** Dónde vive la cita; las antiguas (sin dato) son de GoHighLevel. */
-  engine: "agenda" | "ghl";
+  /** Correo de quien la reservó: ahí van los avisos si se mueve o se cancela. */
+  email: string;
   /** Teléfono personal de contacto, no el WhatsApp del negocio. */
   phone: string;
   startTime: string;
@@ -54,7 +53,7 @@ export function getBookedMeeting(onboardingState: Json | null | undefined): Book
   return {
     appointmentId,
     bookedAt: asString(meeting.bookedAt),
-    engine: meeting.engine === "agenda" ? "agenda" : "ghl",
+    email: asString(meeting.email),
     phone: asString(meeting.phone),
     startTime,
     timezone: asString(meeting.timezone),
@@ -95,59 +94,4 @@ export function isMeetingPast(meeting: BookedMeeting | null, now = new Date()) {
   }
 
   return new Date(meeting.startTime).getTime() < now.getTime();
-}
-
-/**
- * Credenciales del calendario de puesta en marcha. Es un calendario propio del
- * onboarding, distinto del que AAA001 usa con sus clientes, así que el id se
- * pone siempre a mano. El token y la location se heredan, por este orden:
- * las del propio calendario > las del GoHighLevel de la agencia (el del funnel
- * de compra) > la conexión guardada de AAA001.
- */
-export type MeetingCredentials = {
-  calendarId: string;
-  locationId: string;
-  /** De dónde salió el token: lo dice el log cuando GHL rechaza por permisos. */
-  source: "AAA001" | "GHL_AGENCY_TOKEN" | "LEVY_MEETING_GHL_TOKEN";
-  token: string;
-};
-
-export function resolveMeetingCredentials(
-  env: Record<string, string | undefined>,
-): MeetingCredentials {
-  const read = (...keys: string[]) => {
-    for (const key of keys) {
-      const value = env[key]?.trim();
-
-      if (value) {
-        return value;
-      }
-    }
-
-    return "";
-  };
-
-  const token = read("LEVY_MEETING_GHL_TOKEN", "GHL_AGENCY_TOKEN");
-
-  return {
-    calendarId: read("LEVY_MEETING_CALENDAR_ID"),
-    locationId: read("LEVY_MEETING_GHL_LOCATION_ID", "GHL_AGENCY_LOCATION_ID"),
-    source: env.LEVY_MEETING_GHL_TOKEN?.trim()
-      ? "LEVY_MEETING_GHL_TOKEN"
-      : token
-        ? "GHL_AGENCY_TOKEN"
-        : "AAA001",
-    token,
-  };
-}
-
-/**
- * GoHighLevel responde "The token is not authorized for this scope" cuando el
- * token existe pero no tiene los permisos de calendario. Es el fallo más
- * común al estrenar el paso, así que se reconoce para poder decir qué arreglar.
- */
-export function isScopeError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error ?? "");
-
-  return /not authorized for this scope|insufficient.*scope|401|403/i.test(message);
 }

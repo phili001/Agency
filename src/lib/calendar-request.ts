@@ -226,7 +226,7 @@ export function resolveCalendarRequestContext(
 
   // Si el cliente responde a una oferta del agente ("agendemos a las 2"), la
   // fecha puede existir solo en el mensaje saliente inmediatamente anterior.
-  // La reserva siempre se revalida contra GHL, asi que heredarla no confirma
+  // La reserva siempre se revalida contra la agenda, asi que heredarla no confirma
   // por si sola ningun horario.
   if (!inheritedDate) {
     for (let index = latestInboundIndex - 1; index >= 0; index -= 1) {

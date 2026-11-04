@@ -2,14 +2,8 @@ import type { Json } from "@/lib/supabase/database.types";
 
 /**
  * Una "tool de calendario" es un workspace_asset de kind "tool" cuyo metadata
- * apunta a una agenda. Hay dos formatos:
- *
- * - `agenda` (nuevo): una agenda propia (`agendas.id`), `{ type: "agenda",
- *   agenda_id, agenda_name, is_default }`.
- * - `ghl_calendar` (viejo): un calendario de GoHighLevel, `{ type:
- *   "ghl_calendar", calendar_id, calendar_name, is_default }`. Se sigue
- *   leyendo hasta la limpieza (F7.4): mientras un workspace lo tenga, el agente
- *   agenda en GHL (coexistencia, F5.2).
+ * apunta a una agenda propia: `{ type: "agenda", agenda_id, agenda_name,
+ * is_default }`.
  *
  * Reglas del modelo:
  * - El agente elige solo entre las agendas que tenga asignadas, leyendo la
@@ -19,16 +13,8 @@ import type { Json } from "@/lib/supabase/database.types";
  */
 export const CALENDAR_TOOL_TYPE = "agenda";
 
-/** Formato viejo: calendario de GoHighLevel. */
-export const LEGACY_GHL_CALENDAR_TOOL_TYPE = "ghl_calendar";
-
 /** Clave donde el flujo deja la agenda elegida para ese contacto. */
 export const CONTACT_CALENDAR_KEY = "booking_agenda_id";
-
-/** Clave vieja (calendario de GHL fijado por un flujo de GHL). */
-export const LEGACY_CONTACT_CALENDAR_KEY = "booking_calendar_id";
-
-export type CalendarToolKind = "agenda" | "ghl";
 
 export type CalendarToolMetadata = {
   agenda_id: string;
@@ -37,22 +23,14 @@ export type CalendarToolMetadata = {
   type: typeof CALENDAR_TOOL_TYPE;
 };
 
-export type LegacyGhlCalendarToolMetadata = {
-  calendar_id: string;
-  calendar_name: string;
-  is_default: boolean;
-  type: typeof LEGACY_GHL_CALENDAR_TOOL_TYPE;
-};
-
 export type CalendarTool = {
-  /** `agendas.id` si `kind` es "agenda"; id del calendario de GHL si es "ghl". */
+  /** `agendas.id`. */
   calendarId: string;
   calendarName: string;
   /** Cuando usar esta agenda. Es lo que lee el modelo para elegir. */
   description: string;
   id: string;
   isDefault: boolean;
-  kind: CalendarToolKind;
   title: string;
 };
 
@@ -83,28 +61,9 @@ export function buildCalendarToolMetadata({
   };
 }
 
-/** Formato viejo, solo para la tarjeta de GoHighLevel mientras exista (F5.7 la quita). */
-export function buildGhlCalendarToolMetadata({
-  calendarId,
-  calendarName,
-  isDefault,
-}: {
-  calendarId: string;
-  calendarName: string;
-  isDefault: boolean;
-}): LegacyGhlCalendarToolMetadata {
-  return {
-    calendar_id: calendarId,
-    calendar_name: calendarName,
-    is_default: isDefault,
-    type: LEGACY_GHL_CALENDAR_TOOL_TYPE,
-  };
-}
-
-/** ¿Es una tool de calendario (de cualquiera de los dos formatos)? */
+/** ¿Es una tool de calendario? */
 export function isCalendarTool(metadata: Json | null | undefined) {
-  const type = asRecord(metadata).type;
-  return type === CALENDAR_TOOL_TYPE || type === LEGACY_GHL_CALENDAR_TOOL_TYPE;
+  return asRecord(metadata).type === CALENDAR_TOOL_TYPE;
 }
 
 /** Lee una tool de calendario desde su asset. Devuelve null si no lo es. */
@@ -115,28 +74,23 @@ export function parseCalendarTool(asset: {
   title: string;
 }): CalendarTool | null {
   const metadata = asRecord(asset.metadata);
-  const kind: CalendarToolKind | null =
-    metadata.type === CALENDAR_TOOL_TYPE ? "agenda" : metadata.type === LEGACY_GHL_CALENDAR_TOOL_TYPE ? "ghl" : null;
 
-  if (!kind) {
+  if (metadata.type !== CALENDAR_TOOL_TYPE) {
     return null;
   }
 
-  const calendarId = kind === "agenda" ? text(metadata.agenda_id) : text(metadata.calendar_id);
+  const calendarId = text(metadata.agenda_id);
 
   if (!calendarId) {
     return null;
   }
 
-  const name = kind === "agenda" ? text(metadata.agenda_name) : text(metadata.calendar_name);
-
   return {
     calendarId,
-    calendarName: name ? String(kind === "agenda" ? metadata.agenda_name : metadata.calendar_name) : asset.title,
+    calendarName: text(metadata.agenda_name) ? String(metadata.agenda_name) : asset.title,
     description: asset.content?.trim() ?? "",
     id: asset.id,
     isDefault: metadata.is_default === true,
-    kind,
     title: asset.title,
   };
 }
@@ -154,18 +108,11 @@ export function parseCalendarTools(
     .filter((tool): tool is CalendarTool => tool !== null);
 }
 
-/** Agenda fijada a un contacto por un flujo: la nueva gana sobre la vieja de GHL. */
-export function getPinnedCalendar(contactMetadata: Json | null | undefined): { calendarId: string; kind: CalendarToolKind } | null {
-  const metadata = asRecord(contactMetadata);
-  const agendaId = text(metadata[CONTACT_CALENDAR_KEY]);
+/** Agenda fijada a un contacto por un flujo. */
+export function getPinnedCalendar(contactMetadata: Json | null | undefined): { calendarId: string } | null {
+  const agendaId = text(asRecord(contactMetadata)[CONTACT_CALENDAR_KEY]);
 
-  if (agendaId) {
-    return { calendarId: agendaId, kind: "agenda" };
-  }
-
-  const ghlCalendarId = text(metadata[LEGACY_CONTACT_CALENDAR_KEY]);
-
-  return ghlCalendarId ? { calendarId: ghlCalendarId, kind: "ghl" } : null;
+  return agendaId ? { calendarId: agendaId } : null;
 }
 
 /**
@@ -192,7 +139,7 @@ export function resolveCalendarsForAgent({
   const pinned = getPinnedCalendar(contactMetadata);
 
   if (pinned) {
-    const match = tools.find((tool) => tool.kind === pinned.kind && tool.calendarId === pinned.calendarId);
+    const match = tools.find((tool) => tool.calendarId === pinned.calendarId);
     // Una agenda fijada por un flujo se respeta aunque no esté registrada
     // como tool: la elección fue explícita y no debe caerse en silencio.
     return [
@@ -202,7 +149,6 @@ export function resolveCalendarsForAgent({
         description: "Agenda asignada por un flujo para este contacto.",
         id: "",
         isDefault: false,
-        kind: pinned.kind,
         title: "Agenda asignada",
       },
     ];
@@ -227,7 +173,7 @@ export function resolveCalendarForContact({
 }: {
   contactMetadata: Json | null | undefined;
   tools: CalendarTool[];
-}): { calendarId: string; kind: CalendarToolKind } | null {
+}): { calendarId: string } | null {
   const pinned = getPinnedCalendar(contactMetadata);
 
   if (pinned) {
@@ -236,10 +182,5 @@ export function resolveCalendarForContact({
 
   const fallback = tools.find((tool) => tool.isDefault);
 
-  return fallback ? { calendarId: fallback.calendarId, kind: fallback.kind } : null;
-}
-
-/** ¿Sigue este workspace con alguna tool de GHL? (coexistencia hasta F7.2). */
-export function hasLegacyGhlCalendarTools(tools: CalendarTool[]) {
-  return tools.some((tool) => tool.kind === "ghl");
+  return fallback ? { calendarId: fallback.calendarId } : null;
 }
