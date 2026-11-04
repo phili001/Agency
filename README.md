@@ -15,7 +15,7 @@ con traspaso a una persona cuando la IA no debe seguir.
 - **Flujos conversacionales.** Constructor de pasos (mensaje, pregunta con
   validación por IA, opciones, espera, acción del CRM, webhook, traspaso)
   con revisión humana de las respuestas que la IA marca como dudosas.
-- **Integraciones por empresa.** YCloud (WhatsApp), OpenAI, Google Calendar y Gmail, con las
+- **Integraciones por empresa.** YCloud (WhatsApp), OpenAI y Google Calendar, con las
   claves cifradas en base de datos (AES-256-GCM), nunca en variables globales.
 - **Handoff automático.** Si el contacto lo pide, si la IA no sabe responder o si
   promete un humano, la conversación pasa sola a la bandeja de personas.

@@ -55,7 +55,7 @@ describe("callback de Google", () => {
   it("conecta la empresa del state firmado", async () => {
     const state = createOAuthState({ userId: "owner-a", workspaceId: A }, deps);
     const result = await completeGoogleCallback(client, { code: "c", error: null, state }, "owner-a", deps);
-    assert.deepEqual(result, { accountEmail: "dueno@x.com", ok: true, purpose: "calendar", workspaceId: A });
+    assert.deepEqual(result, { accountEmail: "dueno@x.com", ok: true, workspaceId: A });
     assert.equal(fake.table("integrations")[0].workspace_id, A);
     assert.equal(fake.table("integrations")[0].status, "active");
     assert.equal(callbackRedirectPath(result), "/integraciones?google=conectado");
@@ -86,7 +86,7 @@ describe("callback de Google", () => {
   it("cancelación en Google y errores con mensaje para el panel", async () => {
     const state = createOAuthState({ userId: "owner-a", workspaceId: A }, deps);
     const denied = await completeGoogleCallback(client, { code: null, error: "access_denied", state }, "owner-a", deps);
-    assert.deepEqual(denied, { message: "Cancelaste la conexión con Google.", ok: false, purpose: "calendar" });
+    assert.deepEqual(denied, { message: "Cancelaste la conexión con Google.", ok: false });
     const path = callbackRedirectPath(denied);
     assert.ok(path.startsWith("/integraciones?google=error&motivo="));
     assert.equal(new URLSearchParams(path.split("?")[1]).get("motivo"), "Cancelaste la conexión con Google.");

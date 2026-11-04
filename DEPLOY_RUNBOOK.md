@@ -53,7 +53,7 @@ app arranca, pero no se puede conectar Google Calendar ni vender con Stripe.
 | `STRIPE_PRICE_IDS` | Precios de Levy (`price_…`), separados por coma |
 | `STRIPE_FIELD_COMPANY_NAME` | Campo personalizado con el nombre del negocio (por defecto `nombredelnegocio`) |
 | `BILLING_GRACE_DAYS` | Días de gracia tras un impago (por defecto 7) |
-| `RESEND_API_KEY` | Respaldo del correo de acceso, si el Gmail de AAA001 no está conectado o falla |
+| `RESEND_API_KEY` | Envío del correo de acceso y de los avisos de la reunión |
 | `EMAIL_FROM` | Remitente, con dominio verificado en Resend |
 | `LEVY_WORKSPACE_CODE` | Empresa cuyo CRM guarda a los clientes de Levy (por defecto `AAA001`) |
 | `LEVY_MEETING_AGENDA_ID` | Agenda de AAA001 para la reunión de puesta en marcha |
@@ -62,14 +62,6 @@ En Google Cloud, la URI de redirección es
 `{NEXT_PUBLIC_APP_URL}/api/integrations/google-calendar/callback` (y la de
 `http://localhost:3000` para desarrollo). Los scopes son `calendar.events` y
 `calendar.readonly`; con muchos clientes, Google pedirá verificar la app.
-
-El correo de Google (Integraciones → Correo de Google) usa la misma URI de
-redirección. En Google Cloud hay que **activar la Gmail API** y **añadir el scope
-`https://www.googleapis.com/auth/gmail.send`** (además de `openid` y `email`, para
-saber la dirección remitente) en la pantalla de consentimiento. `gmail.send` es un
-**scope sensible**: en producción, Google exige verificar la app; mientras tanto
-solo funciona con usuarios de prueba y muestra un aviso. El correo de acceso tras
-pagar sale del Gmail conectado de **AAA001**, con Resend de respaldo.
 
 En Stripe (Developers → Webhooks), el endpoint es
 `{NEXT_PUBLIC_APP_URL}/api/webhooks/stripe` con estos eventos:
@@ -231,9 +223,9 @@ no es la que usa el agente de WhatsApp. Su horario y duración se cambian en
   `push_and_busy` para que no se solapen.
 
 **Correos.** Al reservar, mover o cancelar (desde el asistente o desde *Agenda*
-en el panel) el cliente recibe un aviso desde el **Gmail conectado de AAA001**.
-Sin Gmail conectado, o si falla, la reserva sigue adelante sin correo y queda en
-el log (`[levy-meeting-email]`). Estos avisos no usan Resend.
+en el panel) el cliente recibe un aviso por **Resend**. Sin `RESEND_API_KEY` y
+`EMAIL_FROM`, o si falla, la reserva sigue adelante sin correo y queda en el log
+(`[levy-meeting-email]`).
 
 ## 8. Antes de dar acceso a un cliente
 

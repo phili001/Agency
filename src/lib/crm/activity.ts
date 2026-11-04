@@ -14,8 +14,6 @@ export type ActivityKind =
   | "appointment_rescheduled"
   | "contact_created"
   | "contact_updated"
-  | "email_failed"
-  | "email_sent"
   | "message_received"
   | "no_show_sent"
   | "no_show_skipped"

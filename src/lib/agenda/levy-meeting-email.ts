@@ -1,16 +1,13 @@
 import type { CrmClient } from "../crm/shared.ts";
-import { escapeHtml, type EmailMessage } from "../email.ts";
-import { getGmailStatus, isValidEmailAddress, sendGmail } from "../integrations/gmail.ts";
-import type { GoogleDeps } from "../integrations/google-calendar.ts";
+import { escapeHtml, isEmailConfigured, isValidEmailAddress, sendEmail, type EmailDeps, type EmailMessage } from "../email.ts";
 import { formatMeetingWhen, getBookedMeeting } from "../onboarding-meeting.ts";
 import type { Json } from "../supabase/database.types.ts";
-import { resolveMeetingAgenda, type MeetingTarget } from "./levy-meeting.ts";
+import { resolveMeetingAgenda } from "./levy-meeting.ts";
 
 /**
  * Correos de la reunión de puesta en marcha: confirmación al reservar y aviso
- * si se mueve o se cancela. Salen solo del Gmail conectado de AAA001, sin
- * Resend de respaldo. Son un extra: nada de aquí lanza, así que un Gmail sin
- * conectar o caído nunca tumba la reserva.
+ * si se mueve o se cancela. Salen por Resend. Son un extra: nada de aquí lanza,
+ * así que un correo sin configurar o caído nunca tumba la reserva.
  */
 
 export type MeetingEmailKind = "cancelled" | "confirmed" | "moved";
@@ -27,7 +24,7 @@ export type MeetingEmailInput = {
 
 export type MeetingEmailResult =
   | { sent: true }
-  | { reason: "failed" | "invalid_recipient" | "not_connected"; sent: false };
+  | { reason: "failed" | "invalid_recipient" | "not_configured"; sent: false };
 
 export function buildMeetingEmail(input: MeetingEmailInput & { to: string }): EmailMessage {
   const name = input.companyName.trim() || "tu empresa";
@@ -63,28 +60,21 @@ export function buildMeetingEmail(input: MeetingEmailInput & { to: string }): Em
   };
 }
 
-/** Envía el aviso desde el Gmail de AAA001. Nunca lanza: devuelve qué pasó. */
-export async function sendMeetingEmail(
-  client: CrmClient,
-  target: MeetingTarget,
-  input: MeetingEmailInput,
-  deps: GoogleDeps = {},
-): Promise<MeetingEmailResult> {
+/** Envía el aviso por Resend. Nunca lanza: devuelve qué pasó. */
+export async function sendMeetingEmail(input: MeetingEmailInput, deps: EmailDeps = {}): Promise<MeetingEmailResult> {
   const to = input.to?.trim() ?? "";
 
   if (!isValidEmailAddress(to)) {
     return { reason: "invalid_recipient", sent: false };
   }
 
+  if (!isEmailConfigured(deps.env ?? process.env)) {
+    console.warn(`[levy-meeting-email] Correo sin configurar: aviso «${input.kind}» sin enviar.`);
+    return { reason: "not_configured", sent: false };
+  }
+
   try {
-    const status = await getGmailStatus(client, target.workspaceId, deps.env ?? process.env);
-
-    if (!status.connected) {
-      console.warn(`[levy-meeting-email] Gmail de AAA001 sin conectar: aviso «${input.kind}» sin enviar.`);
-      return { reason: "not_connected", sent: false };
-    }
-
-    await sendGmail(client, target.workspaceId, buildMeetingEmail({ ...input, to }), deps, { fromName: "Levy" });
+    await sendEmail(buildMeetingEmail({ ...input, to }), deps);
     return { sent: true };
   } catch (error) {
     console.error(`[levy-meeting-email] Aviso «${input.kind}» sin enviar: ${error instanceof Error ? error.message : "error"}`);
@@ -103,7 +93,7 @@ export async function handlePanelMeetingChange(
   client: CrmClient,
   workspaceId: string,
   change: { appointment: ChangedAppointment; kind: "cancelled" | "moved"; previousAppointmentId: string },
-  deps: GoogleDeps = {},
+  deps: EmailDeps = {},
 ): Promise<MeetingEmailResult | null> {
   try {
     const target = await resolveMeetingAgenda(client, deps.env ?? process.env);
@@ -145,8 +135,6 @@ export async function handlePanelMeetingChange(
       .maybeSingle();
 
     return await sendMeetingEmail(
-      client,
-      target,
       {
         companyName: owner.name ?? "",
         kind: change.kind,

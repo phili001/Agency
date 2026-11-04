@@ -413,26 +413,6 @@ function CrmActionFields({
     );
   }
 
-  if (action.type === "send_email") {
-    return (
-      <div className="grid gap-2">
-        <input
-          className={inputClass}
-          onChange={(event) => onPatch({ emailSubject: event.target.value })}
-          placeholder="Asunto"
-          value={action.emailSubject ?? ""}
-        />
-        <textarea
-          className="min-h-24 rounded-lg border border-[#cbd2c6] px-3 py-2 text-sm outline-none"
-          onChange={(event) => onPatch({ emailBody: event.target.value })}
-          placeholder="Texto del correo. Admite {{nombre}}, {{empresa}}, {{email}}, {{telefono}} y {{respuesta}}."
-          value={action.emailBody ?? ""}
-        />
-        <p className="text-xs text-[#647067]">Sale del correo de Google de tu empresa (Integraciones) hacia el correo del contacto.</p>
-      </div>
-    );
-  }
-
   if (action.type === "add_note") {
     return (
       <textarea

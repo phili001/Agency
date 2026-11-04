@@ -1,15 +1,7 @@
-import type { CrmClient } from "./crm/shared.ts";
-import { agencyWorkspaceCode } from "./billing/agency-crm.ts";
-import { getGmailStatus, isValidEmailAddress, sendGmail } from "./integrations/gmail.ts";
-
 /**
- * Correo del sistema de Levy (acceso tras pagar, reenvío desde `/bienvenida`).
- * `sendSystemEmail` elige remitente: el Gmail conectado de AAA001 y, de
- * respaldo, Resend por `fetch` a su API REST (sin librería). Las claves no se
- * registran nunca; los errores dicen el código HTTP, no el cuerpo enviado.
- *
- * Lo que una empresa manda a sus contactos no pasa por aquí: va siempre por su
- * propio Gmail (`crm/contact-email.ts`).
+ * Correo transaccional con Resend, por `fetch` a su API REST (sin librería).
+ * Se usa para el correo de acceso tras pagar Levy y los avisos de la reunión de
+ * puesta en marcha. La clave no se registra nunca; los errores dicen el código HTTP, no el cuerpo enviado.
  */
 
 const RESEND_URL = "https://api.resend.com/emails";
@@ -24,7 +16,6 @@ export type EmailMessage = {
 export type EmailDeps = {
   env?: Record<string, string | undefined>;
   fetch?: typeof fetch;
-  now?: () => Date;
 };
 
 export class EmailError extends Error {
@@ -37,11 +28,17 @@ export class EmailError extends Error {
   }
 }
 
+const EMAIL_PATTERN = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
+
+export function isValidEmailAddress(value: string) {
+  return EMAIL_PATTERN.test(value);
+}
+
 export function isEmailConfigured(env: Record<string, string | undefined> = process.env) {
   return Boolean(env.RESEND_API_KEY?.trim() && env.EMAIL_FROM?.trim());
 }
 
-export async function sendViaResend(message: EmailMessage, deps: EmailDeps = {}) {
+export async function sendEmail(message: EmailMessage, deps: EmailDeps = {}) {
   const env = deps.env ?? process.env;
   const apiKey = env.RESEND_API_KEY?.trim();
   const from = env.EMAIL_FROM?.trim();
@@ -66,39 +63,6 @@ export async function sendViaResend(message: EmailMessage, deps: EmailDeps = {})
 
   const data = (await response.json().catch(() => ({}))) as { id?: unknown };
   return { id: typeof data.id === "string" ? data.id : null };
-}
-
-/** Gmail de AAA001 si está conectado; si no o si falla, Resend si existe `RESEND_API_KEY`. */
-export async function sendSystemEmail(client: CrmClient, message: EmailMessage, deps: EmailDeps = {}) {
-  const env = deps.env ?? process.env;
-  let gmailProblem: string | null = null;
-
-  try {
-    const { data: agency, error } = await client
-      .from("workspaces")
-      .select("id")
-      .eq("company_code", agencyWorkspaceCode(env))
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    const agencyId = (agency as { id: string } | null)?.id;
-
-    if (agencyId && (await getGmailStatus(client, agencyId, env)).connected) {
-      const sent = await sendGmail(client, agencyId, message, deps, { fromName: "Levy" });
-      return { id: sent.id, via: "gmail" as const };
-    }
-  } catch (error) {
-    gmailProblem = error instanceof Error ? error.message : "error";
-    console.error(`[email] Gmail de Levy no disponible: ${gmailProblem}`);
-  }
-
-  if (env.RESEND_API_KEY?.trim()) {
-    const sent = await sendViaResend(message, deps);
-    return { id: sent.id, via: "resend" as const };
-  }
-
-  throw gmailProblem
-    ? new EmailError("failed", `No se pudo enviar por Gmail y no hay Resend de respaldo: ${gmailProblem}`)
-    : new EmailError("not_configured", "No hay correo configurado: conecta el Gmail de la empresa de Levy o define RESEND_API_KEY y EMAIL_FROM.");
 }
 
 export function escapeHtml(value: string) {
@@ -130,9 +94,4 @@ export function buildWelcomeEmail({ companyName, link, to }: { companyName: stri
     ].join("\n\n"),
     to,
   };
-}
-
-/** Texto plano del operador o de un flujo → HTML seguro (sin marcado, con sus saltos de línea). */
-export function plainTextToHtml(value: string) {
-  return `<div>${escapeHtml(value).replaceAll(/\r?\n/g, "<br>")}</div>`;
 }

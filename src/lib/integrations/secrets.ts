@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 import { decryptSecret, encryptSecret } from "./crypto";
 
-export type IntegrationProvider = "gmail" | "google_calendar" | "openai" | "ycloud";
+export type IntegrationProvider = "google_calendar" | "openai" | "ycloud";
 
 type SecretRow = {
   ciphertext: string;

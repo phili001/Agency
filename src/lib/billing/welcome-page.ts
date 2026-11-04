@@ -2,7 +2,7 @@ import type Stripe from "stripe";
 
 import type { CrmClient } from "../crm/shared.ts";
 import { normalizeAppUrl } from "../app-url.ts";
-import { buildWelcomeEmail, sendSystemEmail, type EmailDeps } from "../email.ts";
+import { buildWelcomeEmail, sendEmail, type EmailDeps } from "../email.ts";
 import { buildWelcomeLink } from "../welcome.ts";
 import { isLevyPurchase, type BillingConfig } from "./config.ts";
 import { idOf, ownedWorkspaceId, workspaceInfo } from "./webhook.ts";
@@ -132,7 +132,7 @@ type RecoveryLinkAdmin = {
 
 /** Correo con el enlace de primer acceso. Lo usan el webhook de Stripe y «Reenviar». */
 export async function sendWelcomeAccess(
-  admin: CrmClient & RecoveryLinkAdmin,
+  admin: RecoveryLinkAdmin,
   { companyName, email }: { companyName: string; email: string },
   deps: EmailDeps = {},
 ) {
@@ -142,5 +142,5 @@ export async function sendWelcomeAccess(
     throw error ?? new Error("Supabase no devolvió el enlace de acceso.");
   }
   const appUrl = normalizeAppUrl((deps.env ?? process.env).NEXT_PUBLIC_APP_URL);
-  await sendSystemEmail(admin, buildWelcomeEmail({ companyName, link: buildWelcomeLink(appUrl, hashedToken), to: email }), deps);
+  await sendEmail(buildWelcomeEmail({ companyName, link: buildWelcomeLink(appUrl, hashedToken), to: email }), deps);
 }

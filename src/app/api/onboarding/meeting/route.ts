@@ -34,9 +34,9 @@ async function cancelExisting(meeting: BookedMeeting, target: MeetingTarget | nu
 }
 
 /** El correo va después de responder: ni lo espera el cliente ni puede tumbar la reserva. */
-function emailAfterResponse(target: MeetingTarget, input: MeetingEmailInput) {
+function emailAfterResponse(input: MeetingEmailInput) {
   after(async () => {
-    await sendMeetingEmail(createAdminClient(), target, input);
+    await sendMeetingEmail(input);
   });
 }
 
@@ -161,7 +161,7 @@ export async function POST(request: Request) {
         await saveMeeting(workspaceId, null);
 
         if (cancelled && target) {
-          emailAfterResponse(target, {
+          emailAfterResponse({
             companyName: workspace?.name ?? "",
             kind: "cancelled",
             startTime: current.startTime,
@@ -223,7 +223,7 @@ export async function POST(request: Request) {
     };
 
     await saveMeeting(workspaceId, meeting);
-    emailAfterResponse(target, {
+    emailAfterResponse({
       companyName: workspace?.name ?? "",
       kind: moved ? "moved" : "confirmed",
       previousStartTime: moved ? current?.startTime : null,

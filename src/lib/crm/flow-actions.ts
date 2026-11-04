@@ -1,7 +1,6 @@
 import type { FlowCrmAction } from "../flow-definitions.ts";
-import { contactEmailVariables, sendContactEmail, type ContactEmailDeps } from "./contact-email.ts";
 import { updateContact } from "./contacts.ts";
-import { dbFailure, invalid, notFound } from "./errors.ts";
+import { CrmError, dbFailure, invalid, notFound } from "./errors.ts";
 import { addNote } from "./notes.ts";
 import type { CrmActor, CrmClient } from "./shared.ts";
 import { findStageByName, setContactStage } from "./stages.ts";
@@ -66,7 +65,6 @@ export async function runCrmFlowActions(
   contactId: string,
   actions: FlowCrmAction[],
   answers: Record<string, unknown> = {},
-  deps: ContactEmailDeps = {},
 ) {
   const results: FlowActionResult[] = [];
   const addedTagIds: string[] = [];
@@ -129,19 +127,6 @@ export async function runCrmFlowActions(
           results.push({ action: action.type, ok: true });
           break;
         }
-        case "send_email": {
-          const variables = { ...(await contactEmailVariables(client, workspaceId, contactId)), ...answers };
-          const sent = await sendContactEmail(
-            client,
-            workspaceId,
-            contactId,
-            { body: renderFlowTemplate(action.emailBody, variables), subject: renderFlowTemplate(action.emailSubject, variables) },
-            FLOW_ACTOR,
-            deps,
-          );
-          results.push({ action: action.type, detail: sent.to, ok: true });
-          break;
-        }
         case "set_booking_agenda": {
           if (!action.agendaId) throw invalid("Falta la agenda.");
           const { data: agenda, error: agendaError } = await client
@@ -174,14 +159,12 @@ export async function runCrmFlowActions(
           results.push({ action: String((action as { type?: unknown }).type), error: "Acción desconocida.", ok: false });
       }
     } catch (error) {
-      // CrmError y los de Google traen un mensaje que se puede enseñar.
-      const userFacing = (error as { userFacing?: boolean }).userFacing === true;
-      if (!userFacing) {
+      if (!(error instanceof CrmError)) {
         console.error("[flow-actions]", action.type, error);
       }
       results.push({
         action: action.type,
-        error: userFacing ? (error as Error).message : "Error inesperado al ejecutar la acción.",
+        error: error instanceof CrmError ? error.message : "Error inesperado al ejecutar la acción.",
         ok: false,
       });
     }

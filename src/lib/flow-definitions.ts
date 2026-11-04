@@ -20,7 +20,6 @@ export type FlowCrmActionType =
   | "add_tag"
   | "create_task"
   | "remove_tag"
-  | "send_email"
   | "set_booking_agenda"
   | "set_stage"
   | "update_contact_field";
@@ -29,9 +28,6 @@ export type FlowCrmAction = {
   /** Agenda que usará el agente de citas para este contacto. */
   agendaId?: string;
   engine: "crm";
-  /** Correo (`send_email`): admiten `{{nombre}}`, `{{empresa}}`, `{{email}}`, `{{telefono}}` y las respuestas. */
-  emailBody?: string;
-  emailSubject?: string;
   /** Clave de campo personalizado o `full_name` / `email` / `company`. */
   fieldKey?: string;
   /** Valor; admite `{{respuesta}}` con las respuestas del flujo. */
@@ -59,7 +55,6 @@ export const crmActionTypes: Array<{ label: string; value: FlowCrmActionType }> 
   { label: "Crear tarea", value: "create_task" },
   { label: "Añadir nota", value: "add_note" },
   { label: "Cambiar agenda de citas", value: "set_booking_agenda" },
-  { label: "Enviar correo", value: "send_email" },
 ];
 
 export function isCrmAction(action: unknown): action is FlowCrmAction {

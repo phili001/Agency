@@ -191,9 +191,9 @@ describe("resendWelcomeAccess", () => {
 describe("sendWelcomeAccess", () => {
   it("manda el enlace de primer acceso solo por correo", async () => {
     const requests: Array<{ body: { html: string; to: string[] }; url: string }> = [];
-    const admin = Object.assign(createCrmFake(), {
+    const admin = {
       auth: { admin: { generateLink: async () => ({ data: { properties: { hashed_token: "tok123" } }, error: null }) } },
-    }) as unknown as CrmClient & Parameters<typeof sendWelcomeAccess>[0];
+    };
 
     await sendWelcomeAccess(admin, { companyName: "Clínica Ana", email: "ana@ejemplo.com" }, {
       env: { EMAIL_FROM: "Levy <hola@agentelevi.com>", NEXT_PUBLIC_APP_URL: "https://agentelevi.com", RESEND_API_KEY: "re_test" },
@@ -210,9 +210,9 @@ describe("sendWelcomeAccess", () => {
   });
 
   it("si Supabase no da el enlace no manda nada", async () => {
-    const admin = Object.assign(createCrmFake(), {
+    const admin = {
       auth: { admin: { generateLink: async () => ({ data: {}, error: new Error("sin usuario") }) } },
-    }) as unknown as Parameters<typeof sendWelcomeAccess>[0];
+    };
     await assert.rejects(
       () =>
         sendWelcomeAccess(admin, { companyName: "X", email: "x@ejemplo.com" }, {

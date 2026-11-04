@@ -91,7 +91,7 @@ beforeEach(() => {
 describe("state del OAuth", () => {
   it("firmado, ligado al usuario y con caducidad", () => {
     const state = createOAuthState({ userId: "user-1", workspaceId: A }, deps());
-    assert.deepEqual(verifyOAuthState(state, "user-1", deps()), { purpose: "calendar", userId: "user-1", workspaceId: A });
+    assert.deepEqual(verifyOAuthState(state, "user-1", deps()), { userId: "user-1", workspaceId: A });
 
     const isInvalid = (error: unknown) => error instanceof GoogleCalendarError && error.code === "invalid_state";
     assert.throws(() => verifyOAuthState(state, "otro-usuario", deps()), isInvalid);
