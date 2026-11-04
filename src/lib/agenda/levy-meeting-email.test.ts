@@ -13,29 +13,28 @@ const CLIENT = "ws-client";
 const NOW = new Date("2026-09-06T18:00:00Z");
 const MONDAY_10 = "2026-09-07T08:00:00.000Z";
 const TUESDAY_12 = "2026-09-08T10:00:00.000Z";
-const SEND_URL = "https://api.resend.com/emails";
 
 let fake: FakeSupabase;
 let client: CrmClient;
 let agendaId: string;
 let env: Record<string, string | undefined>;
 let sends: string[];
-let sendStatus: number;
+let sendFails: boolean;
 
 function deps(): EmailDeps {
   return {
     env,
-    fetch: (async (url: string | URL, init: RequestInit = {}) => {
-      assert.equal(String(url), SEND_URL);
-      sends.push(String(init.body));
-      return new Response(JSON.stringify({ id: "email-1" }), { status: sendStatus });
-    }) as unknown as typeof fetch,
+    transport: async (mail) => {
+      if (sendFails) throw new Error("smtp caído");
+      sends.push(mail.to);
+      return { messageId: "email-1" };
+    },
   };
 }
 
 function configureEmail() {
-  env.RESEND_API_KEY = "re_x";
-  env.EMAIL_FROM = "Levy <hola@levy.test>";
+  env.GMAIL_USER = "hola@levy.test";
+  env.GMAIL_APP_PASSWORD = "clave";
 }
 
 function base(kind: "cancelled" | "confirmed" | "moved") {
@@ -82,7 +81,7 @@ beforeEach(async () => {
     LEVY_WORKSPACE_CODE: "AAA001",
   };
   sends = [];
-  sendStatus = 200;
+  sendFails = false;
 });
 
 describe("texto del correo de la reunión", () => {
@@ -110,12 +109,11 @@ describe("texto del correo de la reunión", () => {
 });
 
 describe("envío del aviso", () => {
-  it("sale por Resend hacia el cliente", async () => {
+  it("sale del Gmail de Levy hacia el cliente", async () => {
     configureEmail();
     assert.deepEqual(await sendMeetingEmail(base("confirmed"), deps()), { sent: true });
     assert.equal(sends.length, 1);
-    assert.match(sends[0], /"from":"Levy <hola@levy\.test>"/);
-    assert.match(sends[0], /"to":\["ana@example\.com"\]/);
+    assert.equal(sends[0], "ana@example.com");
   });
 
   it("sin correo configurado no lanza, no envía y la reserva sigue en pie", async () => {
@@ -133,9 +131,9 @@ describe("envío del aviso", () => {
     assert.equal(fake.table("appointments").find((row) => row.id === booked.appointmentId)?.status, "scheduled");
   });
 
-  it("un fallo de Resend no lanza", async () => {
+  it("un fallo de Gmail no lanza", async () => {
     configureEmail();
-    sendStatus = 500;
+    sendFails = true;
     assert.deepEqual(await sendMeetingEmail(base("confirmed"), deps()), { reason: "failed", sent: false });
   });
 
@@ -167,7 +165,7 @@ describe("cambios desde el panel de Agenda", () => {
     assert.equal(state.keep, true);
     assert.equal(state.meeting.appointmentId, "appt-new");
     assert.equal(state.meeting.startTime, TUESDAY_12);
-    assert.match(sends[0], /"to":\["ana@example\.com"\]/);
+    assert.equal(sends[0], "ana@example.com");
   });
 
   it("cancelarla la quita del asistente y le avisa, también sin correo configurado no lanza", async () => {
@@ -191,7 +189,7 @@ describe("cambios desde el panel de Agenda", () => {
     const state = row.onboarding_state as { meeting: Record<string, string> };
     delete state.meeting.email;
     await handlePanelMeetingChange(client, AGENCY, { appointment: moved(), kind: "moved", previousAppointmentId: "appt-old" }, deps());
-    assert.match(sends[0], /"to":\["contacto@example\.com"\]/);
+    assert.equal(sends[0], "contacto@example.com");
   });
 
   it("no toca otras citas, otras agendas ni otras empresas", async () => {

@@ -190,23 +190,23 @@ describe("resendWelcomeAccess", () => {
 
 describe("sendWelcomeAccess", () => {
   it("manda el enlace de primer acceso solo por correo", async () => {
-    const requests: Array<{ body: { html: string; to: string[] }; url: string }> = [];
+    const requests: Array<{ html: string; to: string }> = [];
     const admin = {
       auth: { admin: { generateLink: async () => ({ data: { properties: { hashed_token: "tok123" } }, error: null }) } },
     };
 
     await sendWelcomeAccess(admin, { companyName: "Clínica Ana", email: "ana@ejemplo.com" }, {
-      env: { EMAIL_FROM: "Levy <hola@agentelevi.com>", NEXT_PUBLIC_APP_URL: "https://agentelevi.com", RESEND_API_KEY: "re_test" },
-      fetch: (async (url: string, init: { body: string }) => {
-        requests.push({ body: JSON.parse(init.body), url });
-        return new Response(JSON.stringify({ id: "em_1" }), { status: 200 });
-      }) as unknown as typeof fetch,
+      env: { GMAIL_APP_PASSWORD: "clave", GMAIL_USER: "hola@agentelevi.com", NEXT_PUBLIC_APP_URL: "https://agentelevi.com" },
+      transport: async (mail) => {
+        requests.push({ html: mail.html, to: mail.to });
+        return { messageId: "em_1" };
+      },
     });
 
     assert.equal(requests.length, 1);
-    assert.deepEqual(requests[0].body.to, ["ana@ejemplo.com"]);
-    assert.match(requests[0].body.html, /https:\/\/agentelevi\.com\/auth\/confirm\?/);
-    assert.match(requests[0].body.html, /token_hash=tok123/);
+    assert.equal(requests[0].to, "ana@ejemplo.com");
+    assert.match(requests[0].html, /https:\/\/agentelevi\.com\/auth\/confirm\?/);
+    assert.match(requests[0].html, /token_hash=tok123/);
   });
 
   it("si Supabase no da el enlace no manda nada", async () => {
@@ -216,7 +216,7 @@ describe("sendWelcomeAccess", () => {
     await assert.rejects(
       () =>
         sendWelcomeAccess(admin, { companyName: "X", email: "x@ejemplo.com" }, {
-          fetch: (async () => assert.fail("no debe enviar")) as unknown as typeof fetch,
+          transport: async () => assert.fail("no debe enviar"),
         }),
       /sin usuario/,
     );

@@ -6,7 +6,7 @@ import { resolveMeetingAgenda } from "./levy-meeting.ts";
 
 /**
  * Correos de la reunión de puesta en marcha: confirmación al reservar y aviso
- * si se mueve o se cancela. Salen por Resend. Son un extra: nada de aquí lanza,
+ * si se mueve o se cancela. Salen del Gmail de Levy (`lib/email`). Son un extra: nada de aquí lanza,
  * así que un correo sin configurar o caído nunca tumba la reserva.
  */
 
@@ -60,7 +60,7 @@ export function buildMeetingEmail(input: MeetingEmailInput & { to: string }): Em
   };
 }
 
-/** Envía el aviso por Resend. Nunca lanza: devuelve qué pasó. */
+/** Envía el aviso desde el Gmail de Levy. Nunca lanza: devuelve qué pasó. */
 export async function sendMeetingEmail(input: MeetingEmailInput, deps: EmailDeps = {}): Promise<MeetingEmailResult> {
   const to = input.to?.trim() ?? "";
 

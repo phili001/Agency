@@ -1,46 +1,57 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { EmailError, buildWelcomeEmail, isEmailConfigured, sendEmail } from "./email.ts";
+import {
+  EmailError,
+  buildWelcomeEmail,
+  isEmailConfigured,
+  sendEmail,
+  type EmailAuth,
+  type EmailTransport,
+  type OutgoingEmail,
+} from "./email.ts";
 
-const ENV = { EMAIL_FROM: "Levy <hola@levy.test>", RESEND_API_KEY: "re_test_key" };
+const ENV = { GMAIL_APP_PASSWORD: "abcd efgh ijkl mnop", GMAIL_USER: "hola@levy.test" };
 
-function recorder(status = 200, body: unknown = { id: "email_1" }) {
-  const calls: Array<{ init: RequestInit; url: string }> = [];
-  const fetcher = (async (url: string, init: RequestInit) => {
-    calls.push({ init, url });
-    return new Response(JSON.stringify(body), { status });
-  }) as unknown as typeof fetch;
-  return { calls, fetcher };
+function recorder(failure?: Error) {
+  const calls: Array<{ auth: EmailAuth; mail: OutgoingEmail }> = [];
+  const transport: EmailTransport = async (mail, auth) => {
+    calls.push({ auth, mail });
+    if (failure) throw failure;
+    return { messageId: "<email_1@levy.test>" };
+  };
+  return { calls, transport };
 }
 
 describe("sendEmail", () => {
-  it("manda a Resend con la clave en la cabecera y el destinatario normalizado", async () => {
-    const { calls, fetcher } = recorder();
-    const result = await sendEmail({ html: "<p>x</p>", subject: "Hola", text: "x", to: " Ana@Example.com " }, { env: ENV, fetch: fetcher });
+  it("sale del Gmail configurado, con el destinatario normalizado y la contraseña sin espacios", async () => {
+    const { calls, transport } = recorder();
+    const result = await sendEmail({ html: "<p>x</p>", subject: "Hola", text: "x", to: " Ana@Example.com " }, { env: ENV, transport });
 
-    assert.deepEqual(result, { id: "email_1" });
-    assert.equal(calls[0].url, "https://api.resend.com/emails");
-    assert.equal((calls[0].init.headers as Record<string, string>).authorization, "Bearer re_test_key");
-    const sent = JSON.parse(String(calls[0].init.body));
-    assert.deepEqual(sent.to, ["ana@example.com"]);
-    assert.equal(sent.from, ENV.EMAIL_FROM);
+    assert.deepEqual(result, { id: "<email_1@levy.test>" });
+    assert.deepEqual(calls[0].auth, { pass: "abcdefghijklmnop", user: "hola@levy.test" });
+    assert.deepEqual(calls[0].mail.from, { address: "hola@levy.test", name: "Levy" });
+    assert.equal(calls[0].mail.to, "ana@example.com");
   });
 
   it("no envía sin configuración ni a un correo no válido", async () => {
-    const { calls, fetcher } = recorder();
+    const { calls, transport } = recorder();
     assert.equal(isEmailConfigured({}), false);
-    await assert.rejects(sendEmail({ html: "", subject: "", text: "", to: "a@b.co" }, { env: {}, fetch: fetcher }), (error: unknown) => error instanceof EmailError && error.code === "not_configured");
-    await assert.rejects(sendEmail({ html: "", subject: "", text: "", to: "no-es-correo" }, { env: ENV, fetch: fetcher }), (error: unknown) => error instanceof EmailError && error.code === "invalid");
+    assert.equal(isEmailConfigured({ GMAIL_USER: "hola@levy.test" }), false);
+    assert.equal(isEmailConfigured(ENV), true);
+    await assert.rejects(sendEmail({ html: "", subject: "", text: "", to: "a@b.co" }, { env: {}, transport }), (error) => error instanceof EmailError && error.code === "not_configured");
+    await assert.rejects(sendEmail({ html: "", subject: "", text: "", to: "no-es-correo" }, { env: ENV, transport }), (error) => error instanceof EmailError && error.code === "invalid");
     assert.equal(calls.length, 0);
   });
 
-  it("un error de Resend no filtra la clave en el mensaje", async () => {
-    const { fetcher } = recorder(422, { message: "bad" });
-    await assert.rejects(sendEmail({ html: "", subject: "", text: "", to: "a@b.co" }, { env: ENV, fetch: fetcher }), (error: unknown) => {
+  it("un error de Gmail no filtra la contraseña en el mensaje", async () => {
+    const failure = Object.assign(new Error("Invalid login abcdefghijklmnop"), { code: "EAUTH" });
+    const { transport } = recorder(failure);
+    await assert.rejects(sendEmail({ html: "", subject: "", text: "", to: "a@b.co" }, { env: ENV, transport }), (error) => {
       assert.ok(error instanceof EmailError);
       assert.equal(error.code, "failed");
-      assert.doesNotMatch(error.message, /re_test_key/);
+      assert.match(error.message, /GMAIL_APP_PASSWORD/);
+      assert.doesNotMatch(error.message, /abcdefghijklmnop/);
       return true;
     });
   });

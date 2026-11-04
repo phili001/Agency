@@ -1,10 +1,15 @@
+import nodemailer from "nodemailer";
+
 /**
- * Correo transaccional con Resend, por `fetch` a su API REST (sin librería).
- * Se usa para el correo de acceso tras pagar Levy y los avisos de la reunión de
- * puesta en marcha. La clave no se registra nunca; los errores dicen el código HTTP, no el cuerpo enviado.
+ * Correo transaccional de la plataforma Levy: el acceso tras pagar y los avisos
+ * de la reunión de puesta en marcha. Sale por SMTP de un solo Gmail, configurado
+ * en el servidor con una contraseña de aplicación; no es de ninguna empresa. La
+ * contraseña no se registra nunca; los errores dicen el código, no el contenido.
  */
 
-const RESEND_URL = "https://api.resend.com/emails";
+const SENDER_NAME = "Levy";
+const CONNECT_TIMEOUT_MS = 10_000;
+const SOCKET_TIMEOUT_MS = 20_000;
 
 export type EmailMessage = {
   html: string;
@@ -13,9 +18,13 @@ export type EmailMessage = {
   to: string;
 };
 
+export type EmailAuth = { pass: string; user: string };
+export type OutgoingEmail = EmailMessage & { from: { address: string; name: string } };
+export type EmailTransport = (mail: OutgoingEmail, auth: EmailAuth) => Promise<{ messageId?: string }>;
+
 export type EmailDeps = {
   env?: Record<string, string | undefined>;
-  fetch?: typeof fetch;
+  transport?: EmailTransport;
 };
 
 export class EmailError extends Error {
@@ -34,35 +43,59 @@ export function isValidEmailAddress(value: string) {
   return EMAIL_PATTERN.test(value);
 }
 
+/** Google muestra la contraseña de aplicación con espacios; se aceptan al pegarla. */
+function emailAuth(env: Record<string, string | undefined>): EmailAuth | null {
+  const user = env.GMAIL_USER?.trim();
+  const pass = env.GMAIL_APP_PASSWORD?.replace(/\s/g, "");
+
+  return user && pass ? { pass, user } : null;
+}
+
 export function isEmailConfigured(env: Record<string, string | undefined> = process.env) {
-  return Boolean(env.RESEND_API_KEY?.trim() && env.EMAIL_FROM?.trim());
+  return emailAuth(env) !== null;
+}
+
+const sendWithGmail: EmailTransport = (mail, auth) =>
+  nodemailer
+    .createTransport({
+      auth,
+      connectionTimeout: CONNECT_TIMEOUT_MS,
+      greetingTimeout: CONNECT_TIMEOUT_MS,
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      socketTimeout: SOCKET_TIMEOUT_MS,
+    })
+    .sendMail(mail);
+
+function failureMessage(error: unknown) {
+  const code = (error as { code?: unknown } | null)?.code;
+
+  return code === "EAUTH"
+    ? "Gmail rechazó GMAIL_USER o GMAIL_APP_PASSWORD."
+    : `Gmail no pudo enviar el correo (${typeof code === "string" ? code : "error"}).`;
 }
 
 export async function sendEmail(message: EmailMessage, deps: EmailDeps = {}) {
-  const env = deps.env ?? process.env;
-  const apiKey = env.RESEND_API_KEY?.trim();
-  const from = env.EMAIL_FROM?.trim();
+  const auth = emailAuth(deps.env ?? process.env);
 
-  if (!apiKey || !from) {
-    throw new EmailError("not_configured", "Faltan RESEND_API_KEY o EMAIL_FROM: el correo no está configurado.");
+  if (!auth) {
+    throw new EmailError("not_configured", "Faltan GMAIL_USER o GMAIL_APP_PASSWORD: el correo no está configurado.");
   }
   const to = message.to.trim().toLowerCase();
   if (!isValidEmailAddress(to)) {
     throw new EmailError("invalid", "El correo del destinatario no es válido.");
   }
 
-  const response = await (deps.fetch ?? fetch)(RESEND_URL, {
-    body: JSON.stringify({ from, html: message.html, subject: message.subject, text: message.text, to: [to] }),
-    headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-    method: "POST",
-  });
-
-  if (!response.ok) {
-    throw new EmailError("failed", `Resend respondió ${response.status}.`);
+  try {
+    const sent = await (deps.transport ?? sendWithGmail)(
+      { ...message, from: { address: auth.user, name: SENDER_NAME }, to },
+      auth,
+    );
+    return { id: sent.messageId ?? null };
+  } catch (error) {
+    throw new EmailError("failed", failureMessage(error));
   }
-
-  const data = (await response.json().catch(() => ({}))) as { id?: unknown };
-  return { id: typeof data.id === "string" ? data.id : null };
 }
 
 export function escapeHtml(value: string) {
