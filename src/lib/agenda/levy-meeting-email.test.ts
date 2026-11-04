@@ -33,8 +33,9 @@ function deps(): EmailDeps {
 }
 
 function configureEmail() {
-  env.GMAIL_USER = "hola@levy.test";
-  env.GMAIL_APP_PASSWORD = "clave";
+  env.SMTP_HOST = "smtp.levy.test";
+  env.SMTP_USER = "hola@levy.test";
+  env.SMTP_PASSWORD = "clave";
 }
 
 function base(kind: "cancelled" | "confirmed" | "moved") {
@@ -109,7 +110,7 @@ describe("texto del correo de la reunión", () => {
 });
 
 describe("envío del aviso", () => {
-  it("sale del Gmail de Levy hacia el cliente", async () => {
+  it("sale del correo de Levy hacia el cliente", async () => {
     configureEmail();
     assert.deepEqual(await sendMeetingEmail(base("confirmed"), deps()), { sent: true });
     assert.equal(sends.length, 1);
@@ -131,7 +132,7 @@ describe("envío del aviso", () => {
     assert.equal(fake.table("appointments").find((row) => row.id === booked.appointmentId)?.status, "scheduled");
   });
 
-  it("un fallo de Gmail no lanza", async () => {
+  it("un fallo del servidor de correo no lanza", async () => {
     configureEmail();
     sendFails = true;
     assert.deepEqual(await sendMeetingEmail(base("confirmed"), deps()), { reason: "failed", sent: false });

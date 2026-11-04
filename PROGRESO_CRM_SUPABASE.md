@@ -31,7 +31,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - **D3** Plantilla de WhatsApp aprobada para recordatorios fuera de la ventana de 24 h (nombre por workspace) → mientras, se registran como omitidos.
 
 ## Decisiones tomadas
-- **Sin Gmail (2026-11-04, decisión del usuario):** «no tiene sentido enviar sin poder leer», y leer Gmail exige permisos restringidos con evaluación de seguridad anual de pago. Se quita lo de F6.8: conexión de correo, «Enviar correo» en la ficha y acción `send_email` en flujos. El correo de acceso y los avisos de la reunión salen por **SMTP de un Gmail de la plataforma** (`GMAIL_USER`, `GMAIL_APP_PASSWORD` en el servidor), sin Resend (decisión del usuario). El permiso de Google de las empresas se queda solo en Calendar. El proveedor `gmail` sigue admitido en los checks de la base (sin filas); se retira en F7.4.
+- **Sin Gmail (2026-11-04, decisión del usuario):** «no tiene sentido enviar sin poder leer», y leer Gmail exige permisos restringidos con evaluación de seguridad anual de pago. Se quita lo de F6.8: conexión de correo, «Enviar correo» en la ficha y acción `send_email` en flujos. El correo de acceso y los avisos de la reunión salen por **SMTP del buzón de Levy en Hostinger** (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` en el servidor), sin Resend ni Gmail (decisión del usuario). El permiso de Google de las empresas se queda solo en Calendar. El proveedor `gmail` sigue admitido en los checks de la base (sin filas); se retira en F7.4.
 - **Sin GoHighLevel (2026-11-03, decisión del usuario):** «Ya no vamos a usar GHL». No habrá token nuevo, así que **no se migran datos desde GHL**: etiquetas y etapas de los 160 contactos de AAA001 que solo existían en GHL y sus citas futuras se pierden (los contactos, conversaciones y mensajes ya están en Supabase). F7.1 se cierra así; F7.2 pasa a ser la parte que no necesita GHL. F7.3 y F7.4 siguen siendo [STOP].
 - **F1.1 Etiquetas (2026-11-02).** Tres cosas distintas, cada una en su sitio:
   1. `crm_tags` + `crm_contact_tags`: **las etiquetas del CRM**, las que ve y gestiona el operador (con color). Se ponen/quitan desde panel, flujo (`crm_action`) o agente (solo etiquetas que ya existan en el workspace: el agente no crea etiquetas). Las de GHL se importan aquí en F7.1.
@@ -372,7 +372,8 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
 - 2026-11-04 · Rearme de AAA001 y F7.3 · tools de texto borradas, agenda «Puesta en marcha» creada, correos de la reunión por Gmail con pruebas, panel de Tools sobre agendas y todo GHL fuera del código (código, rutas, variables, script y convivencia); typecheck, lint, test y build en verde. Sin push ni despliegue; F7.4 sin hacer · commit `crm: F7.3 sin GHL y correos de la reunión`.
 
 - 2026-11-04 · Sin Gmail · revertida F6.8 salvo migración; correos de acceso y de la reunión por Resend; se conserva el aviso de correo fallido en `billing_events.error`; typecheck, lint, test y build en verde · commit `crm: quitar Gmail`.
-- 2026-11-04 · Correo de la plataforma · Resend sustituido por SMTP de Gmail con `nodemailer` y contraseña de aplicación; sin probar contra Gmail real · commit `crm: correo de la plataforma por Gmail`.
+- 2026-11-04 · Correo de la plataforma · Resend sustituido por SMTP de Gmail con `nodemailer` y contraseña de aplicación; · commit `crm: correo de la plataforma por Gmail`.
+- 2026-11-04 · Correo de la plataforma · SMTP genérico para el buzón de Hostinger (`SMTP_*`); sin probar contra el servidor real · commit `crm: correo de la plataforma por SMTP`.
 
 ## Resumen final
 <!-- Lo escribe F8.1 -->

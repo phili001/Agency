@@ -53,8 +53,10 @@ app arranca, pero no se puede conectar Google Calendar ni vender con Stripe.
 | `STRIPE_PRICE_IDS` | Precios de Levy (`price_…`), separados por coma |
 | `STRIPE_FIELD_COMPANY_NAME` | Campo personalizado con el nombre del negocio (por defecto `nombredelnegocio`) |
 | `BILLING_GRACE_DAYS` | Días de gracia tras un impago (por defecto 7) |
-| `GMAIL_USER` | Gmail de Levy desde el que salen el correo de acceso y los avisos de la reunión |
-| `GMAIL_APP_PASSWORD` | Contraseña de aplicación de esa cuenta (necesita verificación en dos pasos) |
+| `SMTP_HOST` | Servidor de correo de Levy (`smtp.hostinger.com`) |
+| `SMTP_PORT` | `465` (SSL, por defecto) o `587` (STARTTLS) |
+| `SMTP_USER` | Buzón desde el que salen el correo de acceso y los avisos de la reunión |
+| `SMTP_PASSWORD` | Contraseña de ese buzón |
 | `LEVY_WORKSPACE_CODE` | Empresa cuyo CRM guarda a los clientes de Levy (por defecto `AAA001`) |
 | `LEVY_MEETING_AGENDA_ID` | Agenda de AAA001 para la reunión de puesta en marcha |
 
@@ -223,9 +225,9 @@ no es la que usa el agente de WhatsApp. Su horario y duración se cambian en
   `push_and_busy` para que no se solapen.
 
 **Correos.** Al reservar, mover o cancelar (desde el asistente o desde *Agenda*
-en el panel) el cliente recibe un aviso desde el **Gmail de Levy**. Sin
-`GMAIL_USER` y `GMAIL_APP_PASSWORD`, o si falla, la reserva sigue adelante sin
-correo y queda en el log (`[levy-meeting-email]`).
+en el panel) el cliente recibe un aviso desde el **correo de Levy**. Sin
+`SMTP_HOST`, `SMTP_USER` y `SMTP_PASSWORD`, o si falla, la reserva sigue adelante
+sin correo y queda en el log (`[levy-meeting-email]`).
 
 ## 8. Antes de dar acceso a un cliente
 
