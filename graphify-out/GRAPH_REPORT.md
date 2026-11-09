@@ -1,4 +1,4 @@
-# Graph Report - Agency  (2026-11-08)
+# Graph Report - Agency  (2026-11-09)
 
 ## Corpus Check
 - 301 files · ~198,767 words
@@ -6,12 +6,12 @@
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 2, .example 1, .ico 1)
 
 ## Summary
-- 2157 nodes · 6765 edges · 111 communities (92 shown, 19 thin omitted)
-- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 190 edges (avg confidence: 0.93)
+- 2157 nodes · 6763 edges · 104 communities (85 shown, 19 thin omitted)
+- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 188 edges (avg confidence: 0.93)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `dee395ea`
+- Built from commit: `96eb5b2b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -21,7 +21,7 @@
 - FakeQuery
 - custom-fields.ts
 - step-business.tsx
-- invalid
+- dbFailure
 - slots.ts
 - reminders.ts
 - Dependencias y ESLint
@@ -56,7 +56,7 @@
 - agent-agenda.ts
 - AdminConsole
 - Iconos del scaffold Next
-- ref_node_assert
+- calendar-tools.ts
 - webhook.ts
 - lucide-react
 - admin-companies.ts
@@ -68,23 +68,23 @@
 - flow-answer-verifier.ts
 - welcome-page.ts
 - flow-builder.tsx
-- import-export.ts
+- shared.ts
 - 20261102210000_agenda_core.sql
 - agendas.ts
 - wizard.tsx
 - Auditoria de rendimiento 2026-10-09
-- appointments/route.ts
+- meeting/route.ts
 - workspaces.ts
 - ycloud-webhook.ts
 - StepBusiness
 - agency-crm.ts
-- onboarding/page.tsx
+- send/route.ts
 - contacts.ts
 - Runbook de despliegue
 - next
 - Tareas
 - FlowBuilder
-- deliver/route.ts
+- api/flows/route.ts
 - Levy multi-tenant WhatsApp AI agent panel
 - config.ts
 - agenda-panel.tsx
@@ -95,23 +95,16 @@
 - public-shell.tsx
 - routeAgent
 - ref_node_test
-- requireWorkspaceRole
+- api-error.ts
 - Levy README
 - Per-workspace integrations encrypted AES-256-GCM
 - CLAUDE.md
 - Vercel daily crons (flows, deliver, ghl-sync)
-- agency-crm.ts
+- snapshot/route.ts
 - clientFetch
-- google-sync.test.ts
+- ref_node_assert
 - createClient
 - GHL purchase webhook auto-provisioning (/api/webhooks/ghl/purchase)
-- legal-page.tsx
-- secrets.ts
-- panel-context.ts
-- buildFieldsFromChoices
-- admin.test.ts
-- (panel)/layout.tsx
-- welcome-view.tsx
 
 ## God Nodes (most connected - your core abstractions)
 1. `createAdminClient()` - 166 edges
@@ -128,14 +121,14 @@
 ## Surprising Connections (you probably didn't know these)
 - `Vercel daily crons (flows, deliver, ghl-sync)` --semantically_similar_to--> `Deploy a Vercel workflow`  [INFERRED] [semantically similar]
   DEPLOY_RUNBOOK.md → .github/workflows/deploy.yml
+- `Verificación final` --references--> `test()`  [INFERRED]
+  PROGRESO_CRM_SUPABASE.md → src/components/onboarding/step-whatsapp.tsx
 - `Decisiones tomadas` --references--> `agenda()`  [INFERRED]
   PROGRESO_CRM_SUPABASE.md → src/lib/agenda/reminders.test.ts
-- `Decisiones tomadas` --references--> `Row`  [INFERRED]
-  PROGRESO_CRM_SUPABASE.md → src/lib/testing/fake-supabase.ts
+- `Decisiones tomadas` --references--> `config()`  [INFERRED]
+  PROGRESO_CRM_SUPABASE.md → src/lib/agenda/slots.test.ts
 - `F6 — Stripe y onboarding de Levy` --references--> `getWorkspaceBillingState()`  [INFERRED]
   PROGRESO_CRM_SUPABASE.md → src/lib/billing/workspace-billing.ts
-- `Registro de iteraciones` --references--> `IntegrationProvider`  [INFERRED]
-  PROGRESO_CRM_SUPABASE.md → src/lib/integrations/secrets.ts
 
 ## Import Cycles
 - None detected.
@@ -147,39 +140,39 @@
 - **Next.js starter footer link icons (Learn/Examples/Go to nextjs.org)** — public_file_icon, public_window_icon, public_globe_icon [INFERRED 0.85]
 - **Default create-next-app public/ icon set (likely unused leftovers)** — public_file_icon, public_globe_icon, public_next_logo, public_vercel_logo, public_window_icon [INFERRED 0.85]
 
-## Communities (111 total, 19 thin omitted)
+## Communities (104 total, 19 thin omitted)
 
 ### Community 0 - "shared.tsx"
 Cohesion: 0.25
 Nodes (27): ConnectedBanner(), CopyButton(), Field(), HelpBox(), HowTo(), inputClass, linkButton, Notice() (+19 more)
 
 ### Community 1 - "buffer/route.ts"
-Cohesion: 0.14
-Nodes (26): AgentRow, buildTodayLine(), buildTranscript(), BusinessProfileAsset, callResponsesApi(), ContactMetadata, describeMedia(), ensureAgentIntroduction() (+18 more)
+Cohesion: 0.15
+Nodes (24): AgentRow, buildInstructions(), buildTimeContext(), buildTodayLine(), buildTranscript(), BusinessProfileAsset, callResponsesApi(), ContactMetadata (+16 more)
 
 ### Community 2 - "FakeQuery"
-Cohesion: 0.06
-Nodes (12): CascadeRule, compare(), fakeId(), FakeQuery, FakeSupabase, FakeTables, Filter, likeToRegExp() (+4 more)
+Cohesion: 0.07
+Nodes (6): compare(), fakeId(), FakeQuery, FakeSupabase, likeToRegExp(), parseOr()
 
 ### Community 3 - "custom-fields.ts"
-Cohesion: 0.13
-Nodes (21): Client, CUSTOM_FIELD_TYPES, CustomFieldDefinition, CustomFieldDefinitionInput, CustomFieldType, CustomFieldValue, CustomFieldValues, describeAiReadableFields() (+13 more)
+Cohesion: 0.09
+Nodes (40): ensureFields(), Client, createCustomField(), CUSTOM_FIELD_TYPES, CustomFieldDefinition, CustomFieldDefinitionInput, CustomFieldType, CustomFieldValue (+32 more)
 
 ### Community 4 - "step-business.tsx"
-Cohesion: 0.14
-Nodes (24): Chip(), toggle(), asString(), asStringArray(), AttendMode, attendModes, BusinessChoices, BusinessLocation (+16 more)
+Cohesion: 0.12
+Nodes (31): next(), save(), asString(), asStringArray(), AttendMode, attendModes, buildAddressText(), buildDaysText() (+23 more)
 
-### Community 5 - "invalid"
-Cohesion: 0.38
-Nodes (11): optionalEmail(), updateContact(), invalid(), optionalText(), assertMember(), createdByFor(), createTask(), CrmTask (+3 more)
+### Community 5 - "dbFailure"
+Cohesion: 0.19
+Nodes (22): upcomingAppointmentsForContact(), listActivity(), getContactCard(), eraseContact(), dbFailure(), optionalText(), addNote(), CrmNote (+14 more)
 
 ### Community 6 - "slots.ts"
-Cohesion: 0.13
-Nodes (23): AgendaConfig, agendaConfigFromRow(), clampInt(), DAY_KEYS, DEFAULT_SERVICE_MINUTES, DEFAULT_WEEKLY_SCHEDULE, distributeSlots(), Interval (+15 more)
+Cohesion: 0.12
+Nodes (22): AgendaConfig, agendaConfigFromRow(), clampInt(), DAY_KEYS, DEFAULT_SERVICE_MINUTES, DEFAULT_WEEKLY_SCHEDULE, Interval, normalizeText() (+14 more)
 
 ### Community 7 - "reminders.ts"
-Cohesion: 0.12
-Nodes (22): ACTIVE_STATUSES, AgendaNoticeConfig, CandidateRow, claim(), DEFAULT_MESSAGES, deliverNotice(), fillNotice(), firstName() (+14 more)
+Cohesion: 0.13
+Nodes (21): AgendaNoticeConfig, CandidateRow, claim(), DEFAULT_MESSAGES, deliverNotice(), fillNotice(), firstName(), isMessagingWindowOpen() (+13 more)
 
 ### Community 8 - "Dependencias y ESLint"
 Cohesion: 0.06
@@ -190,28 +183,28 @@ Cohesion: 0.06
 Nodes (51): app_private.check_agenda_slot(), app_private.reschedule_appointment(), app_private.seed_crm_pipeline_stages(), idx_agents_workspace_id, idx_appointments_no_show_due, idx_billing_events_workspace, idx_integration_secrets_workspace_provider, idx_messages_conversation_id_created_at (+43 more)
 
 ### Community 10 - "google-sync.ts"
-Cohesion: 0.13
-Nodes (26): Decisiones tomadas, F5 — Agente, flujos y panel sin GHL, Cambios en lo existente, server-only, buildCalendarToolDefinitions(), buildCalendarRuntime(), CalendarRuntime, CalendarRuntimeResult (+18 more)
+Cohesion: 0.14
+Nodes (24): Lógica en Next.js, server-only, ACTIVE_STATUSES, AppointmentStatus, AgendaSync, clearPending(), connectedWorkspaces(), eventSummary() (+16 more)
 
 ### Community 11 - "CRM y Agenda dentro de AgenteLevy (todo en Supabase) — instrucciones para Claude Code"
-Cohesion: 0.22
-Nodes (8): CRM y Agenda dentro de AgenteLevy (todo en Supabase) — instrucciones para Claude Code, Código de referencia del CRM (portar, no copiar a ciegas), Inventario de GHL a eliminar, Modelo de datos (Supabase, esquema `public`), Objetivo, Onboarding de Levy, Panel, Verificación final (la última tarea del progreso)
+Cohesion: 0.16
+Nodes (13): F5 — Agente, flujos y panel sin GHL, Cambios en lo existente, CRM y Agenda dentro de AgenteLevy (todo en Supabase) — instrucciones para Claude Code, Código de referencia del CRM (portar, no copiar a ciegas), Inventario de GHL a eliminar, Modelo de datos (Supabase, esquema `public`), Objetivo, Onboarding de Levy (+5 more)
 
 ### Community 12 - "InboxPanel"
 Cohesion: 0.09
 Nodes (30): ContactCrmSummary(), nextAppointment(), ConversationItem, handoffSourceLabel, InboxPanel(), handleAddToFlow(), handleInternalNote(), handleRemoveFromFlow() (+22 more)
 
 ### Community 13 - "createAdminClient"
-Cohesion: 0.10
-Nodes (56): PATCH(), GET(), POST(), PATCH(), POST(), DELETE(), POST(), GET() (+48 more)
+Cohesion: 0.09
+Nodes (50): PATCH(), GET(), POST(), DELETE(), POST(), GET(), POST(), Context (+42 more)
 
 ### Community 14 - "timezones.ts"
-Cohesion: 0.27
-Nodes (20): F2 — Lógica del CRM y la Agenda, Registro de iteraciones, getAgendaFreeSlots(), closedReason(), daySlots(), freeSlots(), isOpenAt(), addDaysToDateKey() (+12 more)
+Cohesion: 0.25
+Nodes (21): F2 — Lógica del CRM y la Agenda, Registro de iteraciones, closedReason(), daySlots(), distributeSlots(), freeSlots(), isOpenAt(), spaced() (+13 more)
 
 ### Community 15 - "agent-agenda.test.ts"
-Cohesion: 0.22
-Nodes (17): buildCalendarContext(), buildChangesContext(), buildDirectAvailabilityAnswer(), buildDirectBookingAnswer(), buildNoCalendarContext(), CalendarRuntimeView, hasAvailabilityLookup(), hasConfirmedAppointment() (+9 more)
+Cohesion: 0.14
+Nodes (21): ACTIVE, deps, NOW, buildCalendarContext(), buildChangesContext(), buildDirectAvailabilityAnswer(), buildDirectBookingAnswer(), buildDirectCancelAnswer() (+13 more)
 
 ### Community 16 - "agent-settings.tsx"
 Cohesion: 0.14
@@ -222,16 +215,16 @@ Cohesion: 0.19
 Nodes (15): addDaysToDateKey(), CalendarRequestContext, dateKeyInTimezone(), months, normalize(), parseDateKey(), ParsedTime, parseTime() (+7 more)
 
 ### Community 18 - "panel-data.ts"
-Cohesion: 0.22
-Nodes (14): metadata, ObservabilityPage(), emptyResult, Home(), metadata, PanelPage(), BUSINESS_METRICS_WINDOW_DAYS, BusinessMetrics (+6 more)
+Cohesion: 0.14
+Nodes (23): emptyResult, FlujosPage(), metadata, BusinessPage(), metadata, metadata, ObservabilityPage(), emptyResult (+15 more)
 
 ### Community 19 - "WorkspaceSectionPage"
-Cohesion: 0.14
-Nodes (22): AgentsPage(), metadata, AutomationsPage(), metadata, metadata, TeamPage(), IntegrationsPage(), metadata (+14 more)
+Cohesion: 0.13
+Nodes (19): AgentsPage(), metadata, AutomationsPage(), metadata, metadata, TeamPage(), IntegrationsPage(), metadata (+11 more)
 
 ### Community 20 - "levy-meeting-email.ts"
-Cohesion: 0.08
-Nodes (38): cancelExisting(), emailAfterResponse(), GET(), meetingEngine(), POST(), readWorkspace(), readWorkspaceCode(), saveMeeting() (+30 more)
+Cohesion: 0.09
+Nodes (26): buildMeetingEmail(), ChangedAppointment, MeetingEmailInput, MeetingEmailKind, MeetingEmailResult, sendMeetingEmail(), NOW, buildWelcomeEmail() (+18 more)
 
 ### Community 21 - "billing.test.ts"
 Cohesion: 0.16
@@ -242,8 +235,8 @@ Cohesion: 0.10
 Nodes (19): compilerOptions, allowImportingTsExtensions, allowJs, esModuleInterop, incremental, isolatedModules, jsx, lib (+11 more)
 
 ### Community 23 - "crm-jobs.ts"
-Cohesion: 0.22
-Nodes (10): GET(), isAuthorized(), maxDuration, POST(), CrmJobDeps, CrmJobReport, CrmJobStep, runCrmJobs() (+2 more)
+Cohesion: 0.20
+Nodes (11): GET(), isAuthorized(), maxDuration, POST(), CrmJobDeps, CrmJobReport, CrmJobStep, runCrmJobs() (+3 more)
 
 ### Community 24 - "public.conversations"
 Cohesion: 0.13
@@ -259,15 +252,15 @@ Nodes (34): idx_contacts_automation_labels, app_private.seed_crm_pipeline_stages
 
 ### Community 27 - "inicio/page.tsx"
 Cohesion: 0.14
-Nodes (15): chat, Check(), faqs, growth, included, LandingPage(), metadata, steps (+7 more)
+Nodes (20): chat, Check(), faqs, growth, included, LandingPage(), metadata, steps (+12 more)
 
 ### Community 28 - "webhook.test.ts"
 Cohesion: 0.15
 Nodes (9): stripe@^19.3.0, stripe, StripeWebhookDeps, config, deps(), NOW, signedEvent(), stripeSdk (+1 more)
 
 ### Community 29 - "google-calendar.ts"
-Cohesion: 0.10
-Nodes (44): Lógica en Next.js, buildAuthUrl(), buildEventBody(), calendarFetch(), callbackRedirectPath(), CallbackResult, completeGoogleCallback(), INTEGRATIONS_PATH (+36 more)
+Cohesion: 0.11
+Nodes (38): connect(), decryptSecret(), encryptSecret(), getKey(), buildAuthUrl(), CallbackResult, completeGoogleCallback(), INTEGRATIONS_PATH (+30 more)
 
 ### Community 30 - "public.workspaces"
 Cohesion: 0.15
@@ -275,31 +268,31 @@ Nodes (17): app_private.has_workspace_role(), app_private.is_workspace_member(),
 
 ### Community 31 - "flow-engine.ts"
 Cohesion: 0.12
-Nodes (20): contactAudienceLabels(), addMinutes(), AdminClient, calculateProcessImpact(), ContactRow, ConversationContext, FLOW_OPT_OUT_LABEL, FlowRow (+12 more)
+Nodes (21): flowMatchesTags(), addMinutes(), AdminClient, calculateProcessImpact(), ContactRow, ConversationContext, FLOW_OPT_OUT_LABEL, FlowRow (+13 more)
 
 ### Community 32 - "WorkspaceSettings"
 Cohesion: 0.13
-Nodes (23): buildAssetDraft(), fieldHelp(), WorkspaceSettings(), addBusinessCustomField(), addMember(), assetEditor(), assetList(), businessProfileEditor() (+15 more)
+Nodes (24): asRecord(), WorkspaceSettings(), addBusinessCustomField(), addMember(), assetEditor(), assetList(), businessProfileEditor(), changeOwnPassword() (+16 more)
 
 ### Community 33 - "workspace-settings.tsx"
-Cohesion: 0.11
-Nodes (18): AgendaOption, AgentItem, asRecord(), hashToTab, IntegrationItem, IntegrationTestResult, providers, singletonAssetKinds (+10 more)
+Cohesion: 0.10
+Nodes (19): AgendaOption, AgentItem, buildAssetDraft(), fieldHelp(), hashToTab, IntegrationItem, IntegrationTestResult, providers (+11 more)
 
 ### Community 34 - "steps"
 Cohesion: 0.08
 Nodes (23): concurrency, cancel-in-progress, group, env, runs-on, steps, timeout-minutes, VERCEL_ORG_ID (+15 more)
 
 ### Community 35 - "test-prompt/route.ts"
-Cohesion: 0.16
-Nodes (21): AgentLike, buildIdentityContext(), buildInstructions(), BusinessProfileAsset, getAgentIdentity(), getKnowledgeAssetIds(), getOpenAIModel(), getResponseText() (+13 more)
+Cohesion: 0.19
+Nodes (18): AgentLike, buildIdentityContext(), buildInstructions(), BusinessProfileAsset, getAgentIdentity(), getKnowledgeAssetIds(), getOpenAIModel(), getResponseText() (+10 more)
 
 ### Community 36 - "executeRun"
-Cohesion: 0.23
-Nodes (26): parseFlowSteps(), completeCheckpoint(), decideFlowAnswerReview(), executeRun(), findNextStep(), findStep(), getAnswers(), getFlowOptionMetadata() (+18 more)
+Cohesion: 0.24
+Nodes (25): parseFlowSteps(), completeCheckpoint(), decideFlowAnswerReview(), executeRun(), findNextStep(), findStep(), getAnswers(), getFlowOptionMetadata() (+17 more)
 
 ### Community 37 - "agent-agenda.ts"
-Cohesion: 0.20
-Nodes (18): AgendaRuntimeCalendar, AgendaRuntimeDeps, alternativesFor(), failureWithAlternatives(), formatSlot(), pickUpcoming(), resolveStart(), runAgendaTool() (+10 more)
+Cohesion: 0.13
+Nodes (24): AgendaCalendarRuntime, AgendaRuntimeCalendar, AgendaRuntimeDeps, alternativesFor(), buildAgendaRuntime(), failureWithAlternatives(), formatSlot(), pickUpcoming() (+16 more)
 
 ### Community 38 - "AdminConsole"
 Cohesion: 0.36
@@ -309,9 +302,9 @@ Nodes (9): AdminConsole(), addSuperadmin(), createCompany(), deleteJson(), linkO
 Cohesion: 0.40
 Nodes (6): File/Document Icon (gray 16x16, page with folded corner and text lines), Globe Icon (gray 16x16, world/web symbol), Next.js Wordmark Logo (black), Default create-next-app Scaffold Assets, Vercel Triangle Logo (white), Browser Window Icon (gray 16x16, window with three dots)
 
-### Community 40 - "ref_node_assert"
-Cohesion: 0.10
-Nodes (24): saveCalendarTool(), AgendaCalendarRuntime, buildAgendaRuntime(), ACTIVE, deps, NOW, setup(), NOW (+16 more)
+### Community 40 - "calendar-tools.ts"
+Cohesion: 0.26
+Nodes (13): asRecord(), CALENDAR_TOOL_TYPE, CalendarTool, CalendarToolMetadata, CONTACT_CALENDAR_KEY, getPinnedCalendar(), isCalendarTool(), parseCalendarTool() (+5 more)
 
 ### Community 41 - "webhook.ts"
 Cohesion: 0.18
@@ -322,12 +315,12 @@ Cohesion: 0.09
 Nodes (32): lucide-react, react, Company, Summary, ACTIVITY_LABELS, activityDetail(), ACTOR_LABELS, Block() (+24 more)
 
 ### Community 43 - "admin-companies.ts"
-Cohesion: 0.20
-Nodes (18): AdminClient, createCompanyWithOwner(), createDefaultAgentsForWorkspace(), buildDefaultAgentConfig(), buildDefaultAgentPrompt(), DEFAULT_AGENT_PROMPT_VERSION, DefaultAgentPreset, defaultAgentPresets (+10 more)
+Cohesion: 0.17
+Nodes (20): AdminClient, createCompanyWithOwner(), createDefaultAgentsForWorkspace(), buildDefaultAgentConfig(), buildDefaultAgentPrompt(), DEFAULT_AGENT_PROMPT_VERSION, DefaultAgentPreset, defaultAgentPresets (+12 more)
 
 ### Community 44 - "invalid"
-Cohesion: 0.13
-Nodes (27): AGENDA_COLUMNS, agendaChanges(), AgendaInput, AgendaRow, createAgenda(), getDefaultAgenda(), GoogleSyncMode, intInRange() (+19 more)
+Cohesion: 0.17
+Nodes (27): Agenda, AGENDA_COLUMNS, agendaChanges(), AgendaInput, AgendaRow, createAgenda(), getDefaultAgenda(), GoogleSyncMode (+19 more)
 
 ### Community 51 - "step-agents.tsx"
 Cohesion: 0.25
@@ -338,28 +331,28 @@ Cohesion: 0.17
 Nodes (6): app_private.book_appointment(), app_private.check_agenda_slot(), app_private.reschedule_appointment(), idx_appointments_no_show_due, app_private.book_appointment(), public.crm_contact_activity
 
 ### Community 53 - "flow-answer-verifier.ts"
-Cohesion: 0.46
-Nodes (6): extractOutputText(), getRecord(), validateAnswerLocally(), VerificationResult, verifyFlowAnswer(), getWorkspaceOpenAIKey()
+Cohesion: 0.60
+Nodes (5): extractOutputText(), getRecord(), validateAnswerLocally(), VerificationResult, verifyFlowAnswer()
 
 ### Community 54 - "welcome-page.ts"
 Cohesion: 0.15
 Nodes (18): Stripe (Payment Link externo), isLevyPurchase(), handleCheckout(), idOf(), ownedWorkspaceId(), workspaceInfo(), billingWorkspace(), getWelcomeState() (+10 more)
 
 ### Community 55 - "flow-builder.tsx"
-Cohesion: 0.08
-Nodes (35): ActionsEditor(), patchAction(), replaceCrm(), AgentItem, CrmActionFields(), FlowBuilderProps, FlowCrmOptions, FlowRunItem (+27 more)
+Cohesion: 0.09
+Nodes (34): ActionsEditor(), patchAction(), replaceCrm(), AgentItem, CrmActionFields(), FlowBuilderProps, FlowCrmOptions, FlowRunItem (+26 more)
 
-### Community 56 - "import-export.ts"
-Cohesion: 0.13
-Nodes (21): RFC-4180, csvSafe(), csvUnsafe(), FORMULA_STARTS, parseCsv(), parseCsvRecords(), quoteCell(), toCsv() (+13 more)
+### Community 56 - "shared.ts"
+Cohesion: 0.10
+Nodes (22): RFC-4180, AgendaErrorCode, DEFAULT_MESSAGES, SQLSTATE_CODES, STATUS, ActivityEntry, ActivityKind, csvSafe() (+14 more)
 
 ### Community 57 - "20261102210000_agenda_core.sql"
 Cohesion: 0.29
 Nodes (9): public.agendas, public.appointments, public.google_event_deletions, public.offered_slots, public.schedule_blocks, set_agendas_updated_at, set_appointments_updated_at, set_google_event_deletions_updated_at (+1 more)
 
 ### Community 58 - "agendas.ts"
-Cohesion: 0.08
-Nodes (39): agent, MONDAY_10, NOW, operator, seed(), Agenda, getAgenda(), setDefaultAgenda() (+31 more)
+Cohesion: 0.09
+Nodes (44): Decisiones tomadas, agent, MONDAY_10, NOW, operator, seed(), getAgenda(), setDefaultAgenda() (+36 more)
 
 ### Community 59 - "wizard.tsx"
 Cohesion: 0.12
@@ -369,33 +362,33 @@ Nodes (26): OnboardingProgressCard(), SupportContact(), StepDone(), enter(), Wiz
 Cohesion: 0.25
 Nodes (5): Auditoria de rendimiento 2026-10-09, AppShell monolith (1350 lines), idx_conversations_workspace_last_message index (not applied), Incremental inbox snapshot (pending), Shared (panel) layout
 
-### Community 61 - "appointments/route.ts"
-Cohesion: 0.70
-Nodes (4): dateParam(), GET(), listAppointments(), listBlocks()
+### Community 61 - "meeting/route.ts"
+Cohesion: 0.18
+Nodes (17): PATCH(), dateParam(), GET(), POST(), cancelExisting(), emailAfterResponse(), GET(), meetingEngine() (+9 more)
 
 ### Community 62 - "workspaces.ts"
-Cohesion: 0.30
-Nodes (9): GET(), asStateRecord(), patchOnboardingState(), POST(), requireUser(), DefaultConversationMode, withDefaultConversationMode(), isChecklistComplete() (+1 more)
+Cohesion: 0.24
+Nodes (13): asStateRecord(), patchOnboardingState(), POST(), metadata, OnboardingPage(), DefaultConversationMode, getDefaultConversationMode(), withDefaultConversationMode() (+5 more)
 
 ### Community 63 - "ycloud-webhook.ts"
-Cohesion: 0.10
-Nodes (30): maxDuration, POST(), maxDuration, POST(), findOrCreateOpenConversation(), OpenConversation, MEDIA_KINDS, MESSAGE_WRAPPERS (+22 more)
+Cohesion: 0.06
+Nodes (48): configString(), ContactRow, GET(), getInteractiveOptions(), IntegrationRow, InteractiveOption, isAuthorized(), POST() (+40 more)
 
 ### Community 64 - "StepBusiness"
-Cohesion: 0.26
-Nodes (14): Estado real vs. inventario (F0.1, 2026-11-02), StepBusiness(), addLocation(), patch(), removeLocation(), selectCountry(), selectSector(), updateLocation() (+6 more)
+Cohesion: 0.19
+Nodes (18): Estado real vs. inventario (F0.1, 2026-11-02), Chip(), StepBusiness(), addLocation(), patch(), removeLocation(), selectCountry(), selectSector() (+10 more)
 
 ### Community 65 - "agency-crm.ts"
-Cohesion: 0.11
-Nodes (37): assertConversationInWorkspace(), ActivityEntry, ActivityKind, logActivity(), operator, seed(), STAGE_NAMES, eraseContact() (+29 more)
-
-### Community 66 - "onboarding/page.tsx"
 Cohesion: 0.13
-Nodes (21): POST(), readResponsePayload(), YCloudErrorPayload, GET(), configString(), ContactRow, ConversationRow, IntegrationRow (+13 more)
+Nodes (31): bucket(), ensureTag(), FIELDS, LEVY_ACTIVE_TAG, LEVY_TAGS, STAGES, STRIPE_ACTOR, syncAgencyContact() (+23 more)
+
+### Community 66 - "send/route.ts"
+Cohesion: 0.32
+Nodes (7): configString(), ContactRow, ConversationRow, IntegrationRow, POST(), sendYCloudText(), YCloudSendResult
 
 ### Community 67 - "contacts.ts"
-Cohesion: 0.16
-Nodes (28): ClientsPage(), metadata, loadBusyIntervals(), listActivity(), CONTACT_SOURCES, ContactSearch, ContactSource, createContact() (+20 more)
+Cohesion: 0.13
+Nodes (21): ClientsPage(), metadata, findContactId(), CONTACT_SOURCES, ContactSearch, ContactSource, createContact(), CreateContactInput (+13 more)
 
 ### Community 68 - "Runbook de despliegue"
 Cohesion: 0.19
@@ -413,9 +406,9 @@ Nodes (16): Decisiones pendientes (las responde el usuario; mientras, sigue con 
 Cohesion: 0.26
 Nodes (14): FlowBuilder(), addStage(), archiveFlow(), createEmptyFlow(), createTemplate(), moveSelectedStep(), saveFlow(), updateDraft() (+6 more)
 
-### Community 72 - "deliver/route.ts"
-Cohesion: 0.15
-Nodes (20): configString(), ContactRow, GET(), getInteractiveOptions(), IntegrationRow, InteractiveOption, isAuthorized(), POST() (+12 more)
+### Community 72 - "api/flows/route.ts"
+Cohesion: 0.60
+Nodes (4): excludeExistingContacts(), FlowPayload, POST(), stringArray()
 
 ### Community 73 - "Levy multi-tenant WhatsApp AI agent panel"
 Cohesion: 0.24
@@ -442,20 +435,20 @@ Cohesion: 0.15
 Nodes (14): POST(), appUrl, figtree, inter, metadata, viewport, redirectAfterAuth(), requestPasswordReset() (+6 more)
 
 ### Community 84 - "public-shell.tsx"
-Cohesion: 0.24
-Nodes (15): GlobalError(), LoginPage(), metadata, NotFound(), metadata, RecuperarPage(), metadata, ResetPasswordPage() (+7 more)
+Cohesion: 0.08
+Nodes (41): nextConfig, cookies, CookiesPage(), metadata, GlobalError(), LoginPage(), metadata, NotFound() (+33 more)
 
 ### Community 85 - "routeAgent"
 Cohesion: 0.47
 Nodes (9): getAgentIntentBoost(), getConfigRecord(), getRouterDescription(), getRoutingKeywords(), getRoutingTokens(), isBookingAgent(), isContextualBookingFollowUp(), normalizeRoutingText() (+1 more)
 
 ### Community 86 - "ref_node_test"
-Cohesion: 0.18
-Nodes (14): AdminClient, applyConversationHandoff(), buildHandoffContext(), buildHandoffNote(), ConversationHandoffInfo, detectAnswerHandoff(), findHandoffKeyword(), HANDOFF_CLIENT_NOTICE (+6 more)
+Cohesion: 0.15
+Nodes (19): GET(), getEnabledToolIds(), getKnowledgeAssetIds(), isAuthorized(), POST(), AdminClient, applyConversationHandoff(), buildHandoffNote() (+11 more)
 
-### Community 90 - "requireWorkspaceRole"
-Cohesion: 0.11
-Nodes (21): Reglas para cada iteración, deliverQueuedReviewMessages(), POST(), ReviewPayload, excludeExistingContacts(), FlowPayload, POST(), stringArray() (+13 more)
+### Community 90 - "api-error.ts"
+Cohesion: 0.09
+Nodes (36): Reglas para cada iteración, deliverQueuedReviewMessages(), POST(), ReviewPayload, deliverFirstMessage(), POST(), StartFlowPayload, POST() (+28 more)
 
 ### Community 95 - "Levy README"
 Cohesion: 0.29
@@ -469,17 +462,17 @@ Nodes (5): Required environment variables, INTEGRATION_ENCRYPTION_KEY, LEVY_WORK
 Cohesion: 0.33
 Nodes (5): Deploy a Vercel workflow, deploy job (vercel pull + vercel deploy --prod), Vercel CLI, VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID secrets, External scheduler (cron-job.org / QStash) every 5 min
 
-### Community 99 - "agency-crm.ts"
-Cohesion: 0.21
-Nodes (16): agencyWorkspaceCode(), bucket(), ensureFields(), ensureTag(), FIELDS, findContactId(), LEVY_ACTIVE_TAG, LEVY_TAGS (+8 more)
+### Community 99 - "snapshot/route.ts"
+Cohesion: 0.80
+Nodes (4): GET(), getMetadataRecord(), getYCloudContactName(), stableTime()
 
 ### Community 100 - "clientFetch"
 Cohesion: 0.15
 Nodes (29): act(), save(), save(), BillingActions(), openPortal(), WelcomeResendButton(), resend(), ContactsPanel() (+21 more)
 
-### Community 101 - "google-sync.test.ts"
-Cohesion: 0.17
-Nodes (12): agendaWithCalendar(), Call, connect(), deps, ENV, Route, decryptSecret(), encryptSecret() (+4 more)
+### Community 101 - "ref_node_assert"
+Cohesion: 0.10
+Nodes (20): NOW, agendaWithCalendar(), Call, deps, ENV, Route, client(), broken (+12 more)
 
 ### Community 102 - "createClient"
 Cohesion: 0.14
@@ -489,34 +482,6 @@ Nodes (17): Check, envCheck(), GET(), incrementalTables, recommendedEnv, require
 Cohesion: 0.50
 Nodes (4): /auth/confirm create-password flow, GHL purchase webhook auto-provisioning (/api/webhooks/ghl/purchase), GHL tags cliente-levy / levy-acceso-listo / levy-activo, LEVY_PURCHASE_WEBHOOK_SECRET
 
-### Community 104 - "legal-page.tsx"
-Cohesion: 0.31
-Nodes (11): cookies, CookiesPage(), metadata, metadata, PrivacyPage(), metadata, TermsPage(), legalMail (+3 more)
-
-### Community 105 - "secrets.ts"
-Cohesion: 0.29
-Nodes (10): POST(), GET(), POST(), generateWebhookSecret(), hashSecret(), IntegrationProvider, maskSecret(), saveIntegrationSecret() (+2 more)
-
-### Community 106 - "panel-context.ts"
-Cohesion: 0.24
-Nodes (9): emptyResult, FlujosPage(), metadata, BusinessPage(), metadata, getPanelContext, PanelContext, getConfigRecord() (+1 more)
-
-### Community 107 - "buildFieldsFromChoices"
-Cohesion: 0.24
-Nodes (11): next(), save(), buildAddressText(), buildDaysText(), buildFieldsFromChoices(), buildHoursText(), buildLocationText(), buildServicesText() (+3 more)
-
-### Community 108 - "admin.test.ts"
-Cohesion: 0.42
-Nodes (7): assertWorkspace(), BillingAdminError, updateWorkspaceBillingAdmin(), buildPaymentLinkUrl(), normalizeStripeCustomerId(), parsePaymentLink(), publicPaymentLinkUrl()
-
-### Community 109 - "(panel)/layout.tsx"
-Cohesion: 0.29
-Nodes (6): nextConfig, PanelLayout(), BrandMark(), IntentLink(), sidebarItems, SidebarNav()
-
-### Community 110 - "welcome-view.tsx"
-Cohesion: 0.32
-Nodes (7): WelcomeAutoRefresh(), Hero(), preparation, WelcomeView(), WelcomeViewState, brandEyebrow, WelcomeState
-
 ## Knowledge Gaps
 - **24 isolated node(s):** `RFC-4180`, `/auth/confirm create-password flow`, `GHL tags cliente-levy / levy-acceso-listo / levy-activo`, `LEVY_PURCHASE_WEBHOOK_SECRET`, `File/Document Icon (gray 16x16, page with folded corner and text lines)` (+19 more)
   These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 565 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
@@ -525,17 +490,17 @@ Nodes (7): WelcomeAutoRefresh(), Hero(), preparation, WelcomeView(), WelcomeView
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `next` connect `next` to `buffer/route.ts`, `Dependencias y ESLint`, `google-sync.ts`, `createAdminClient`, `panel-data.ts`, `WorkspaceSectionPage`, `levy-meeting-email.ts`, `billing.test.ts`, `crm-jobs.ts`, `inicio/page.tsx`, `test-prompt/route.ts`, `lucide-react`, `admin-companies.ts`, `wizard.tsx`, `appointments/route.ts`, `workspaces.ts`, `ycloud-webhook.ts`, `onboarding/page.tsx`, `contacts.ts`, `deliver/route.ts`, `agenda-panel.tsx`, `bienvenida/page.tsx`, `login/actions.ts`, `public-shell.tsx`, `requireWorkspaceRole`, `createClient`, `legal-page.tsx`, `secrets.ts`, `panel-context.ts`, `(panel)/layout.tsx`?**
-  _High betweenness centrality (0.128) - this node is a cross-community bridge._
+- **Why does `next` connect `next` to `buffer/route.ts`, `Dependencias y ESLint`, `google-sync.ts`, `createAdminClient`, `panel-data.ts`, `WorkspaceSectionPage`, `billing.test.ts`, `crm-jobs.ts`, `inicio/page.tsx`, `test-prompt/route.ts`, `agent-agenda.ts`, `lucide-react`, `admin-companies.ts`, `wizard.tsx`, `meeting/route.ts`, `workspaces.ts`, `ycloud-webhook.ts`, `send/route.ts`, `contacts.ts`, `api/flows/route.ts`, `agenda-panel.tsx`, `bienvenida/page.tsx`, `login/actions.ts`, `public-shell.tsx`, `api-error.ts`, `snapshot/route.ts`, `createClient`?**
+  _High betweenness centrality (0.149) - this node is a cross-community bridge._
 - **Are the 2 inferred relationships involving `createAdminClient()` (e.g. with `Decisiones tomadas` and `Reglas para cada iteración`) actually correct?**
   _`createAdminClient()` has 2 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `RFC-4180`, `/auth/confirm create-password flow`, `GHL tags cliente-levy / levy-acceso-listo / levy-activo` to the rest of the system?**
   _24 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `buffer/route.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.13675213675213677 - nodes in this community are weakly interconnected._
-- **Why does `createAdminClient()` connect `createAdminClient` to `buffer/route.ts`, `google-sync.ts`, `panel-data.ts`, `WorkspaceSectionPage`, `levy-meeting-email.ts`, `billing.test.ts`, `crm-jobs.ts`, `admin-companies.ts`, `appointments/route.ts`, `workspaces.ts`, `ycloud-webhook.ts`, `onboarding/page.tsx`, `contacts.ts`, `next`, `deliver/route.ts`, `agenda-panel.tsx`, `bienvenida/page.tsx`, `login/actions.ts`, `requireWorkspaceRole`, `createClient`, `secrets.ts`, `panel-context.ts`?**
-  _High betweenness centrality (0.112) - this node is a cross-community bridge._
+- **Should `FakeQuery` be split into smaller, more focused modules?**
+  _Cohesion score 0.06794871794871794 - nodes in this community are weakly interconnected._
+- **Why does `createAdminClient()` connect `createAdminClient` to `buffer/route.ts`, `CRM y Agenda dentro de AgenteLevy (todo en Supabase) — instrucciones para Claude Code`, `panel-data.ts`, `billing.test.ts`, `crm-jobs.ts`, `agent-agenda.ts`, `admin-companies.ts`, `agendas.ts`, `meeting/route.ts`, `workspaces.ts`, `ycloud-webhook.ts`, `send/route.ts`, `contacts.ts`, `next`, `api/flows/route.ts`, `agenda-panel.tsx`, `bienvenida/page.tsx`, `login/actions.ts`, `ref_node_test`, `api-error.ts`, `snapshot/route.ts`, `createClient`?**
+  _High betweenness centrality (0.078) - this node is a cross-community bridge._
 - **Are the 3 inferred relationships involving `apiErrorResponse()` (e.g. with `Decisiones tomadas` and `Registro de iteraciones`) actually correct?**
   _`apiErrorResponse()` has 3 INFERRED edges - model-reasoned connections that need verification._
-- **Should `FakeQuery` be split into smaller, more focused modules?**
-  _Cohesion score 0.060129509713228495 - nodes in this community are weakly interconnected._
+- **Should `custom-fields.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.08985507246376812 - nodes in this community are weakly interconnected._
