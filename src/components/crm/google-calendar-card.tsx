@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CalendarDays, Loader2 } from "lucide-react";
 
 import { readApiError } from "@/components/onboarding/shared";
+import { clientFetch } from "@/lib/client-fetch";
 
 /**
  * Tarjeta de Google Calendar en Integraciones.
@@ -26,7 +27,7 @@ export function GoogleCalendarCard({ canManage }: { canManage: boolean }) {
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const response = await fetch("/api/integrations/google-calendar/status");
+    const response = await clientFetch("/api/integrations/google-calendar/status");
     if (!response.ok) {
       setError(await readApiError(response, "No se pudo leer el estado de Google Calendar."));
       return;
@@ -58,7 +59,7 @@ export function GoogleCalendarCard({ canManage }: { canManage: boolean }) {
     if (!window.confirm("¿Desconectar Google Calendar? Las citas dejan de copiarse a Google.")) return;
     setBusy(true);
     setError("");
-    const response = await fetch("/api/integrations/google-calendar/disconnect", { method: "POST" });
+    const response = await clientFetch("/api/integrations/google-calendar/disconnect", { method: "POST" });
     setBusy(false);
     if (!response.ok) {
       setError(await readApiError(response, "No se pudo desconectar."));
@@ -69,19 +70,19 @@ export function GoogleCalendarCard({ canManage }: { canManage: boolean }) {
   }
 
   const badge = status?.connected
-    ? { className: "bg-[#e7f6ce] text-[#31521d]", label: "Conectado" }
+    ? { className: "bg-yellow-soft text-ink", label: "Conectado" }
     : status?.status === "error"
       ? { className: "bg-[#f8dcd6] text-[#7a2f1d]", label: "Hay que reconectar" }
-      : { className: "bg-[#eef2eb] text-[#4d5a51]", label: "Sin conectar" };
+      : { className: "bg-paper-2 text-ink-2", label: "Sin conectar" };
 
   return (
-    <div className="grid content-start gap-3 rounded-lg border border-[#e2e6df] p-3">
+    <div className="grid content-start gap-3 rounded-lg border border-line p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="flex items-center gap-1.5 font-semibold">
             <CalendarDays size={16} /> Google Calendar
           </h3>
-          <p className="mt-1 text-sm text-[#647067]">
+          <p className="mt-1 text-sm text-muted">
             Opcional. Copia las citas de tu agenda a tu Google Calendar y, si quieres, evita ofrecer horas en las que ya
             tienes algo allí.
           </p>
@@ -89,15 +90,15 @@ export function GoogleCalendarCard({ canManage }: { canManage: boolean }) {
         {status ? <span className={`shrink-0 rounded-lg px-2 py-1 text-xs ${badge.className}`}>{badge.label}</span> : null}
       </div>
 
-      {notice ? <p className="rounded-lg border border-[#d9ded3] bg-[#fafbf8] p-2 text-sm">{notice}</p> : null}
+      {notice ? <p className="rounded-lg border border-line bg-paper-2 p-2 text-sm">{notice}</p> : null}
       {error ? <p className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</p> : null}
 
       {!canManage ? (
-        <p className="text-sm text-[#647067]">Solo el dueño o un admin de la empresa puede conectar Google Calendar.</p>
+        <p className="text-sm text-muted">Solo el dueño o un admin de la empresa puede conectar Google Calendar.</p>
       ) : !status ? (
-        <Loader2 className="animate-spin text-[#647067]" size={16} />
+        <Loader2 className="animate-spin text-muted" size={16} />
       ) : !status.configured ? (
-        <p className="text-sm text-[#647067]">
+        <p className="text-sm text-muted">
           Google Calendar todavía no está disponible en este servidor. Avisa a soporte.
         </p>
       ) : (
@@ -113,7 +114,7 @@ export function GoogleCalendarCard({ canManage }: { canManage: boolean }) {
           <div className="flex flex-wrap gap-2">
             {!status.connected ? (
               <button
-                className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white"
+                className="inline-flex h-10 items-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink"
                 onClick={() => {
                   // Va a la pantalla de permisos de Google (navegación completa).
                   window.location.href = "/api/integrations/google-calendar/connect";
@@ -124,7 +125,7 @@ export function GoogleCalendarCard({ canManage }: { canManage: boolean }) {
               </button>
             ) : (
               <button
-                className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium disabled:opacity-60"
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-line px-3 text-sm font-medium disabled:opacity-60"
                 disabled={busy}
                 onClick={disconnect}
                 type="button"

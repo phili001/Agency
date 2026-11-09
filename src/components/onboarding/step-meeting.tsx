@@ -25,6 +25,8 @@ import {
   secondaryButton,
 } from "./shared";
 import type { StepContext } from "./wizard";
+import { onboardingStepEyebrow } from "@/lib/onboarding-steps";
+import { clientFetch } from "@/lib/client-fetch";
 
 export function StepMeeting({ ctx }: { ctx: StepContext }) {
   const [days, setDays] = useState<MeetingDay[]>(ctx.meetingDays);
@@ -51,7 +53,7 @@ export function StepMeeting({ ctx }: { ctx: StepContext }) {
     let cancelled = false;
 
     async function loadDays() {
-      const response = await fetch(
+      const response = await clientFetch(
         `/api/onboarding/meeting?workspaceId=${encodeURIComponent(
           ctx.workspace.id,
         )}&timezone=${encodeURIComponent(timeZone)}`,
@@ -103,7 +105,7 @@ export function StepMeeting({ ctx }: { ctx: StepContext }) {
 
     setBusy(true);
     setError("");
-    const response = await fetch("/api/onboarding/meeting", {
+    const response = await clientFetch("/api/onboarding/meeting", {
       body: JSON.stringify({
         action: "book",
         phone,
@@ -132,7 +134,7 @@ export function StepMeeting({ ctx }: { ctx: StepContext }) {
   async function cancel() {
     setBusy(true);
     setError("");
-    const response = await fetch("/api/onboarding/meeting", {
+    const response = await clientFetch("/api/onboarding/meeting", {
       body: JSON.stringify({ action: "cancel", workspaceId: ctx.workspace.id }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
@@ -161,7 +163,7 @@ export function StepMeeting({ ctx }: { ctx: StepContext }) {
     return (
       <div className="grid gap-6">
         <StepHeading
-          eyebrow="Paso 3 · Reunión con Levy"
+          eyebrow={onboardingStepEyebrow("meeting", "Reunión con Levy")}
           title="¿Prefieres que lo hagamos juntos?"
           description={
             calendarDown
@@ -186,7 +188,7 @@ export function StepMeeting({ ctx }: { ctx: StepContext }) {
   return (
     <div className="grid gap-6">
       <StepHeading
-        eyebrow="Paso 3 · Reunión con Levy"
+        eyebrow={onboardingStepEyebrow("meeting", "Reunión con Levy")}
         title={
           meeting && !changing
             ? "Tu puesta en marcha ya está agendada"
@@ -225,7 +227,7 @@ export function StepMeeting({ ctx }: { ctx: StepContext }) {
           />
 
           {loadingDays ? (
-            <p className="flex items-center gap-2 rounded-xl border border-[#e2e6df] bg-[#fafbf8] px-4 py-3 text-sm text-[#647067]">
+            <p className="flex items-center gap-2 rounded-xl border border-line bg-paper-2 px-4 py-3 text-sm text-muted">
               <Loader2 className="animate-spin" size={16} />
               Buscando horas libres…
             </p>
@@ -243,8 +245,8 @@ export function StepMeeting({ ctx }: { ctx: StepContext }) {
                       aria-pressed={day.dateKey === selectedDay?.dateKey}
                       className={`rounded-xl border-2 px-3.5 py-2.5 text-sm font-medium transition ${
                         day.dateKey === selectedDay?.dateKey
-                          ? "border-[#10231c] bg-[#eef6df]"
-                          : "border-[#e2e6df] bg-white hover:border-[#cbd2c6]"
+                          ? "border-ink bg-yellow-soft"
+                          : "border-line bg-white hover:border-line"
                       }`}
                       key={day.dateKey}
                       onClick={() => {
@@ -269,8 +271,8 @@ export function StepMeeting({ ctx }: { ctx: StepContext }) {
                       aria-pressed={slot === item.iso}
                       className={`rounded-xl border-2 px-4 py-2.5 text-sm font-semibold tabular-nums transition ${
                         slot === item.iso
-                          ? "border-[#10231c] bg-[#10231c] text-white"
-                          : "border-[#e2e6df] bg-white text-[#20231f] hover:border-[#35735b]"
+                          ? "border-ink bg-ink text-paper"
+                          : "border-line bg-white text-ink hover:border-ink"
                       }`}
                       key={item.iso}
                       onClick={() => setSlot(item.iso)}

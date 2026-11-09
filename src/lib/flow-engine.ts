@@ -1079,7 +1079,7 @@ export async function startTagFlows({
       .select("id")
       .eq("workspace_id", workspaceId)
       .eq("contact_id", contactId)
-      .order("last_message_at", { ascending: false })
+      .order("last_message_at", { ascending: false, nullsFirst: false })
       .limit(1),
   ]);
   const conversationId = ((conversations ?? []) as Array<{ id: string }>)[0]?.id;

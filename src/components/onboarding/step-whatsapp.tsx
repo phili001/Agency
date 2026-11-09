@@ -20,6 +20,8 @@ import {
   secondaryButton,
 } from "./shared";
 import { type StepContext, getIntegrationConfig } from "./wizard";
+import { onboardingStepEyebrow } from "@/lib/onboarding-steps";
+import { clientFetch } from "@/lib/client-fetch";
 
 function explainYCloudError(message: string) {
   const text = message.toLowerCase();
@@ -69,7 +71,7 @@ export function StepWhatsApp({ ctx }: { ctx: StepContext }) {
     setBusy("save");
     setError("");
     setSuccess("");
-    const response = await fetch("/api/integrations/ycloud", {
+    const response = await clientFetch("/api/integrations/ycloud", {
       body: JSON.stringify({
         apiKey: cleanKey,
         phoneE164: cleanPhone,
@@ -110,7 +112,7 @@ export function StepWhatsApp({ ctx }: { ctx: StepContext }) {
     setBusy("test");
     setError("");
     setSuccess("");
-    const response = await fetch("/api/integrations/ycloud/test", {
+    const response = await clientFetch("/api/integrations/ycloud/test", {
       body: JSON.stringify({ workspaceId: ctx.workspace.id }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
@@ -128,7 +130,7 @@ export function StepWhatsApp({ ctx }: { ctx: StepContext }) {
   return (
     <div className="grid gap-6">
       <StepHeading
-        eyebrow="Paso 4 · Tu WhatsApp"
+        eyebrow={onboardingStepEyebrow("whatsapp", "Tu WhatsApp")}
         title="Conecta tu número de WhatsApp"
         description={
           <>
@@ -198,7 +200,7 @@ export function StepWhatsApp({ ctx }: { ctx: StepContext }) {
                 <>
                   Entra en{" "}
                   <a
-                    className="font-medium text-[#35735b] underline"
+                    className="font-medium text-ink underline"
                     href="https://www.ycloud.com"
                     rel="noreferrer"
                     target="_blank"
@@ -276,19 +278,19 @@ export function StepWhatsApp({ ctx }: { ctx: StepContext }) {
       {success ? <Notice tone="success">{success}</Notice> : null}
 
       {connected && ctx.webhookUrl ? (
-        <div className="grid gap-3 rounded-xl border-2 border-[#10231c] bg-[#fafbf8] p-4">
+        <div className="grid gap-3 rounded-xl border-2 border-ink bg-paper-2 p-4">
           <div className="flex items-center gap-2">
-            <Send className="text-[#35735b]" size={18} />
+            <Send className="text-ink" size={18} />
             <h3 className="text-base font-semibold">
               Último paso: dile a YCloud dónde enviar los mensajes
             </h3>
           </div>
-          <p className="text-sm text-[#4d5a51]">
+          <p className="text-sm text-ink-2">
             Sin esto, los mensajes de tus clientes no llegan a Levy. Copia esta
             dirección y pégala en YCloud siguiendo los pasos.
           </p>
-          <div className="flex flex-col gap-2 rounded-lg border border-dashed border-[#cbd2c6] bg-white p-3 sm:flex-row sm:items-center">
-            <code className="min-w-0 flex-1 break-all text-xs text-[#20231f]">
+          <div className="flex flex-col gap-2 rounded-lg border border-dashed border-line bg-white p-3 sm:flex-row sm:items-center">
+            <code className="min-w-0 flex-1 break-all text-xs text-ink">
               {ctx.webhookUrl}
             </code>
             <CopyButton label="Copiar dirección" value={ctx.webhookUrl} />

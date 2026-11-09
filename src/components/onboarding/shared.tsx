@@ -26,16 +26,16 @@ import {
  */
 
 export const primaryButton =
-  "inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#10231c] px-5 text-base font-semibold text-white transition hover:bg-[#1b3a2f] disabled:cursor-not-allowed disabled:bg-[#9aa59e]";
+  "inline-flex h-12 items-center justify-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-5 text-base font-bold text-ink transition hover:bg-yellow-strong disabled:cursor-not-allowed disabled:opacity-50";
 
 export const secondaryButton =
-  "inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-[#cbd2c6] bg-white px-5 text-base font-medium text-[#20231f] transition hover:bg-[#f6f7f3] disabled:cursor-not-allowed disabled:text-[#9aa59e]";
+  "inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-line bg-white px-5 text-base font-medium text-ink transition hover:bg-paper-2 disabled:cursor-not-allowed disabled:text-faint";
 
 export const linkButton =
-  "inline-flex items-center gap-1.5 text-sm font-medium text-[#35735b] underline-offset-4 hover:underline disabled:text-[#9aa59e]";
+  "inline-flex items-center gap-1.5 text-sm font-medium text-ink underline-offset-4 hover:underline disabled:text-faint";
 
 export const inputClass =
-  "h-12 w-full rounded-xl border border-[#cbd2c6] bg-white px-4 text-base outline-none transition focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50 disabled:bg-[#f3f4ef]";
+  "h-12 w-full rounded-xl border border-line bg-white px-4 text-base outline-none transition focus:border-ink focus:ring-2 focus:ring-yellow/50 disabled:bg-paper-2";
 
 export function StepHeading({
   eyebrow,
@@ -49,15 +49,15 @@ export function StepHeading({
   return (
     <div>
       {eyebrow ? (
-        <p className="text-xs font-semibold uppercase tracking-wide text-[#647067]">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted">
           {eyebrow}
         </p>
       ) : null}
-      <h2 className="mt-1 text-2xl font-semibold leading-tight text-[#20231f] md:text-3xl">
+      <h2 className="mt-1 text-2xl font-semibold leading-tight text-ink md:text-3xl">
         {title}
       </h2>
       {description ? (
-        <div className="mt-3 text-base leading-relaxed text-[#4d5a51]">{description}</div>
+        <div className="mt-3 text-base leading-relaxed text-ink-2">{description}</div>
       ) : null}
     </div>
   );
@@ -76,14 +76,14 @@ export function Field({
 }) {
   return (
     <label className="grid gap-1.5">
-      <span className="text-base font-medium text-[#20231f]">
+      <span className="text-base font-medium text-ink">
         {label}
         {optional ? (
-          <span className="ml-2 text-sm font-normal text-[#7a847c]">opcional</span>
+          <span className="ml-2 text-sm font-normal text-muted">opcional</span>
         ) : null}
       </span>
       {children}
-      {help ? <span className="text-sm text-[#647067]">{help}</span> : null}
+      {help ? <span className="text-sm text-muted">{help}</span> : null}
     </label>
   );
 }
@@ -101,21 +101,21 @@ export function HelpBox({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="rounded-xl border border-[#d9ded3] bg-[#fafbf8]">
+    <div className="rounded-xl border border-line bg-paper-2">
       <button
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-base font-medium text-[#20231f]"
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-base font-medium text-ink"
         onClick={() => setOpen((current) => !current)}
         type="button"
       >
         {title}
         <ChevronDown
-          className={`shrink-0 text-[#647067] transition ${open ? "rotate-180" : ""}`}
+          className={`shrink-0 text-muted transition ${open ? "rotate-180" : ""}`}
           size={18}
         />
       </button>
       {open ? (
-        <div className="grid gap-2 border-t border-[#e2e6df] px-4 py-3 text-sm leading-relaxed text-[#4d5a51]">
+        <div className="grid gap-2 border-t border-line px-4 py-3 text-sm leading-relaxed text-ink-2">
           {children}
         </div>
       ) : null}
@@ -129,7 +129,7 @@ export function NumberedSteps({ items }: { items: ReactNode[] }) {
     <ol className="grid gap-2">
       {items.map((item, index) => (
         <li className="flex gap-3" key={index}>
-          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#e7f6ce] text-xs font-semibold text-[#31521d]">
+          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-yellow-soft text-xs font-semibold text-ink">
             {index + 1}
           </span>
           <span className="min-w-0 flex-1">{item}</span>
@@ -142,12 +142,12 @@ export function NumberedSteps({ items }: { items: ReactNode[] }) {
 /** "Cómo completar este paso": la misma caja, siempre abierta, en cada pantalla. */
 export function HowTo({ items, title = "Cómo completar este paso" }: { items: ReactNode[]; title?: string }) {
   return (
-    <div className="grid gap-3 rounded-xl border border-[#b9dc9c] bg-[#f4faec] p-4">
-      <p className="flex items-center gap-2 text-base font-semibold text-[#20231f]">
-        <ListChecks className="text-[#35735b]" size={18} />
+    <div className="grid gap-3 rounded-xl border border-yellow-strong bg-yellow-soft p-4">
+      <p className="flex items-center gap-2 text-base font-semibold text-ink">
+        <ListChecks className="text-ink" size={18} />
         {title}
       </p>
-      <div className="text-sm leading-relaxed text-[#334139]">
+      <div className="text-sm leading-relaxed text-ink-2">
         <NumberedSteps items={items} />
       </div>
     </div>
@@ -170,17 +170,17 @@ export function SupportContact({
   const message = buildSupportMessage({ companyName, stepIndex, stepTitle });
 
   return (
-    <aside className="flex flex-col gap-3 rounded-2xl border border-[#d9ded3] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+    <aside className="flex flex-col gap-3 rounded-2xl border border-line bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-start gap-3">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#eef6df] text-[#35735b]">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-yellow-soft text-ink">
           <MessageCircleQuestion size={20} />
         </span>
-        <div className="text-sm leading-relaxed text-[#4d5a51]">
-          <p className="text-base font-semibold text-[#20231f]">
+        <div className="text-sm leading-relaxed text-ink-2">
+          <p className="text-base font-semibold text-ink">
             ¿Te confundiste en este paso? Escríbenos, sin pena.
           </p>
           <p className="mt-1">
-            WhatsApp <span className="font-semibold text-[#20231f]">{SUPPORT_PHONE_DISPLAY}</span>.
+            WhatsApp <span className="font-semibold text-ink">{SUPPORT_PHONE_DISPLAY}</span>.
             Para que te atienda una persona, di en el mensaje que{" "}
             <span className="font-medium">quieres hablar con una persona</span> y en qué paso
             estás; así le queda en el resumen a quien te atienda.
@@ -188,7 +188,7 @@ export function SupportContact({
         </div>
       </div>
       <a
-        className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-[#35735b] px-4 text-sm font-semibold text-[#35735b] transition hover:bg-[#eef6df]"
+        className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-ink px-4 text-sm font-semibold text-ink transition hover:bg-yellow-soft"
         href={buildSupportLink(message)}
         rel="noreferrer"
         target="_blank"
@@ -216,15 +216,15 @@ export function OptionCard({
       aria-pressed={active}
       className={`grid content-start gap-1 rounded-xl border-2 p-3 text-left transition ${
         active
-          ? "border-[#10231c] bg-[#eef6df]"
-          : "border-[#e2e6df] bg-white hover:border-[#cbd2c6]"
+          ? "border-ink bg-yellow-soft"
+          : "border-line bg-white hover:border-line"
       }`}
       onClick={onClick}
       type="button"
     >
-      <span className="text-sm font-semibold leading-snug text-[#20231f]">{label}</span>
+      <span className="text-sm font-semibold leading-snug text-ink">{label}</span>
       {description ? (
-        <span className="text-xs leading-relaxed text-[#4d5a51]">{description}</span>
+        <span className="text-xs leading-relaxed text-ink-2">{description}</span>
       ) : null}
     </button>
   );
@@ -245,8 +245,8 @@ export function Chip({
       aria-pressed={active}
       className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition ${
         active
-          ? "border-[#10231c] bg-[#10231c] text-white"
-          : "border-[#cbd2c6] bg-white text-[#20231f] hover:border-[#35735b]"
+          ? "border-ink bg-ink text-paper"
+          : "border-line bg-white text-ink hover:border-ink"
       }`}
       onClick={onClick}
       type="button"
@@ -272,13 +272,13 @@ export function Question({
   return (
     <div className="grid gap-2.5">
       <div>
-        <h3 className="text-base font-semibold text-[#20231f]">
+        <h3 className="text-base font-semibold text-ink">
           {title}
           {optional ? (
-            <span className="ml-2 text-sm font-normal text-[#7a847c]">opcional</span>
+            <span className="ml-2 text-sm font-normal text-muted">opcional</span>
           ) : null}
         </h3>
-        {hint ? <p className="mt-0.5 text-sm text-[#647067]">{hint}</p> : null}
+        {hint ? <p className="mt-0.5 text-sm text-muted">{hint}</p> : null}
       </div>
       {children}
     </div>
@@ -300,7 +300,7 @@ export function ToggleSwitch({
       aria-label={label}
       aria-pressed={checked}
       className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-        checked ? "bg-[#35735b]" : "bg-[#cbd2c6]"
+        checked ? "bg-ink" : "bg-line"
       }`}
       onClick={onChange}
       type="button"
@@ -323,10 +323,10 @@ export function StatusPill({
 }) {
   const classes =
     tone === "done"
-      ? "bg-[#e7f6ce] text-[#31521d]"
+      ? "bg-yellow-soft text-ink"
       : tone === "error"
         ? "bg-[#f8dcd6] text-[#7a2f1d]"
-        : "bg-[#eef2eb] text-[#4d5a51]";
+        : "bg-paper-2 text-ink-2";
 
   return (
     <span
@@ -348,14 +348,14 @@ export function ConnectedBanner({
   title: string;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#b9dc9c] bg-[#eef6df] p-4">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-yellow-strong bg-yellow-soft p-4">
       <div className="flex items-start gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#35735b] text-white">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink text-white">
           <Check size={18} />
         </span>
         <div>
-          <p className="text-base font-semibold text-[#20231f]">{title}</p>
-          {detail ? <p className="mt-0.5 text-sm text-[#4d5a51]">{detail}</p> : null}
+          <p className="text-base font-semibold text-ink">{title}</p>
+          {detail ? <p className="mt-0.5 text-sm text-ink-2">{detail}</p> : null}
         </div>
       </div>
       {action}
@@ -374,7 +374,7 @@ export function Notice({
     tone === "error"
       ? "border-[#f0c4bb] bg-[#fdf1ee] text-[#7a2f1d]"
       : tone === "success"
-        ? "border-[#b9dc9c] bg-[#eef6df] text-[#31521d]"
+        ? "border-yellow-strong bg-yellow-soft text-ink"
         : "border-amber-200 bg-amber-50 text-amber-900";
 
   return (
@@ -400,7 +400,7 @@ export function CopyButton({ label = "Copiar", value }: { label?: string; value:
 
   return (
     <button
-      className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-semibold text-white"
+      className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink"
       onClick={copy}
       type="button"
     >
@@ -426,7 +426,7 @@ export function StepFooter({
   secondary?: ReactNode;
 }) {
   return (
-    <div className="mt-8 flex flex-col-reverse gap-3 border-t border-[#e2e6df] pt-5 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mt-8 flex flex-col-reverse gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
       <div>
         {onBack ? (
           <button className={secondaryButton} onClick={onBack} type="button">

@@ -21,6 +21,7 @@ import {
 import type { Json } from "@/lib/supabase/database.types";
 import type { DefaultConversationMode } from "@/lib/conversation-default";
 import { createClient } from "@/lib/supabase/client";
+import { clientFetch } from "@/lib/client-fetch";
 
 type AgentType = "setter" | "booking" | "support";
 
@@ -186,7 +187,7 @@ function ToggleSwitch({
     <button
       aria-pressed={checked}
       className={`flex h-7 w-[62px] shrink-0 items-center rounded-full p-0.5 text-[10px] font-bold uppercase tracking-normal transition disabled:opacity-60 ${
-        checked ? "bg-[#22a7c7] text-white shadow-sm" : "bg-[#eef2eb] text-[#647067]"
+        checked ? "bg-ink text-paper shadow-sm" : "bg-paper-2 text-muted"
       }`}
       disabled={disabled}
       onClick={onChange}
@@ -255,7 +256,7 @@ export function AgentSettings({
 
     setIsSavingConversationMode(true);
     setStatus("");
-    const response = await fetch("/api/workspaces", {
+    const response = await clientFetch("/api/workspaces", {
       body: JSON.stringify({
         action: "set_default_conversation_mode",
         defaultConversationMode: mode,
@@ -474,7 +475,7 @@ export function AgentSettings({
     setStatus("");
     setTestAnswer("");
 
-    const response = await fetch("/api/agents/test-prompt", {
+    const response = await clientFetch("/api/agents/test-prompt", {
       body: JSON.stringify({
         agentId: selectedAgent.id,
         message: testMessage.trim(),
@@ -499,17 +500,17 @@ export function AgentSettings({
 
   if (!selectedAgent) {
     return (
-      <section className="min-w-0 rounded-lg border border-[#d9ded3] bg-white p-4">
+      <section className="min-w-0 rounded-lg border border-line bg-white p-4">
         <div className="flex items-center gap-2">
-          <Bot className="text-[#35735b]" size={19} />
+          <Bot className="text-ink" size={19} />
           <h2 className="text-base font-semibold">Configuración de agentes</h2>
         </div>
-        <p className="mt-3 text-sm text-[#647067]">
+        <p className="mt-3 text-sm text-muted">
           Crea un agente para configurar instrucciones, modelo y pruebas.
         </p>
-        {status ? <p className="mt-3 text-sm text-[#647067]">{status}</p> : null}
+        {status ? <p className="mt-3 text-sm text-muted">{status}</p> : null}
         <button
-          className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]"
+          className="mt-4 inline-flex h-10 items-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink disabled:opacity-50"
           disabled={isCreating || !workspaceId}
           onClick={createBaseAgent}
           type="button"
@@ -523,21 +524,21 @@ export function AgentSettings({
 
   return (
     <>
-    <section className="min-w-0 rounded-lg border border-[#d9ded3] bg-white p-4">
+    <section className="min-w-0 rounded-lg border border-line bg-white p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Bot className="text-[#35735b]" size={19} />
+          <Bot className="text-ink" size={19} />
           <h2 className="text-base font-semibold">Configuración de agentes</h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-[#647067]">Conversaciones nuevas</span>
-          <div className="inline-flex rounded-lg border border-[#cbd2c6] bg-[#f6f7f3] p-0.5">
+          <span className="text-xs font-semibold text-muted">Conversaciones nuevas</span>
+          <div className="inline-flex rounded-lg border border-line bg-paper-2 p-0.5">
             <button
               aria-pressed={conversationMode === "ai"}
               className={`inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition ${
                 conversationMode === "ai"
-                  ? "bg-[#10231c] text-white"
-                  : "text-[#4d5a51] hover:bg-white"
+                  ? "bg-ink text-white"
+                  : "text-ink-2 hover:bg-white"
               }`}
               disabled={isSavingConversationMode}
               onClick={() => saveDefaultConversationMode("ai")}
@@ -550,8 +551,8 @@ export function AgentSettings({
               aria-pressed={conversationMode === "handoff"}
               className={`inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition ${
                 conversationMode === "handoff"
-                  ? "bg-[#10231c] text-white"
-                  : "text-[#4d5a51] hover:bg-white"
+                  ? "bg-ink text-white"
+                  : "text-ink-2 hover:bg-white"
               }`}
               disabled={isSavingConversationMode}
               onClick={() => saveDefaultConversationMode("handoff")}
@@ -565,23 +566,23 @@ export function AgentSettings({
               Handoff
             </button>
           </div>
-          <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
+          <span className="rounded-lg bg-paper-2 px-2 py-1 text-xs text-ink-2">
             {getAgentTypeLabel(form.type)}
           </span>
         </div>
       </div>
 
-      <div className="mt-4 grid gap-2 rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3 sm:grid-cols-3">
+      <div className="mt-4 grid gap-2 rounded-lg border border-line bg-paper-2 p-3 sm:grid-cols-3">
         <div>
-          <p className="text-xs font-semibold uppercase text-[#647067]">Agentes</p>
+          <p className="text-xs font-semibold uppercase text-muted">Agentes</p>
           <p className="mt-1 text-lg font-semibold">{localAgents.length}</p>
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase text-[#647067]">Tools</p>
+          <p className="text-xs font-semibold uppercase text-muted">Tools</p>
           <p className="mt-1 text-lg font-semibold">{tools.length}</p>
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase text-[#647067]">Base</p>
+          <p className="text-xs font-semibold uppercase text-muted">Base</p>
           <p className="mt-1 text-lg font-semibold">{knowledgeAssets.length}</p>
         </div>
       </div>
@@ -592,21 +593,21 @@ export function AgentSettings({
             <button
               className={`rounded-lg border px-3 py-2 text-left text-sm transition ${
                 agent.id === selectedAgent.id
-                  ? "border-[#35735b] bg-[#eef6df]"
-                  : "border-[#e2e6df] hover:bg-[#f6f7f3]"
+                  ? "border-ink bg-yellow-soft"
+                  : "border-line hover:bg-paper-2"
               }`}
               key={agent.id}
               onClick={() => selectAgent(agent)}
               type="button"
             >
               <p className="font-semibold">{agent.name}</p>
-              <p className="mt-1 text-xs text-[#647067]">
+              <p className="mt-1 text-xs text-muted">
                 {agent.is_active ? "Activo" : "Pausado"} - {agent.model}
               </p>
             </button>
           ))}
           <button
-            className="rounded-lg border border-dashed border-[#cbd2c6] px-3 py-2 text-left text-sm text-[#4d5a51] transition hover:bg-[#f6f7f3]"
+            className="rounded-lg border border-dashed border-line px-3 py-2 text-left text-sm text-ink-2 transition hover:bg-paper-2"
             disabled={isCreating}
             onClick={createBaseAgent}
             type="button"
@@ -620,7 +621,7 @@ export function AgentSettings({
             <label className="grid gap-1.5 text-sm font-medium">
               Nombre
               <input
-                className="h-10 rounded-lg border border-[#cbd2c6] px-3 outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                className="h-10 rounded-lg border border-line px-3 outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
                 onChange={(event) =>
                   setForm((current) => ({ ...current, agent_name: event.target.value }))
                 }
@@ -631,7 +632,7 @@ export function AgentSettings({
             <label className="grid gap-1.5 text-sm font-medium">
               Trabajo
               <input
-                className="h-10 rounded-lg border border-[#cbd2c6] px-3 outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                className="h-10 rounded-lg border border-line px-3 outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
                 onChange={(event) =>
                   setForm((current) => ({ ...current, job_title: event.target.value }))
                 }
@@ -642,7 +643,7 @@ export function AgentSettings({
             <label className="grid gap-1.5 text-sm font-medium">
               Tipo de agente
               <select
-                className="h-10 rounded-lg border border-[#cbd2c6] px-3 outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                className="h-10 rounded-lg border border-line px-3 outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
@@ -664,7 +665,7 @@ export function AgentSettings({
             <label className="grid gap-1.5 text-sm font-medium">
               Modelo OpenAI
               <select
-                className="h-10 rounded-lg border border-[#cbd2c6] px-3 outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                className="h-10 rounded-lg border border-line px-3 outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
                 onChange={(event) =>
                   setForm((current) => ({ ...current, model: event.target.value }))
                 }
@@ -680,7 +681,7 @@ export function AgentSettings({
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
-            <div className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-[#e2e6df] px-3 py-2">
+            <div className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-line px-3 py-2">
               <p className="text-sm font-medium">Estado del agente</p>
               <ToggleSwitch
                 checked={form.is_active}
@@ -695,7 +696,7 @@ export function AgentSettings({
             <label className="grid gap-1.5 text-sm font-medium">
               Estilo
               <select
-                className="h-10 rounded-lg border border-[#cbd2c6] px-3 outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                className="h-10 rounded-lg border border-line px-3 outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
@@ -716,7 +717,7 @@ export function AgentSettings({
           <label className="grid gap-1.5 text-sm font-medium">
             Descripción para router
             <textarea
-              className="min-h-24 rounded-lg border border-[#cbd2c6] p-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+              className="min-h-24 rounded-lg border border-line p-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
               onChange={(event) =>
                 setForm((current) => ({
                   ...current,
@@ -726,7 +727,7 @@ export function AgentSettings({
               placeholder="Ej: Usar este agente cuando el contacto pregunte precios, ubicación, servicios y dudas generales."
               value={form.router_description}
             />
-            <span className="text-xs font-normal text-[#647067]">
+            <span className="text-xs font-normal text-muted">
               El router compara esta descripción con el mensaje y decide que agente activo responde.
             </span>
           </label>
@@ -734,7 +735,7 @@ export function AgentSettings({
           <label className="grid gap-1.5 text-sm font-medium">
             Instrucciones del agente
             <textarea
-              className="min-h-36 rounded-lg border border-[#cbd2c6] p-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+              className="min-h-36 rounded-lg border border-line p-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
               onChange={(event) =>
                 setForm((current) => ({
                   ...current,
@@ -743,7 +744,7 @@ export function AgentSettings({
               }
               value={form.system_prompt}
             />
-            <span className="text-xs font-normal text-[#647067]">
+            <span className="text-xs font-normal text-muted">
               Define identidad, tono, objetivo y como debe conversar.
             </span>
           </label>
@@ -752,7 +753,7 @@ export function AgentSettings({
             <label className="grid gap-1.5 text-sm font-medium">
               Reglas -- que SI debe hacer
               <textarea
-                className="min-h-28 rounded-lg border border-[#cbd2c6] p-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                className="min-h-28 rounded-lg border border-line p-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
@@ -764,7 +765,7 @@ export function AgentSettings({
                 }
                 value={form.rules}
               />
-              <span className="text-xs font-normal text-[#647067]">
+              <span className="text-xs font-normal text-muted">
                 Una regla por línea. Se inyectan como obligaciones del agente.
               </span>
             </label>
@@ -772,7 +773,7 @@ export function AgentSettings({
             <label className="grid gap-1.5 text-sm font-medium">
               Restricciones -- que NUNCA debe hacer
               <textarea
-                className="min-h-28 rounded-lg border border-[#cbd2c6] p-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                className="min-h-28 rounded-lg border border-line p-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
@@ -784,22 +785,22 @@ export function AgentSettings({
                 }
                 value={form.restrictions}
               />
-              <span className="text-xs font-normal text-[#647067]">
-                Una restriccion por línea. Tiene prioridad sobre respuestas libres.
+              <span className="text-xs font-normal text-muted">
+                Una restricción por línea. Tiene prioridad sobre respuestas libres.
               </span>
             </label>
           </div>
 
           <div className="grid min-w-0 gap-3 md:grid-cols-2 [&>*]:min-w-0">
-            <div className="min-w-0 rounded-lg border border-[#e2e6df] p-3">
+            <div className="min-w-0 rounded-lg border border-line p-3">
               <div className="flex items-center gap-2">
-                <Wrench className="text-[#35735b]" size={17} />
+                <Wrench className="text-ink" size={17} />
                 <h3 className="text-sm font-semibold">Tools asignadas</h3>
               </div>
               <div className="mt-3 grid min-w-0 gap-2">
                 {tools.map((tool) => (
                   <label
-                    className="flex min-w-0 items-start gap-2 rounded-lg border border-[#e2e6df] px-3 py-2 text-sm"
+                    className="flex min-w-0 items-start gap-2 rounded-lg border border-line px-3 py-2 text-sm"
                     key={tool.id}
                   >
                     <input
@@ -815,32 +816,32 @@ export function AgentSettings({
                     />
                     <span className="min-w-0">
                       <span className="block font-medium">{tool.title}</span>
-                      <span className="mt-0.5 line-clamp-2 block text-xs text-[#647067]">
+                      <span className="mt-0.5 line-clamp-2 block text-xs text-muted">
                         {tool.content || "Tool disponible para este agente."}
                       </span>
                     </span>
                   </label>
                 ))}
                 {tools.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
-                    Crea tools en la pestana Tools para asignarlas aquí.
+                  <p className="rounded-lg border border-dashed border-line p-3 text-sm text-muted">
+                    Crea tools en la pestaña Tools para asignarlas aquí.
                   </p>
                 ) : null}
               </div>
             </div>
 
-            <div className="min-w-0 rounded-lg border border-[#e2e6df] p-3">
+            <div className="min-w-0 rounded-lg border border-line p-3">
               <div className="flex items-center gap-2">
-                <BookOpenText className="text-[#35735b]" size={17} />
+                <BookOpenText className="text-ink" size={17} />
                 <h3 className="text-sm font-semibold">Documentos RAG asignados</h3>
               </div>
-              <p className="mt-1 text-xs text-[#647067]">
+              <p className="mt-1 text-xs text-muted">
                 Selecciona los documentos que este agente puede usar como contexto.
               </p>
               <div className="mt-3 grid min-w-0 gap-2">
                 {knowledgeAssets.map((asset) => (
                   <div
-                    className="flex min-h-12 min-w-0 items-center justify-between gap-3 rounded-lg border border-[#e2e6df] px-3 py-2 text-sm"
+                    className="flex min-h-12 min-w-0 items-center justify-between gap-3 rounded-lg border border-line px-3 py-2 text-sm"
                     key={asset.id}
                   >
                     <span className="min-w-0 truncate font-medium">
@@ -861,7 +862,7 @@ export function AgentSettings({
                   </div>
                 ))}
                 {knowledgeAssets.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
+                  <p className="rounded-lg border border-dashed border-line p-3 text-sm text-muted">
                     Agrega documentos en Knowledge Base para asignarlos aquí.
                   </p>
                 ) : null}
@@ -870,20 +871,20 @@ export function AgentSettings({
           </div>
 
           <div
-            className="grid gap-3 rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3"
+            className="grid gap-3 rounded-lg border border-line bg-paper-2 p-3"
             data-tour="agent-test"
           >
             <label className="grid gap-1.5 text-sm font-medium">
               Probar prompt
               <textarea
-                className="min-h-20 rounded-lg border border-[#cbd2c6] p-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                className="min-h-20 rounded-lg border border-line p-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
                 onChange={(event) => setTestMessage(event.target.value)}
                 value={testMessage}
               />
             </label>
             {testAnswer ? (
-              <div className="rounded-lg border border-[#d9ded3] bg-white p-3 text-sm">
-                <p className="text-xs font-semibold uppercase text-[#647067]">
+              <div className="rounded-lg border border-line bg-white p-3 text-sm">
+                <p className="text-xs font-semibold uppercase text-muted">
                   Respuesta
                 </p>
                 <p className="mt-2 whitespace-pre-wrap">{testAnswer}</p>
@@ -891,11 +892,11 @@ export function AgentSettings({
             ) : null}
           </div>
 
-          {status ? <p className="text-sm text-[#647067]">{status}</p> : null}
+          {status ? <p className="text-sm text-muted">{status}</p> : null}
 
           <div className="flex flex-wrap gap-2">
             <button
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]"
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink disabled:opacity-50"
               disabled={isSaving}
               onClick={saveAgent}
               type="button"
@@ -904,7 +905,7 @@ export function AgentSettings({
               Guardar agente
             </button>
             <button
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm font-medium disabled:bg-[#f3f4ef]"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-medium disabled:bg-paper-2"
               disabled={isTesting}
               onClick={testPrompt}
               type="button"
@@ -913,7 +914,7 @@ export function AgentSettings({
               Probar prompt
             </button>
             <button
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-red-200 bg-white px-3 text-sm font-medium text-red-700 disabled:bg-[#f3f4ef]"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-red-200 bg-white px-3 text-sm font-medium text-red-700 disabled:bg-paper-2"
               disabled={isDeleting || localAgents.length === 0}
               onClick={() => setShowDeleteDialog(true)}
               type="button"
@@ -926,17 +927,17 @@ export function AgentSettings({
       </div>
     </section>
       {showDeleteDialog ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-[#10231c]/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-lg border border-[#d9ded3] bg-white p-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 grid place-items-center bg-ink/35 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-lg border border-line bg-white p-4 shadow-2xl">
             <div className="flex items-start gap-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-700">
                 <Trash2 size={18} />
               </div>
               <div className="min-w-0">
-                <h3 className="text-base font-semibold text-[#20231f]">
+                <h3 className="text-base font-semibold text-ink">
                   Borrar agente
                 </h3>
-                <p className="mt-1 text-sm text-[#647067]">
+                <p className="mt-1 text-sm text-muted">
                   Vas a borrar <span className="font-semibold">{selectedAgent.name}</span>.
                   Esta acción no se puede deshacer.
                 </p>
@@ -944,7 +945,7 @@ export function AgentSettings({
             </div>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
               <button
-                className="inline-flex h-10 items-center justify-center rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm font-medium text-[#20231f] disabled:bg-[#f3f4ef]"
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-line bg-white px-3 text-sm font-medium text-ink disabled:bg-paper-2"
                 disabled={isDeleting}
                 onClick={() => setShowDeleteDialog(false)}
                 type="button"
@@ -952,7 +953,7 @@ export function AgentSettings({
                 Cancelar
               </button>
               <button
-                className="inline-flex h-10 items-center gap-2 rounded-lg bg-red-700 px-3 text-sm font-medium text-white disabled:bg-red-300"
+                className="inline-flex h-10 items-center gap-2 rounded-lg border-[1.5px] border-line bg-paper px-3 text-sm font-bold text-red-700 transition hover:border-red disabled:cursor-progress disabled:opacity-50"
                 disabled={isDeleting}
                 onClick={deleteAgent}
                 type="button"

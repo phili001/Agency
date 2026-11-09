@@ -34,6 +34,7 @@ import type { DefaultConversationMode } from "@/lib/conversation-default";
 import { GoogleCalendarCard } from "@/components/crm/google-calendar-card";
 import { createClient } from "@/lib/supabase/client";
 import { getTimeZoneOptions } from "@/lib/timezones";
+import { clientFetch } from "@/lib/client-fetch";
 
 type IntegrationItem = {
   config: Json;
@@ -134,7 +135,7 @@ const providers = [
     description: "Datos del número conectado en YCloud.",
     fields: [
       ["api_key", "YCloud API key"],
-      ["phone_e164", "Número WhatsApp con pais"],
+      ["phone_e164", "Número WhatsApp con país"],
       ["waba_id", "WABA ID de YCloud"],
       ["phone_id", "Phone ID del número (opcional)"],
       ["webhook_secret", "Secreto webhook"],
@@ -166,7 +167,7 @@ const toolPresets = [
   },
   {
     content:
-      "Acción: llama un webhook HTTPS propio con payload JSON. Usar solo cuando el endpoint y permisos esten claros.",
+      "Acción: llama un webhook HTTPS propio con payload JSON. Usar solo cuando el endpoint y permisos estén claros.",
     title: "Webhook personalizado",
   },
 ] as const;
@@ -232,12 +233,12 @@ function fieldHelp(provider: string, key: string) {
         placeholder: "123456789012345",
       },
       phone_id: {
-        help: "Opcional. Si YCloud no lo muestra en esta pantalla, dejalo vacio; el webhook también buscara por WABA ID o número.",
+        help: "Opcional. Si YCloud no lo muestra en esta pantalla, déjalo vacío; el webhook también buscará por WABA ID o número.",
         placeholder: "Opcional: phone_... o el ID técnico si YCloud lo muestra",
       },
       webhook_secret: {
         help: "Se usará solo para generar y validar la URL del webhook de esta empresa.",
-        placeholder: "Dejalo vacio para generar uno automáticamente",
+        placeholder: "Déjalo vacío para generar uno automáticamente",
       },
       api_key: {
         help: "Se cifra en el backend y se usa solo para enviar mensajes de este número.",
@@ -367,7 +368,7 @@ export function WorkspaceSettings({
     let cancelled = false;
 
     async function loadYCloudWebhookUrl() {
-      const response = await fetch(
+      const response = await clientFetch(
         `/api/integrations/ycloud?workspaceId=${encodeURIComponent(workspaceId!)}`,
       );
 
@@ -410,7 +411,7 @@ export function WorkspaceSettings({
     let cancelled = false;
 
     async function loadAgendas() {
-      const response = await fetch("/api/agenda/agendas");
+      const response = await clientFetch("/api/agenda/agendas");
       const payload = (await response.json()) as {
         agendas?: AgendaOption[];
         error?: string;
@@ -462,7 +463,7 @@ export function WorkspaceSettings({
             webhookSecret: draft.config.webhook_secret,
             workspaceId,
           };
-    const response = await fetch(endpoint, {
+    const response = await clientFetch(endpoint, {
       body: JSON.stringify(requestBody),
       headers: { "Content-Type": "application/json" },
       method: "POST",
@@ -512,7 +513,7 @@ export function WorkspaceSettings({
     setSavingKey(`${provider}:test`);
     setStatus("");
 
-    const response = await fetch(`/api/integrations/${provider}/test`, {
+    const response = await clientFetch(`/api/integrations/${provider}/test`, {
       body: JSON.stringify({ workspaceId }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
@@ -611,7 +612,7 @@ export function WorkspaceSettings({
 
   async function deleteAsset(asset: WorkspaceAsset) {
     const label = asset.title || "este recurso";
-    const confirmed = window.confirm(`Eliminar ${label}? Esta accion no se puede deshacer.`);
+    const confirmed = window.confirm(`¿Eliminar ${label}? Esta acción no se puede deshacer.`);
 
     if (!confirmed) {
       return;
@@ -816,7 +817,7 @@ export function WorkspaceSettings({
     setSavingKey("team:add");
     setStatus("");
 
-    const response = await fetch("/api/team/members", {
+    const response = await clientFetch("/api/team/members", {
       body: JSON.stringify({
         email,
         resetPassword: memberResetPassword,
@@ -880,7 +881,7 @@ export function WorkspaceSettings({
     setSavingKey("team:password");
     setStatus("");
 
-    const response = await fetch("/api/account/password", {
+    const response = await clientFetch("/api/account/password", {
       body: JSON.stringify({
         currentPassword: current,
         newPassword: next,
@@ -913,7 +914,7 @@ export function WorkspaceSettings({
 
     const label = member.display_email || member.display_name || member.user_id;
     const confirmed = window.confirm(
-      `Eliminar a ${label} de este workspace? Podra volver a entrar solo si lo agregas de nuevo.`,
+      `¿Eliminar a ${label} de este workspace? Podrá volver a entrar solo si lo agregas de nuevo.`,
     );
 
     if (!confirmed) {
@@ -923,7 +924,7 @@ export function WorkspaceSettings({
     setSavingKey(`team:remove:${member.id}`);
     setStatus("");
 
-    const response = await fetch("/api/team/members", {
+    const response = await clientFetch("/api/team/members", {
       body: JSON.stringify({
         memberId: member.id,
         workspaceId,
@@ -961,7 +962,7 @@ export function WorkspaceSettings({
     setSavingKey(`team:role:${member.id}`);
     setStatus("");
 
-    const response = await fetch("/api/team/members", {
+    const response = await clientFetch("/api/team/members", {
       body: JSON.stringify({
         memberId: member.id,
         role,
@@ -1110,7 +1111,7 @@ export function WorkspaceSettings({
       <div className="grid gap-5">
         <div>
           <h3 className="text-sm font-semibold">Info del negocio</h3>
-          <p className="mt-1 text-sm text-[#647067]">
+          <p className="mt-1 text-sm text-muted">
             Completa estos datos. Cada campo se puede usar como
             variable en los prompts de agentes.
           </p>
@@ -1127,13 +1128,13 @@ export function WorkspaceSettings({
               <label className="grid gap-1.5 text-sm font-medium" key={field.key}>
                 <span className="flex items-center justify-between gap-2">
                   {field.label}
-                  <code className="rounded-md bg-[#eef2eb] px-1.5 py-0.5 text-[11px] font-normal text-[#4d5a51]">
+                  <code className="rounded-md bg-paper-2 px-1.5 py-0.5 text-[11px] font-normal text-ink-2">
                     {field.variable}
                   </code>
                 </span>
                 {isTimeZone ? (
                   <select
-                    className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                    className="h-10 rounded-lg border border-line px-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
                     onChange={(event) =>
                       updateBusinessField(field.key, event.target.value)
                     }
@@ -1151,7 +1152,7 @@ export function WorkspaceSettings({
                   </select>
                 ) : (
                   <input
-                    className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                    className="h-10 rounded-lg border border-line px-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
                     onChange={(event) =>
                       updateBusinessField(field.key, event.target.value)
                     }
@@ -1161,11 +1162,11 @@ export function WorkspaceSettings({
                 )}
                 <span
                   className={`text-xs font-normal ${
-                    unknownTimeZone ? "text-[#a8442c]" : "text-[#647067]"
+                    unknownTimeZone ? "text-[#a8442c]" : "text-muted"
                   }`}
                 >
                   {unknownTimeZone
-                    ? `"${fieldValue}" no es una zona horaria valida y se ignora al agendar. Elige una de la lista.`
+                    ? `"${fieldValue}" no es una zona horaria válida y se ignora al agendar. Elige una de la lista.`
                     : field.help}
                 </span>
               </label>
@@ -1173,16 +1174,16 @@ export function WorkspaceSettings({
           })}
         </div>
 
-        <div className="grid gap-3 rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3">
+        <div className="grid gap-3 rounded-lg border border-line bg-paper-2 p-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="text-sm font-semibold">Campos adicionales</h3>
-              <p className="mt-1 text-sm text-[#647067]">
+              <p className="mt-1 text-sm text-muted">
                 Agrega cualquier dato propio del negocio y usalo como variable.
               </p>
             </div>
             <button
-              className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm font-medium"
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-medium"
               onClick={addBusinessCustomField}
               type="button"
             >
@@ -1197,14 +1198,14 @@ export function WorkspaceSettings({
 
               return (
                 <div
-                  className="grid gap-2 rounded-lg border border-[#e2e6df] bg-white p-3"
+                  className="grid gap-2 rounded-lg border border-line bg-white p-3"
                   key={`${index}-${field.key}`}
                 >
                   <div className="grid gap-2 md:grid-cols-[1fr_180px]">
                     <label className="grid gap-1.5 text-sm font-medium">
                       Nombre visible
                       <input
-                        className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                        className="h-10 rounded-lg border border-line px-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
                         onChange={(event) =>
                           updateBusinessCustomField(index, {
                             label: event.target.value,
@@ -1217,7 +1218,7 @@ export function WorkspaceSettings({
                     <label className="grid gap-1.5 text-sm font-medium">
                       Variable
                       <input
-                        className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                        className="h-10 rounded-lg border border-line px-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
                         onChange={(event) =>
                           updateBusinessCustomField(index, {
                             key: normalizeVariableKey(event.target.value),
@@ -1231,7 +1232,7 @@ export function WorkspaceSettings({
                   <label className="grid gap-1.5 text-sm font-medium">
                     Valor
                     <textarea
-                      className="min-h-20 rounded-lg border border-[#cbd2c6] p-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                      className="min-h-20 rounded-lg border border-line p-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
                       onChange={(event) =>
                         updateBusinessCustomField(index, {
                           value: event.target.value,
@@ -1242,7 +1243,7 @@ export function WorkspaceSettings({
                     />
                   </label>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <code className="rounded-md bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
+                    <code className="rounded-md bg-paper-2 px-2 py-1 text-xs text-ink-2">
                       {variableKey ? `{${variableKey}}` : "{variable}"}
                     </code>
                     <button
@@ -1257,7 +1258,7 @@ export function WorkspaceSettings({
               );
             })}
             {(metadata.custom_fields ?? []).length === 0 ? (
-              <p className="rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
+              <p className="rounded-lg border border-dashed border-line p-3 text-sm text-muted">
                 No hay campos adicionales. Puedes agregar políticas, promociones,
                 especialidades, URLs o cualquier dato que el agente deba conocer.
               </p>
@@ -1267,7 +1268,7 @@ export function WorkspaceSettings({
 
         <div className="flex flex-wrap items-center gap-2">
           <select
-            className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+            className="h-10 rounded-lg border border-line px-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
             onChange={(event) =>
               setAssetDrafts((current) => ({
                 ...current,
@@ -1284,7 +1285,7 @@ export function WorkspaceSettings({
             <option value="archived">Archivado</option>
           </select>
           <button
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]"
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink disabled:opacity-50"
             disabled={savingKey === "business_profile"}
             onClick={() => saveAsset("business_profile")}
             type="button"
@@ -1329,8 +1330,8 @@ export function WorkspaceSettings({
           <div
             className={`flex items-start justify-between gap-3 rounded-lg border p-3 text-sm ${
               editingId === asset.id
-                ? "border-[#35735b] bg-[#f3f8ee]"
-                : "border-[#e2e6df]"
+                ? "border-ink bg-yellow-soft"
+                : "border-line"
             }`}
             key={asset.id}
           >
@@ -1342,19 +1343,19 @@ export function WorkspaceSettings({
               <p className="font-semibold">
                 {asset.title}
                 {editingId === asset.id ? (
-                  <span className="ml-2 text-xs font-normal text-[#35735b]">
+                  <span className="ml-2 text-xs font-normal text-ink">
                     editando
                   </span>
                 ) : null}
               </p>
-              <p className="mt-1 line-clamp-2 text-[#647067]">{asset.content}</p>
+              <p className="mt-1 line-clamp-2 text-muted">{asset.content}</p>
             </button>
             <div className="flex shrink-0 items-center gap-2">
-              <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
+              <span className="rounded-lg bg-paper-2 px-2 py-1 text-xs text-ink-2">
                 {asset.status}
               </span>
               <button
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#cbd2c6] bg-white px-2 text-xs font-medium text-[#10231c]"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-white px-2 text-xs font-medium text-ink"
                 onClick={() => editAsset(asset)}
                 type="button"
               >
@@ -1378,7 +1379,7 @@ export function WorkspaceSettings({
           </div>
         ))}
         {currentAssets.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
+          <p className="rounded-lg border border-dashed border-line p-3 text-sm text-muted">
             {empty}
           </p>
         ) : null}
@@ -1403,7 +1404,7 @@ export function WorkspaceSettings({
     return (
       <div
         className={`grid gap-3 ${
-          isEditing ? "rounded-lg border border-[#35735b] bg-[#f7faf4] p-3" : ""
+          isEditing ? "rounded-lg border border-ink bg-paper-2 p-3" : ""
         }`}
       >
         <div className="flex flex-wrap items-start justify-between gap-2">
@@ -1411,7 +1412,7 @@ export function WorkspaceSettings({
             <h3 className="text-sm font-semibold">
               {isEditing ? `Editando: ${draft.title || "sin título"}` : title}
             </h3>
-            <p className="mt-1 text-sm text-[#647067]">
+            <p className="mt-1 text-sm text-muted">
               {isEditing
                 ? "Los cambios reemplazan el documento existente."
                 : helper}
@@ -1419,7 +1420,7 @@ export function WorkspaceSettings({
           </div>
           {isEditing ? (
             <button
-              className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm font-medium text-[#10231c]"
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-medium text-ink"
               onClick={() =>
                 setAssetDrafts((current) => ({
                   ...current,
@@ -1440,7 +1441,7 @@ export function WorkspaceSettings({
           ) : null}
         </div>
         <input
-          className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+          className="h-10 rounded-lg border border-line px-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
           onChange={(event) =>
             setAssetDrafts((current) => ({
               ...current,
@@ -1451,7 +1452,7 @@ export function WorkspaceSettings({
           value={draft.title}
         />
         <textarea
-          className="min-h-32 rounded-lg border border-[#cbd2c6] p-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+          className="min-h-32 rounded-lg border border-line p-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
           onChange={(event) =>
             setAssetDrafts((current) => ({
               ...current,
@@ -1463,7 +1464,7 @@ export function WorkspaceSettings({
         />
         <div className="flex flex-wrap items-center gap-2">
           <select
-            className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+            className="h-10 rounded-lg border border-line px-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
             onChange={(event) =>
               setAssetDrafts((current) => ({
                 ...current,
@@ -1480,7 +1481,7 @@ export function WorkspaceSettings({
             <option value="archived">Archivado</option>
           </select>
           <button
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]"
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink disabled:opacity-50"
             disabled={savingKey === kind}
             // Solo se crea uno nuevo cuando no se esta editando ninguno. Antes
             // forzaba crear siempre, asi que editar generaba duplicados.
@@ -1500,17 +1501,17 @@ export function WorkspaceSettings({
   }
 
   return (
-    <section className="min-w-0 rounded-lg border border-[#d9ded3] bg-white">
+    <section className="min-w-0 rounded-lg border border-line bg-white">
       {showNavigation ? (
-      <div className="border-b border-[#e2e6df] px-4 py-3">
+      <div className="border-b border-line px-4 py-3">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h2 className="text-base font-semibold">Workspace</h2>
-            <p className="text-sm text-[#647067]">
+            <p className="text-sm text-muted">
               Integraciones, contexto del negocio y recursos del agente.
             </p>
           </div>
-          <span className="rounded-lg bg-[#eef2eb] px-2.5 py-1 text-xs font-semibold text-[#4d5a51]">
+          <span className="rounded-lg bg-paper-2 px-2.5 py-1 text-xs font-semibold text-ink-2">
             {workspaceName}
           </span>
         </div>
@@ -1519,8 +1520,8 @@ export function WorkspaceSettings({
             <button
               className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium ${
                 activeTab === tab.id
-                  ? "bg-[#10231c] text-white"
-                  : "bg-[#eef2eb] text-[#4d5a51]"
+                  ? "bg-ink text-white"
+                  : "bg-paper-2 text-ink-2"
               }`}
               key={tab.id}
               onClick={() => {
@@ -1559,30 +1560,30 @@ export function WorkspaceSettings({
 
               return (
                 <div
-                  className="grid content-start gap-3 rounded-lg border border-[#e2e6df] p-3"
+                  className="grid content-start gap-3 rounded-lg border border-line p-3"
                   key={provider.provider}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h3 className="font-semibold">{provider.label}</h3>
-                      <p className="mt-1 text-sm text-[#647067]">
+                      <p className="mt-1 text-sm text-muted">
                         {provider.description}
                       </p>
                     </div>
                     <span
                       className={`shrink-0 rounded-lg px-2 py-1 text-xs ${
                         connected?.status === "active"
-                          ? "bg-[#e7f6ce] text-[#31521d]"
+                          ? "bg-yellow-soft text-ink"
                           : connected?.status === "error"
                             ? "bg-[#f8dcd6] text-[#7a2f1d]"
-                            : "bg-[#eef2eb] text-[#4d5a51]"
+                            : "bg-paper-2 text-ink-2"
                       }`}
                     >
                       {statusLabels[connected?.status ?? "pending"]}
                     </span>
                   </div>
                   {provider.provider === "ycloud" ? (
-                    <div className="rounded-lg border border-dashed border-[#cbd2c6] bg-[#fafbf8] p-2 text-xs text-[#4d5a51]">
+                    <div className="rounded-lg border border-dashed border-line bg-paper-2 p-2 text-xs text-ink-2">
                       <p className="font-semibold">Webhook URL para pegar en YCloud</p>
                       <p className="mt-1 break-all">{webhookUrl}</p>
                       <p className="mt-2">
@@ -1599,7 +1600,7 @@ export function WorkspaceSettings({
                       <label className="grid gap-1.5 text-sm font-medium" key={key}>
                         {label}
                         <input
-                          className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                          className="h-10 rounded-lg border border-line px-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
                           onChange={(event) =>
                             setIntegrationDrafts((current) => ({
                               ...current,
@@ -1616,7 +1617,7 @@ export function WorkspaceSettings({
                           type={key.includes("key") ? "password" : "text"}
                           value={draft.config[key] ?? ""}
                         />
-                        <span className="text-xs font-normal text-[#647067]">
+                        <span className="text-xs font-normal text-muted">
                           {helper.help}
                         </span>
                       </label>
@@ -1624,7 +1625,7 @@ export function WorkspaceSettings({
                   })}
                   <div className="flex flex-wrap gap-2">
                     <button
-                      className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]"
+                      className="inline-flex h-10 items-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink disabled:opacity-50"
                       disabled={savingKey === provider.provider}
                       onClick={() => saveIntegration(provider.provider)}
                       type="button"
@@ -1637,7 +1638,7 @@ export function WorkspaceSettings({
                       Guardar
                     </button>
                     <button
-                      className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#10231c] px-3 text-sm font-medium text-[#10231c] disabled:border-[#9aa59e] disabled:text-[#9aa59e]"
+                      className="inline-flex h-10 items-center gap-2 rounded-lg border border-ink px-3 text-sm font-medium text-ink disabled:border-faint disabled:text-faint"
                       disabled={savingKey === `${provider.provider}:test` || !connected}
                       onClick={() => testIntegration(provider.provider)}
                       type="button"
@@ -1661,24 +1662,24 @@ export function WorkspaceSettings({
         {activeTab === "tools" ? (
           <div className="grid gap-5">
             <div>
-              <h3 className="text-sm font-semibold">Catalogo de Tools</h3>
-              <p className="mt-1 text-sm text-[#647067]">
+              <h3 className="text-sm font-semibold">Catálogo de Tools</h3>
+              <p className="mt-1 text-sm text-muted">
                 Crea capacidades reutilizables y luego asignalas a cada agente.
               </p>
             </div>
 
-            <div className="grid gap-3 rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3">
+            <div className="grid gap-3 rounded-lg border border-line bg-paper-2 p-3">
               <div>
                 <h3 className="text-sm font-semibold">Calendarios de agendamiento</h3>
-                <p className="mt-1 text-sm text-[#647067]">
+                <p className="mt-1 text-sm text-muted">
                   Habilita las agendas y describe cuando usar cada uno. El
                   agente elige según lo que pida el cliente. Asignaselos en la
-                  pestana Agentes.
+                  pestaña Agentes.
                 </p>
               </div>
 
               {agendaOptions.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-[#d9ded3] bg-white p-3 text-sm text-[#647067]">
+                <p className="rounded-lg border border-dashed border-line bg-white p-3 text-sm text-muted">
                   {agendaOptionsError ||
                     "Crea una agenda en la sección Agenda para poder asignarla a tus agentes."}
                 </p>
@@ -1691,7 +1692,7 @@ export function WorkspaceSettings({
 
                     return (
                       <div
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#e2e6df] bg-white p-3"
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-white p-3"
                         key={calendar.id}
                       >
                         <div className="min-w-0 flex-1">
@@ -1700,7 +1701,7 @@ export function WorkspaceSettings({
                           </p>
                           {tool ? (
                             <textarea
-                              className="mt-1.5 w-full rounded-lg border border-[#cbd2c6] px-2 py-1.5 text-xs outline-none focus:border-[#35735b]"
+                              className="mt-1.5 w-full rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-ink"
                               defaultValue={tool.description}
                               onBlur={(event) => {
                                 if (event.target.value.trim() === tool.description) {
@@ -1718,19 +1719,19 @@ export function WorkspaceSettings({
                               rows={2}
                             />
                           ) : (
-                            <p className="mt-0.5 text-xs text-[#647067]">
+                            <p className="mt-0.5 text-xs text-muted">
                               Todavía no está habilitado.
                             </p>
                           )}
                         </div>
                         <div className="flex shrink-0 items-start gap-2">
                           {tool?.isDefault ? (
-                            <span className="rounded-lg bg-[#e7f6ce] px-2 py-1 text-xs text-[#31521d]">
+                            <span className="rounded-lg bg-yellow-soft px-2 py-1 text-xs text-ink">
                               Preferida
                             </span>
                           ) : tool ? (
                             <button
-                              className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#10231c] px-3 text-sm font-medium text-[#10231c] disabled:border-[#9aa59e] disabled:text-[#9aa59e]"
+                              className="inline-flex h-9 items-center gap-2 rounded-lg border border-ink px-3 text-sm font-medium text-ink disabled:border-faint disabled:text-faint"
                               disabled={savingKey === `calendar:${calendar.id}`}
                               onClick={() =>
                                 saveCalendarTool({
@@ -1750,7 +1751,7 @@ export function WorkspaceSettings({
                           ) : null}
                           {!tool ? (
                             <button
-                              className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]"
+                              className="inline-flex h-9 items-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink disabled:opacity-50"
                               disabled={savingKey === `calendar:${calendar.id}`}
                               onClick={() =>
                                 saveCalendarTool({
@@ -1774,15 +1775,15 @@ export function WorkspaceSettings({
             <div className="grid gap-3 xl:grid-cols-2">
               {toolPresets.map((tool) => (
                 <div
-                  className="flex items-start justify-between gap-3 rounded-lg border border-[#e2e6df] p-3"
+                  className="flex items-start justify-between gap-3 rounded-lg border border-line p-3"
                   key={tool.title}
                 >
                   <div>
                     <p className="text-sm font-semibold">{tool.title}</p>
-                    <p className="mt-1 text-sm text-[#647067]">{tool.content}</p>
+                    <p className="mt-1 text-sm text-muted">{tool.content}</p>
                   </div>
                   <button
-                    className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]"
+                    className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink disabled:opacity-50"
                     disabled={savingKey === `tool:${tool.title}`}
                     onClick={() => createAsset("tool", tool.title, tool.content)}
                     type="button"
@@ -1848,19 +1849,19 @@ export function WorkspaceSettings({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-semibold">Equipo del workspace</h3>
-                <p className="mt-1 text-sm text-[#647067]">
+                <p className="mt-1 text-sm text-muted">
                   Personas que pueden atender chats, configurar agentes o revisar datos.
                 </p>
               </div>
-              <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
+              <span className="rounded-lg bg-paper-2 px-2 py-1 text-xs text-ink-2">
                 {localMembers.length} miembros
               </span>
             </div>
-            <div className="mt-4 grid gap-3 rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3 md:grid-cols-[1fr_180px_150px_auto]">
+            <div className="mt-4 grid gap-3 rounded-lg border border-line bg-paper-2 p-3 md:grid-cols-[1fr_180px_150px_auto]">
               <label className="grid gap-1.5 text-sm font-medium">
                 Email
                 <input
-                  className="h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                  className="h-10 rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
                   onChange={(event) => setMemberEmail(event.target.value)}
                   placeholder="persona@empresa.com"
                   type="email"
@@ -1870,7 +1871,7 @@ export function WorkspaceSettings({
               <label className="grid gap-1.5 text-sm font-medium">
                 Contraseña temporal
                 <input
-                  className="h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                  className="h-10 rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
                   minLength={8}
                   onChange={(event) => setMemberTemporaryPassword(event.target.value)}
                   placeholder="Min. 8 caracteres"
@@ -1881,7 +1882,7 @@ export function WorkspaceSettings({
               <label className="grid gap-1.5 text-sm font-medium">
                 Rol
                 <select
-                  className="h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                  className="h-10 rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
                   onChange={(event) =>
                     setMemberRole(event.target.value as WorkspaceMember["role"])
                   }
@@ -1894,7 +1895,7 @@ export function WorkspaceSettings({
                 </select>
               </label>
               <button
-                className="inline-flex h-10 self-end items-center justify-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]"
+                className="inline-flex h-10 self-end items-center justify-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink disabled:opacity-50"
                 disabled={savingKey === "team:add"}
                 onClick={addMember}
                 type="button"
@@ -1906,35 +1907,35 @@ export function WorkspaceSettings({
                 )}
                 Agregar
               </button>
-              <label className="flex items-center gap-2 text-sm text-[#4d5a51] md:col-span-4">
+              <label className="flex items-center gap-2 text-sm text-ink-2 md:col-span-4">
                 <input
                   checked={memberResetPassword}
-                  className="size-4 rounded border-[#cbd2c6]"
+                  className="size-4 rounded border-line"
                   onChange={(event) => setMemberResetPassword(event.target.checked)}
                   type="checkbox"
                 />
                 Resetear contraseña si este correo ya existe
               </label>
-              <p className="text-xs text-[#647067] md:col-span-4">
+              <p className="text-xs text-muted md:col-span-4">
                 Para un usuario nuevo, la contraseña temporal es obligatoria. Para un
                 usuario existente, no se cambia su contraseña salvo que marques el reset.
               </p>
             </div>
-            <div className="mt-4 rounded-lg border border-[#e2e6df] bg-white p-3">
+            <div className="mt-4 rounded-lg border border-line bg-white p-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h4 className="text-sm font-semibold">Cambiar mi contraseña</h4>
-                  <p className="mt-1 text-sm text-[#647067]">
+                  <p className="mt-1 text-sm text-muted">
                     Usa tu contraseña anterior para confirmar el cambio.
                   </p>
                 </div>
-                <KeyRound className="shrink-0 text-[#35735b]" size={18} />
+                <KeyRound className="shrink-0 text-ink" size={18} />
               </div>
               <div className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
                 <label className="grid gap-1.5 text-sm font-medium">
                   Contraseña actual
                   <input
-                    className="h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                    className="h-10 rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
                     onChange={(event) => setCurrentPassword(event.target.value)}
                     placeholder="Actual"
                     type="password"
@@ -1944,7 +1945,7 @@ export function WorkspaceSettings({
                 <label className="grid gap-1.5 text-sm font-medium">
                   Nueva contraseña
                   <input
-                    className="h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                    className="h-10 rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
                     minLength={8}
                     onChange={(event) => setNewPassword(event.target.value)}
                     placeholder="Min. 8 caracteres"
@@ -1955,7 +1956,7 @@ export function WorkspaceSettings({
                 <label className="grid gap-1.5 text-sm font-medium">
                   Confirmar nueva
                   <input
-                    className="h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
+                    className="h-10 rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50"
                     minLength={8}
                     onChange={(event) =>
                       setNewPasswordConfirmation(event.target.value)
@@ -1966,7 +1967,7 @@ export function WorkspaceSettings({
                   />
                 </label>
                 <button
-                  className="inline-flex h-10 self-end items-center justify-center gap-2 rounded-lg border border-[#10231c] px-3 text-sm font-medium text-[#10231c] disabled:border-[#9aa59e] disabled:text-[#9aa59e]"
+                  className="inline-flex h-10 self-end items-center justify-center gap-2 rounded-lg border border-ink px-3 text-sm font-medium text-ink disabled:border-faint disabled:text-faint"
                   disabled={savingKey === "team:password"}
                   onClick={changeOwnPassword}
                   type="button"
@@ -1983,14 +1984,14 @@ export function WorkspaceSettings({
             <div className="mt-4 grid gap-2">
               {localMembers.map((member) => (
                 <div
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#e2e6df] p-3 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line p-3 text-sm"
                   key={member.id}
                 >
                   <div className="min-w-0">
                     <p className="truncate font-medium">
                       {member.display_name || member.display_email || member.user_id}
                     </p>
-                    <p className="mt-1 text-xs text-[#647067]">
+                    <p className="mt-1 text-xs text-muted">
                       {member.display_email || member.user_id} - Alta{" "}
                       {stableDate(member.created_at)}
                     </p>
@@ -1999,7 +2000,7 @@ export function WorkspaceSettings({
                     {canChangeMemberRoles ? (
                       <select
                         aria-label={`Permiso de ${member.display_email || member.user_id}`}
-                        className="h-9 rounded-lg border border-[#cbd2c6] bg-white px-2 text-xs font-semibold text-[#31521d] outline-none focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50 disabled:bg-[#eef2eb] disabled:text-[#7b877e]"
+                        className="h-9 rounded-lg border border-line bg-white px-2 text-xs font-semibold text-ink outline-none focus:border-ink focus:ring-2 focus:ring-yellow/50 disabled:bg-paper-2 disabled:text-faint"
                         disabled={savingKey === `team:role:${member.id}`}
                         onChange={(event) =>
                           updateMemberRole(
@@ -2015,15 +2016,15 @@ export function WorkspaceSettings({
                         <option value="viewer">viewer</option>
                       </select>
                     ) : (
-                      <span className="rounded-lg bg-[#e7f6ce] px-2 py-1 text-xs text-[#31521d]">
+                      <span className="rounded-lg bg-yellow-soft px-2 py-1 text-xs text-ink">
                         {member.role}
                       </span>
                     )}
                     {savingKey === `team:role:${member.id}` ? (
-                      <Loader2 className="animate-spin text-[#35735b]" size={14} />
+                      <Loader2 className="animate-spin text-ink" size={14} />
                     ) : null}
                     <button
-                      className="inline-flex h-9 min-w-[94px] items-center justify-center gap-1.5 rounded-lg border border-[#efc4bd] bg-[#fff3f1] px-3 text-xs font-semibold text-[#9b2f22] shadow-sm transition hover:border-[#d96c5e] hover:bg-[#ffe4df] hover:text-[#7f2419] focus:outline-none focus:ring-2 focus:ring-[#f5b6ad]/60 disabled:cursor-not-allowed disabled:border-[#e4dfdb] disabled:bg-[#f6f4f1] disabled:text-[#9aa59e] disabled:shadow-none"
+                      className="inline-flex h-9 min-w-[94px] items-center justify-center gap-1.5 rounded-lg border border-[#efc4bd] bg-[#fff3f1] px-3 text-xs font-semibold text-[#9b2f22] shadow-sm transition hover:border-[#d96c5e] hover:bg-[#ffe4df] hover:text-[#7f2419] focus:outline-none focus:ring-2 focus:ring-[#f5b6ad]/60 disabled:cursor-not-allowed disabled:border-[#e4dfdb] disabled:bg-[#f6f4f1] disabled:text-faint disabled:shadow-none"
                       disabled={savingKey === `team:remove:${member.id}`}
                       onClick={() => removeMember(member)}
                       type="button"
@@ -2039,8 +2040,8 @@ export function WorkspaceSettings({
                 </div>
               ))}
               {localMembers.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
-                  Aun no hay miembros visibles en este workspace.
+                <p className="rounded-lg border border-dashed border-line p-3 text-sm text-muted">
+                  Aún no hay miembros visibles en este workspace.
                 </p>
               ) : null}
             </div>
@@ -2048,9 +2049,9 @@ export function WorkspaceSettings({
         ) : null}
 
         {activeTab === "automations" ? (
-          <div className="rounded-lg border border-[#e2e6df] p-4">
+          <div className="rounded-lg border border-line p-4">
             <h3 className="text-sm font-semibold">Automatizaciones</h3>
-            <p className="mt-1 text-sm text-[#647067]">
+            <p className="mt-1 text-sm text-muted">
               Aquí vamos a conectar reglas como buffer IA, entrega de mensajes,
               recordatorios y sincronización con tu calendario. Por ahora quedan listas las
               bases para configurar agentes, tools y conocimiento.
@@ -2059,7 +2060,7 @@ export function WorkspaceSettings({
         ) : null}
 
         {status ? (
-          <p className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#eef2eb] px-3 py-2 text-sm text-[#4d5a51]">
+          <p className="mt-4 inline-flex items-center gap-2 rounded-lg bg-paper-2 px-3 py-2 text-sm text-ink-2">
             <Check size={15} />
             {status}
           </p>

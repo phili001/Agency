@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import type { CrmClient } from "../crm/shared.ts";
 import { createCrmFake } from "../testing/fake-supabase.ts";
 import { BillingAdminError, updateWorkspaceBillingAdmin } from "./admin.ts";
-import { buildPaymentLinkUrl, normalizeStripeCustomerId } from "./links.ts";
+import { buildPaymentLinkUrl, normalizeStripeCustomerId, publicPaymentLinkUrl } from "./links.ts";
 
 const A = "workspace-a";
 const B = "workspace-b";
@@ -31,6 +31,12 @@ describe("buildPaymentLinkUrl", () => {
     assert.equal(buildPaymentLinkUrl("", { email: null, workspaceId: A }), null);
     assert.equal(buildPaymentLinkUrl("http://buy.stripe.com/x", { email: null, workspaceId: A }), null);
     assert.equal(buildPaymentLinkUrl("no es una url", { email: null, workspaceId: A }), null);
+  });
+
+  it("la landing usa el Payment Link sin datos de ninguna empresa", () => {
+    assert.equal(publicPaymentLinkUrl(" https://buy.stripe.com/abc "), "https://buy.stripe.com/abc");
+    assert.equal(publicPaymentLinkUrl("http://buy.stripe.com/abc"), null);
+    assert.equal(publicPaymentLinkUrl(undefined), null);
   });
 
   it("valida ids de cliente de Stripe", () => {

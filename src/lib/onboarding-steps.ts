@@ -114,3 +114,13 @@ export function getOnboardingState(value: Json | null | undefined): OnboardingSt
       typeof record.wizard_skipped_at === "string" ? record.wizard_skipped_at : null,
   };
 }
+
+/** Número que ve el usuario para un paso; sale de la lista para no desfasarse al añadir pasos. */
+export function onboardingStepNumber(id: OnboardingStepId) {
+  return onboardingSteps.find((step) => step.id === id)?.index ?? 0;
+}
+
+/** «Paso N · Etiqueta», con N tomado de la lista real de pasos. */
+export function onboardingStepEyebrow(id: OnboardingStepId, label: string) {
+  return `Paso ${onboardingStepNumber(id)} · ${label}`;
+}

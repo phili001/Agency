@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Bot, CalendarCheck, Hand, MessageSquareText } from "lucide-react";
 
 import { InboxPanel } from "@/components/inbox-panel";
@@ -18,6 +19,8 @@ import {
 } from "@/lib/panel-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOnboardingChecklist } from "@/lib/workspaces";
+
+export const metadata: Metadata = { title: "Dashboard" };
 
 const emptyResult = { data: [], error: null };
 
@@ -351,18 +354,18 @@ export default async function Home({
     <aside className="grid min-w-0 content-start gap-5">
       {/* Una tarjeta por fila: en columna estrecha la cifra va al lado
           del texto, no debajo, para no dejar la mitad derecha vacía. */}
-      <section className="grid min-w-0 content-start gap-2">
+      <section className="grid min-w-0 content-start gap-2 md:grid-cols-2 xl:grid-cols-4 min-[1680px]:grid-cols-1">
         {dashboardMetrics.map((item) => (
           <div
-            className="flex min-w-0 items-center gap-3 rounded-lg border border-[#d9ded3] bg-white px-4 py-3"
+            className="flex min-w-0 items-center gap-3 rounded-lg border border-line bg-white px-4 py-3"
             key={item.label}
           >
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#eef2eb] text-[#35735b]">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-paper-2 text-ink">
               <item.icon size={18} />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm text-[#647067]">{item.label}</p>
-              <p className="truncate text-xs text-[#7a847c]">{item.detail}</p>
+              <p className="text-sm text-muted">{item.label}</p>
+              <p className="truncate text-xs text-muted">{item.detail}</p>
             </div>
             <p className="shrink-0 text-xl font-semibold tabular-nums">
               {item.value}
@@ -373,36 +376,36 @@ export default async function Home({
 
       {deployReadinessComplete ? null : (
         <section
-          className="scroll-mt-5 rounded-lg border border-[#d9ded3] bg-white p-4"
+          className="scroll-mt-5 rounded-lg border border-line bg-white p-4"
           id="observability"
         >
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold">Deploy readiness</h2>
-              <p className="mt-1 text-sm text-[#647067]">
+              <p className="mt-1 text-sm text-muted">
                 Variables necesarias para producción.
               </p>
             </div>
-            <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
+            <span className="rounded-lg bg-paper-2 px-2 py-1 text-xs text-ink-2">
               {deployReadiness.ready}/{deployReadiness.checks.length}
             </span>
           </div>
           <div className="mt-4 grid gap-2">
             {deployReadiness.checks.map((check) => (
               <div
-                className="flex items-center justify-between gap-3 rounded-lg border border-[#e2e6df] p-3"
+                className="flex items-center justify-between gap-3 rounded-lg border border-line p-3"
                 key={check.label}
               >
                 <div className="min-w-0">
                   <p className="text-sm font-semibold">{check.label}</p>
-                  <p className="mt-1 text-xs text-[#647067]">
+                  <p className="mt-1 text-xs text-muted">
                     {check.description}
                   </p>
                 </div>
                 <span
                   className={`shrink-0 rounded-lg px-2 py-1 text-xs ${
                     check.ready
-                      ? "bg-[#e7f6ce] text-[#31521d]"
+                      ? "bg-yellow-soft text-ink"
                       : "bg-amber-50 text-amber-800"
                   }`}
                 >
@@ -413,7 +416,7 @@ export default async function Home({
           </div>
           {platformAdmin ? (
             <a
-              className="mt-3 inline-flex h-9 items-center justify-center rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium text-[#20231f]"
+              className="mt-3 inline-flex h-9 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink"
               href="/api/health/readiness"
               target="_blank"
             >
@@ -423,15 +426,15 @@ export default async function Home({
         </section>
       )}
 
-      <section className="rounded-lg border border-[#d9ded3] bg-white p-4">
+      <section className="rounded-lg border border-line bg-white p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold">Vista agencia</h2>
-            <p className="mt-1 text-sm text-[#647067]">
+            <p className="mt-1 text-sm text-muted">
               Workspaces visibles para tu usuario.
             </p>
           </div>
-          <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
+          <span className="rounded-lg bg-paper-2 px-2 py-1 text-xs text-ink-2">
             {agencyCards.length}
           </span>
         </div>
@@ -441,8 +444,8 @@ export default async function Home({
               <div
                 className={`rounded-lg border p-3 ${
                   agencyWorkspace.id === workspaceId
-                    ? "border-[#35735b] bg-[#eef6df]"
-                    : "border-[#e2e6df]"
+                    ? "border-ink bg-yellow-soft"
+                    : "border-line"
                 }`}
                 key={agencyWorkspace.id}
               >
@@ -451,11 +454,11 @@ export default async function Home({
                     <p className="truncate text-sm font-semibold">
                       {agencyWorkspace.name}
                     </p>
-                    <p className="mt-1 text-xs text-[#647067]">
+                    <p className="mt-1 text-xs text-muted">
                       {agencyWorkspace.companyCode ?? agencyWorkspace.slug} - {agencyWorkspace.role}
                     </p>
                   </div>
-                  <span className="rounded-lg bg-white px-2 py-1 text-xs text-[#4d5a51]">
+                  <span className="rounded-lg bg-white px-2 py-1 text-xs text-ink-2">
                     {agencyWorkspace.status}
                   </span>
                 </div>
@@ -464,19 +467,19 @@ export default async function Home({
                     <p className="font-semibold">
                       {agencyWorkspace.conversationCount}
                     </p>
-                    <p className="text-[#647067]">Chats</p>
+                    <p className="text-muted">Chats</p>
                   </div>
                   <div className="rounded-lg bg-white p-2">
                     <p className="font-semibold">
                       {agencyWorkspace.memberCount}
                     </p>
-                    <p className="text-[#647067]">Equipo</p>
+                    <p className="text-muted">Equipo</p>
                   </div>
                   <div className="rounded-lg bg-white p-2">
                     <p className="font-semibold">
                       {agencyWorkspace.handoffCount}
                     </p>
-                    <p className="text-[#647067]">Handoff</p>
+                    <p className="text-muted">Handoff</p>
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
@@ -484,8 +487,8 @@ export default async function Home({
                     <span
                       className={`rounded-lg px-2 py-1 text-xs ${
                         agencyWorkspace.activeProviders.includes(provider)
-                          ? "bg-[#e7f6ce] text-[#31521d]"
-                          : "bg-[#eef2eb] text-[#647067]"
+                          ? "bg-yellow-soft text-ink"
+                          : "bg-paper-2 text-muted"
                       }`}
                       key={provider}
                     >
@@ -496,7 +499,7 @@ export default async function Home({
               </div>
             ))
           ) : (
-            <p className="rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
+            <p className="rounded-lg border border-dashed border-line p-3 text-sm text-muted">
               No hay workspaces visibles todavía.
             </p>
           )}
@@ -521,17 +524,17 @@ export default async function Home({
       ) : null}
 
       <section
-        className="scroll-mt-5 rounded-lg border border-[#d9ded3] bg-white"
+        className="scroll-mt-5 rounded-lg border border-line bg-white"
         id="inbox"
       >
-        <div className="flex items-center justify-between border-b border-[#e2e6df] px-4 py-3">
+        <div className="flex items-center justify-between border-b border-line px-4 py-3">
           <div>
             <h2 className="text-base font-semibold">Inbox vivo</h2>
-            <p className="text-sm text-[#647067]">
+            <p className="text-sm text-muted">
               Conversaciones y mensajes del número conectado.
             </p>
           </div>
-          <span className="rounded-lg bg-[#e7f6ce] px-2.5 py-1 text-xs font-semibold text-[#31521d]">
+          <span className="rounded-lg bg-yellow-soft px-2.5 py-1 text-xs font-semibold text-ink">
             {realConversations.length > 0 ? "En vivo" : "Contactos"}
           </span>
         </div>

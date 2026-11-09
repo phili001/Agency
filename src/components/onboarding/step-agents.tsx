@@ -26,6 +26,8 @@ import {
   readApiError,
 } from "./shared";
 import type { StepContext, WizardAgent } from "./wizard";
+import { onboardingStepEyebrow } from "@/lib/onboarding-steps";
+import { clientFetch } from "@/lib/client-fetch";
 
 const roleCopy: Record<string, { label: string; what: string }> = {
   booking: {
@@ -114,7 +116,7 @@ export function StepAgents({ ctx }: { ctx: StepContext }) {
 
     setSavingMode(true);
     setError("");
-    const response = await fetch("/api/workspaces", {
+    const response = await clientFetch("/api/workspaces", {
       body: JSON.stringify({
         action: "set_default_conversation_mode",
         defaultConversationMode: mode,
@@ -195,7 +197,7 @@ export function StepAgents({ ctx }: { ctx: StepContext }) {
 
     ctx.setAgents(updated);
 
-    const response = await fetch("/api/workspaces", {
+    const response = await clientFetch("/api/workspaces", {
       body: JSON.stringify({ action: "confirm_agents", workspaceId: ctx.workspace.id }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
@@ -214,7 +216,7 @@ export function StepAgents({ ctx }: { ctx: StepContext }) {
   return (
     <div className="grid gap-6">
       <StepHeading
-        eyebrow="Paso 2 · Tus agentes"
+        eyebrow={onboardingStepEyebrow("agents", "Tus agentes")}
         title="Conoce a tus agentes"
         description="Ya vienen listos y entrenados con lo que escribiste de tu negocio. Aquí decides cómo hablan, cuáles trabajan y, si quieres, afinas sus instrucciones."
       />
@@ -246,21 +248,21 @@ export function StepAgents({ ctx }: { ctx: StepContext }) {
             <div
               className={`grid gap-3 rounded-xl border p-4 ${
                 draft.isActive
-                  ? "border-[#e2e6df] bg-[#fafbf8]"
-                  : "border-dashed border-[#cbd2c6] bg-white"
+                  ? "border-line bg-paper-2"
+                  : "border-dashed border-line bg-white"
               }`}
               key={agent.id}
             >
               <div className="grid gap-3 md:grid-cols-[1fr_220px_auto] md:items-start">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#35735b]">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-ink">
                     Agente de {copy.label.toLowerCase()}
                   </p>
-                  <p className="mt-1 text-sm leading-relaxed text-[#4d5a51]">{copy.what}</p>
+                  <p className="mt-1 text-sm leading-relaxed text-ink-2">{copy.what}</p>
                   {keywords.length > 0 ? (
-                    <p className="mt-2 text-sm text-[#647067]">
+                    <p className="mt-2 text-sm text-muted">
                       Pasa el chat a una persona si el cliente dice:{" "}
-                      <span className="font-medium text-[#20231f]">{keywords.join(", ")}</span>.
+                      <span className="font-medium text-ink">{keywords.join(", ")}</span>.
                     </p>
                   ) : null}
                 </div>
@@ -278,16 +280,16 @@ export function StepAgents({ ctx }: { ctx: StepContext }) {
                     label={`Activar ${draft.name}`}
                     onChange={() => updateDraft(agent.id, { isActive: !draft.isActive })}
                   />
-                  <span className="text-sm font-medium text-[#4d5a51]">
+                  <span className="text-sm font-medium text-ink-2">
                     {draft.isActive ? "Activo" : "Pausado"}
                   </span>
                 </div>
               </div>
 
-              <div className="border-t border-[#e2e6df] pt-3">
+              <div className="border-t border-line pt-3">
                 <button
                   aria-expanded={open}
-                  className="flex items-center gap-1.5 text-sm font-medium text-[#35735b]"
+                  className="flex items-center gap-1.5 text-sm font-medium text-ink"
                   onClick={() => setOpenAgentId(open ? "" : agent.id)}
                   type="button"
                 >
@@ -323,7 +325,7 @@ export function StepAgents({ ctx }: { ctx: StepContext }) {
                         value={draft.restrictions}
                       />
                     </Field>
-                    <p className="text-sm text-[#647067]">
+                    <p className="text-sm text-muted">
                       Lo que escribas entre llaves, como {"{company_name}"} o{" "}
                       {"{business_hours}"}, se cambia solo por los datos de tu negocio.
                     </p>
@@ -382,8 +384,8 @@ export function StepAgents({ ctx }: { ctx: StepContext }) {
                 aria-pressed={active}
                 className={`grid gap-2 rounded-xl border-2 p-4 text-left transition ${
                   active
-                    ? "border-[#10231c] bg-[#eef6df]"
-                    : "border-[#e2e6df] bg-white hover:border-[#cbd2c6]"
+                    ? "border-ink bg-yellow-soft"
+                    : "border-line bg-white hover:border-line"
                 }`}
                 disabled={savingMode}
                 key={option.value}
@@ -394,7 +396,7 @@ export function StepAgents({ ctx }: { ctx: StepContext }) {
                   <option.icon size={18} />
                   {option.label}
                 </span>
-                <span className="text-sm text-[#4d5a51]">{option.description}</span>
+                <span className="text-sm text-ink-2">{option.description}</span>
               </button>
             );
           })}

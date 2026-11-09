@@ -1,16 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Figtree, Inter } from "next/font/google";
 import "./globals.css";
 
 import { normalizeAppUrl } from "@/lib/app-url";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Inter para el texto y Figtree para los títulos, como en el sistema de diseño.
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const figtree = Figtree({
+  variable: "--font-figtree",
   subsets: ["latin"],
 });
 
@@ -47,7 +48,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#10231c",
+  themeColor: "#ffffff",
   width: "device-width",
   initialScale: 1,
 };
@@ -60,7 +61,7 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${figtree.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

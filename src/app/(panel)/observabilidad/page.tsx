@@ -3,6 +3,10 @@ import { WalletCards } from "lucide-react";
 import { PanelPage } from "@/components/panel/panel-header";
 import { getPanelContext } from "@/lib/panel-context";
 import { getDeployReadiness, stableNumber } from "@/lib/panel-data";
+import type { Metadata } from "next";
+import { sectionTitles } from "@/lib/panel-data";
+
+export const metadata: Metadata = { title: sectionTitles.observability.title };
 
 export default async function ObservabilityPage() {
   const { platformAdmin, supabase, workspace, workspaceId } =
@@ -26,25 +30,25 @@ export default async function ObservabilityPage() {
   return (
     <PanelPage hasWorkspace={Boolean(workspace)} section="observability">
       <>
-        <section className="rounded-lg border border-[#d9ded3] bg-white p-4">
+        <section className="rounded-lg border border-line bg-white p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold">Consumo de IA</h2>
-              <p className="mt-1 text-sm text-[#647067]">
+              <p className="mt-1 text-sm text-muted">
                 Últimos {stableNumber(usageEvents.length)} eventos registrados.
               </p>
             </div>
-            <WalletCards className="text-[#35735b]" size={20} />
+            <WalletCards className="text-ink" size={20} />
           </div>
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            <div className="rounded-lg border border-[#e2e6df] p-3">
-              <p className="text-xs text-[#647067]">Coste acumulado</p>
+            <div className="rounded-lg border border-line p-3">
+              <p className="text-xs text-muted">Coste acumulado</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">
                 ${totalCost.toFixed(2)}
               </p>
             </div>
-            <div className="rounded-lg border border-[#e2e6df] p-3">
-              <p className="text-xs text-[#647067]">Tokens</p>
+            <div className="rounded-lg border border-line p-3">
+              <p className="text-xs text-muted">Tokens</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">
                 {stableNumber(
                   usageEvents.reduce(
@@ -63,36 +67,36 @@ export default async function ObservabilityPage() {
         </section>
 
         <section
-          className="rounded-lg border border-[#d9ded3] bg-white p-4"
+          className="rounded-lg border border-line bg-white p-4"
           id="observability"
         >
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold">Deploy readiness</h2>
-              <p className="mt-1 text-sm text-[#647067]">
+              <p className="mt-1 text-sm text-muted">
                 Variables necesarias para producción.
               </p>
             </div>
-            <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
+            <span className="rounded-lg bg-paper-2 px-2 py-1 text-xs text-ink-2">
               {readyDeployChecks}/{deployReadiness.length}
             </span>
           </div>
           <div className="mt-4 grid gap-2 md:grid-cols-2">
             {deployReadiness.map((check) => (
               <div
-                className="flex items-center justify-between gap-3 rounded-lg border border-[#e2e6df] p-3"
+                className="flex items-center justify-between gap-3 rounded-lg border border-line p-3"
                 key={check.label}
               >
                 <div className="min-w-0">
                   <p className="text-sm font-semibold">{check.label}</p>
-                  <p className="mt-1 text-xs text-[#647067]">
+                  <p className="mt-1 text-xs text-muted">
                     {check.description}
                   </p>
                 </div>
                 <span
                   className={`shrink-0 rounded-lg px-2 py-1 text-xs ${
                     check.ready
-                      ? "bg-[#e7f6ce] text-[#31521d]"
+                      ? "bg-yellow-soft text-ink"
                       : "bg-amber-50 text-amber-800"
                   }`}
                 >
@@ -103,7 +107,7 @@ export default async function ObservabilityPage() {
           </div>
           {platformAdmin ? (
             <a
-              className="mt-3 inline-flex h-9 items-center justify-center rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium text-[#20231f]"
+              className="mt-3 inline-flex h-9 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink"
               href="/api/health/readiness"
               target="_blank"
             >

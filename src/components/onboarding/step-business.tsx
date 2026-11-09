@@ -45,6 +45,7 @@ import {
   inputClass,
 } from "./shared";
 import type { StepContext } from "./wizard";
+import { onboardingStepEyebrow } from "@/lib/onboarding-steps";
 
 const OTHER_CITY = "__otra__";
 
@@ -238,7 +239,7 @@ export function StepBusiness({ ctx }: { ctx: StepContext }) {
   return (
     <div className="grid gap-6">
       <StepHeading
-        eyebrow="Paso 1 · Tu negocio"
+        eyebrow={onboardingStepEyebrow("business", "Tu negocio")}
         title={
           part === 0
             ? "Cuéntale a Levy sobre tu negocio"
@@ -328,7 +329,7 @@ export function StepBusiness({ ctx }: { ctx: StepContext }) {
                 </Field>
               ) : (
                 <button
-                  className="justify-self-start text-sm font-medium text-[#35735b] underline-offset-4 hover:underline"
+                  className="justify-self-start text-sm font-medium text-ink underline-offset-4 hover:underline"
                   onClick={() => setShowExtraServices(true)}
                   type="button"
                 >
@@ -345,7 +346,7 @@ export function StepBusiness({ ctx }: { ctx: StepContext }) {
             <div className="flex flex-wrap gap-2">
               {weekdayPresets.map((preset) => (
                 <button
-                  className="rounded-full border border-dashed border-[#cbd2c6] px-3 py-1.5 text-sm text-[#4d5a51] hover:border-[#35735b] hover:text-[#20231f]"
+                  className="rounded-full border border-dashed border-line px-3 py-1.5 text-sm text-ink-2 hover:border-ink hover:text-ink"
                   key={preset.label}
                   onClick={() => patch({ days: [...preset.days] })}
                   type="button"
@@ -360,8 +361,8 @@ export function StepBusiness({ ctx }: { ctx: StepContext }) {
                   aria-pressed={choices.days.includes(day.key)}
                   className={`size-12 rounded-xl border-2 text-sm font-semibold transition ${
                     choices.days.includes(day.key)
-                      ? "border-[#10231c] bg-[#10231c] text-white"
-                      : "border-[#e2e6df] bg-white text-[#4d5a51] hover:border-[#cbd2c6]"
+                      ? "border-ink bg-ink text-paper"
+                      : "border-line bg-white text-ink-2 hover:border-line"
                   }`}
                   key={day.key}
                   onClick={() => patch({ days: toggle(choices.days, day.key) })}
@@ -455,14 +456,14 @@ export function StepBusiness({ ctx }: { ctx: StepContext }) {
                     <div
                       className={
                         several
-                          ? "grid gap-3 rounded-xl border border-[#e2e6df] bg-[#fafbf8] p-3"
+                          ? "grid gap-3 rounded-xl border border-line bg-paper-2 p-3"
                           : "grid gap-3"
                       }
                       key={location.id}
                     >
                       {several ? (
                         <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-semibold text-[#20231f]">
+                          <p className="text-sm font-semibold text-ink">
                             {choices.attendMode === "domicilio"
                               ? `Ciudad ${index + 1}`
                               : location.venue.trim() || `Local ${index + 1}`}
@@ -490,7 +491,7 @@ export function StepBusiness({ ctx }: { ctx: StepContext }) {
                           />
                           {cityOptions.length > 0 ? (
                             <button
-                              className="justify-self-start text-sm font-medium text-[#35735b] underline-offset-4 hover:underline"
+                              className="justify-self-start text-sm font-medium text-ink underline-offset-4 hover:underline"
                               onClick={() => {
                                 setFreeCityIds((current) =>
                                   current.filter((item) => item !== location.id),
@@ -561,7 +562,7 @@ export function StepBusiness({ ctx }: { ctx: StepContext }) {
               </div>
 
               <button
-                className="inline-flex items-center gap-1.5 justify-self-start rounded-full border border-dashed border-[#cbd2c6] px-3.5 py-2 text-sm font-medium text-[#4d5a51] hover:border-[#35735b] hover:text-[#20231f]"
+                className="inline-flex items-center gap-1.5 justify-self-start rounded-full border border-dashed border-line px-3.5 py-2 text-sm font-medium text-ink-2 hover:border-ink hover:text-ink"
                 onClick={addLocation}
                 type="button"
               >
@@ -640,13 +641,13 @@ export function StepBusiness({ ctx }: { ctx: StepContext }) {
             ) : null}
 
             {countryZones.length === 1 && !showTimeZone ? (
-              <p className="flex flex-wrap items-center gap-2 rounded-xl border border-[#e2e6df] bg-[#fafbf8] px-3 py-2.5">
-                <span className="font-semibold text-[#20231f]">
+              <p className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-paper-2 px-3 py-2.5">
+                <span className="font-semibold text-ink">
                   {countryZones[0].label}
                 </span>
-                <span className="text-[#647067]">{getZoneOffsetLabel(countryZones[0].key)}</span>
+                <span className="text-muted">{getZoneOffsetLabel(countryZones[0].key)}</span>
                 <button
-                  className="font-medium text-[#35735b] underline-offset-4 hover:underline"
+                  className="font-medium text-ink underline-offset-4 hover:underline"
                   onClick={() => setShowTimeZone(true)}
                   type="button"
                 >

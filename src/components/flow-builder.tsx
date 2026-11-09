@@ -34,6 +34,7 @@ import {
   type FlowStage,
 } from "@/lib/flow-definitions";
 import type { Json } from "@/lib/supabase/database.types";
+import { clientFetch } from "@/lib/client-fetch";
 
 type AgentItem = {
   id: string;
@@ -167,7 +168,7 @@ function TriggerConfigEditor({
       <label className="grid gap-1.5 text-sm font-medium">
         Palabra clave
         <input
-          className="h-10 rounded-lg border border-[#cbd2c6] px-3 outline-none"
+          className="h-10 w-full min-w-0 rounded-lg border border-line px-3 outline-none"
           onChange={(event) =>
             onChange({
               trigger_config: { ...triggerConfig, keyword: event.target.value },
@@ -185,7 +186,7 @@ function TriggerConfigEditor({
       <label className="grid gap-1.5 text-sm font-medium">
         Clave externa
         <input
-          className="h-10 rounded-lg border border-[#cbd2c6] px-3 outline-none"
+          className="h-10 w-full min-w-0 rounded-lg border border-line px-3 outline-none"
           onChange={(event) =>
             onChange({
               trigger_config: { ...triggerConfig, flowKey: event.target.value },
@@ -204,7 +205,7 @@ function TriggerConfigEditor({
       <label className="grid gap-1.5 text-sm font-medium">
         Etiqueta que lo dispara
         <select
-          className="h-10 rounded-lg border border-[#cbd2c6] px-3 outline-none"
+          className="h-10 w-full min-w-0 rounded-lg border border-line px-3 outline-none"
           onChange={(event) => {
             const tag = tags.find((item) => item.id === event.target.value);
             onChange({
@@ -223,11 +224,11 @@ function TriggerConfigEditor({
           ))}
         </select>
         {!selectedTagId && triggerConfig.tag ? (
-          <span className="text-xs font-normal text-[#647067]">
+          <span className="text-xs font-normal text-muted">
             Guardado por nombre: «{String(triggerConfig.tag)}». Elige la etiqueta de la lista para fijarla.
           </span>
         ) : (
-          <span className="text-xs font-normal text-[#647067]">
+          <span className="text-xs font-normal text-muted">
             Arranca cuando se le pone esta etiqueta al contacto (desde el panel, un flujo o el agente).
           </span>
         )}
@@ -240,7 +241,7 @@ function TriggerConfigEditor({
       <label className="grid gap-1.5 text-sm font-medium">
         Quien entra
         <select
-          className="h-10 rounded-lg border border-[#cbd2c6] px-3 outline-none"
+          className="h-10 w-full min-w-0 rounded-lg border border-line px-3 outline-none"
           onChange={(event) => {
             const nextAudience = event.target.value as FlowAudience;
             onChange({
@@ -268,7 +269,7 @@ function TriggerConfigEditor({
         <label className="grid gap-1.5 text-sm font-medium">
           Etiquetas requeridas
           <input
-            className="h-10 rounded-lg border border-[#cbd2c6] px-3 outline-none"
+            className="h-10 w-full min-w-0 rounded-lg border border-line px-3 outline-none"
             onChange={(event) =>
               onChange({
                 trigger_config: {
@@ -292,7 +293,7 @@ function TriggerConfigEditor({
       <label className="flex items-start gap-2 text-sm">
         <input
           checked={triggerConfig.allowRepeat === true}
-          className="mt-0.5 h-4 w-4 accent-[#35735b]"
+          className="mt-0.5 h-4 w-4 accent-ink"
           onChange={(event) =>
             onChange({
               trigger_config: {
@@ -305,7 +306,7 @@ function TriggerConfigEditor({
         />
         <span>
           <span className="block font-semibold">Permitir repetir flujo</span>
-          <span className="block text-xs text-[#647067]">
+          <span className="block text-xs text-muted">
             Desactivado evita que un contacto terminado vuelva al onboarding.
           </span>
         </span>
@@ -315,7 +316,7 @@ function TriggerConfigEditor({
   );
 }
 
-const inputClass = "h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none";
+const inputClass = "h-9 rounded-lg border border-line px-3 text-sm outline-none";
 
 function CrmActionFields({
   action,
@@ -394,7 +395,7 @@ function CrmActionFields({
 
   if (action.type === "create_task") {
     return (
-      <div className="grid gap-2 md:grid-cols-[1fr_140px]">
+      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_140px]">
         <input
           className={inputClass}
           onChange={(event) => onPatch({ taskTitle: event.target.value })}
@@ -416,7 +417,7 @@ function CrmActionFields({
   if (action.type === "add_note") {
     return (
       <textarea
-        className="min-h-20 rounded-lg border border-[#cbd2c6] px-3 py-2 text-sm outline-none"
+        className="min-h-20 rounded-lg border border-line px-3 py-2 text-sm outline-none"
         onChange={(event) => onPatch({ noteBody: event.target.value })}
         placeholder="Texto de la nota. Admite {{respuesta}}."
         value={action.noteBody ?? ""}
@@ -427,7 +428,7 @@ function CrmActionFields({
   return (
     <div className="grid gap-2">
       <select
-        className={`${inputClass} disabled:bg-[#f2f4f0] disabled:text-[#9aa59e]`}
+        className={`${inputClass} disabled:bg-paper-2 disabled:text-faint`}
         disabled={crm.agendas.length === 0}
         onChange={(event) => onPatch({ agendaId: event.target.value || undefined })}
         value={action.agendaId ?? ""}
@@ -439,7 +440,7 @@ function CrmActionFields({
           </option>
         ))}
       </select>
-      <p className="text-xs text-[#647067]">
+      <p className="text-xs text-muted">
         A partir de aquí, el agente de citas agenda a este contacto en esta agenda.
       </p>
     </div>
@@ -466,11 +467,11 @@ function ActionsEditor({
   }
 
   return (
-    <div className="rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3">
+    <div className="rounded-lg border border-line bg-paper-2 p-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-semibold">Acciones del CRM al ejecutar</p>
         <button
-          className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#cbd2c6] bg-white px-2 text-xs font-medium"
+          className="inline-flex h-8 items-center gap-1 rounded-lg border border-line bg-white px-2 text-xs font-medium"
           onClick={() => replaceCrm([...crmActions, { engine: "crm", label: "Nueva acción", type: "add_tag" }])}
           type="button"
         >
@@ -480,8 +481,8 @@ function ActionsEditor({
       </div>
       <div className="mt-3 grid gap-2">
         {crmActions.map((action, index) => (
-          <div className="grid gap-2 rounded-lg border border-[#e2e6df] bg-white p-3" key={index}>
-            <div className="grid gap-2 md:grid-cols-[1fr_200px_auto]">
+          <div className="grid gap-2 rounded-lg border border-line bg-white p-3" key={index}>
+            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_200px_auto]">
               <input
                 className={inputClass}
                 onChange={(event) => patchAction(index, { label: event.target.value })}
@@ -546,26 +547,26 @@ function StepEditor({
     getStageLabel(step.stageKey);
 
   return (
-    <div className="rounded-lg border border-[#d9ded3] bg-white p-4">
+    <div className="rounded-lg border border-line bg-white p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold uppercase text-[#647067]">
+          <p className="text-xs font-semibold uppercase text-muted">
             {stageLabel}
           </p>
           <h3 className="text-base font-semibold">Configuración del paso</h3>
         </div>
-        <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
+        <span className="rounded-lg bg-paper-2 px-2 py-1 text-xs text-ink-2">
           {stepType?.label ?? step.type}
         </span>
       </div>
-      <div className="grid gap-3 md:grid-cols-[1fr_180px_auto_auto_auto]">
+      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto_auto_auto]">
         <input
-          className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm font-semibold outline-none"
+          className="h-10 rounded-lg border border-line px-3 text-sm font-semibold outline-none"
           onChange={(event) => onChange({ ...step, name: event.target.value })}
           value={step.name}
         />
         <select
-          className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+          className="h-10 rounded-lg border border-line px-3 text-sm outline-none"
           onChange={(event) =>
             onChange({ ...step, type: event.target.value as FlowStepType })
           }
@@ -579,7 +580,7 @@ function StepEditor({
         </select>
         <button
           aria-label="Subir paso"
-          className="inline-flex h-10 items-center justify-center rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium disabled:opacity-40"
+          className="inline-flex h-10 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium disabled:opacity-40"
           disabled={!canMoveUp}
           onClick={onMoveUp}
           title="Subir paso"
@@ -589,7 +590,7 @@ function StepEditor({
         </button>
         <button
           aria-label="Bajar paso"
-          className="inline-flex h-10 items-center justify-center rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium disabled:opacity-40"
+          className="inline-flex h-10 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium disabled:opacity-40"
           disabled={!canMoveDown}
           onClick={onMoveDown}
           title="Bajar paso"
@@ -607,13 +608,13 @@ function StepEditor({
           <Trash2 size={15} />
         </button>
       </div>
-      <p className="mt-2 text-xs text-[#647067]">{stepType?.description}</p>
+      <p className="mt-2 text-xs text-muted">{stepType?.description}</p>
 
-      <div className="mt-3 grid gap-2 rounded-lg border border-[#d9ded3] bg-[#fafbf8] p-3">
+      <div className="mt-3 grid gap-2 rounded-lg border border-line bg-paper-2 p-3">
         <label className="flex items-start gap-2 text-sm">
           <input
             checked={step.requiredForStage !== false}
-            className="mt-0.5 h-4 w-4 accent-[#35735b]"
+            className="mt-0.5 h-4 w-4 accent-ink"
             onChange={(event) =>
               onChange({ ...step, requiredForStage: event.target.checked })
             }
@@ -621,16 +622,16 @@ function StepEditor({
           />
           <span>
             <span className="block font-semibold">Requisito para avanzar de etapa</span>
-            <span className="block text-xs text-[#647067]">
+            <span className="block text-xs text-muted">
               El cliente no completa esta etapa hasta que este paso tenga check.
             </span>
           </span>
         </label>
         {step.type === "message" ? (
-          <label className="flex items-start gap-2 border-t border-[#e2e6df] pt-2 text-sm">
+          <label className="flex items-start gap-2 border-t border-line pt-2 text-sm">
             <input
               checked={step.waitForInbound !== false}
-              className="mt-0.5 h-4 w-4 accent-[#35735b]"
+              className="mt-0.5 h-4 w-4 accent-ink"
               onChange={(event) =>
                 onChange({ ...step, waitForInbound: event.target.checked })
               }
@@ -640,9 +641,9 @@ function StepEditor({
               <span className="block font-semibold">
                 Esperar que el cliente vuelva a escribir
               </span>
-              <span className="block text-xs text-[#647067]">
-                Envia este mensaje, marca el check y continua el siguiente paso con
-                el próximo mensaje del cliente.
+              <span className="block text-xs text-muted">
+                Envía este mensaje, marca el check y pasa al siguiente paso cuando
+                el cliente vuelva a escribir.
               </span>
             </span>
           </label>
@@ -652,7 +653,7 @@ function StepEditor({
       <label className="mt-3 grid gap-1.5 text-sm font-medium">
         Etapa del pipeline
         <select
-          className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+          className="h-10 rounded-lg border border-line px-3 text-sm outline-none"
           onChange={(event) => onChange({ ...step, stageKey: event.target.value })}
           value={step.stageKey ?? "inicio"}
         >
@@ -668,7 +669,7 @@ function StepEditor({
         <label className="mt-3 grid gap-1.5 text-sm font-medium">
           Mensaje WhatsApp
           <textarea
-            className="min-h-28 rounded-lg border border-[#cbd2c6] p-3 text-sm outline-none"
+            className="min-h-28 rounded-lg border border-line p-3 text-sm outline-none"
             onChange={(event) => onChange({ ...step, message: event.target.value })}
             value={step.message ?? ""}
           />
@@ -679,7 +680,7 @@ function StepEditor({
         <label className="mt-3 grid gap-1.5 text-sm font-medium">
           Guardar respuesta en campo Levy
           <input
-            className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+            className="h-10 rounded-lg border border-line px-3 text-sm outline-none"
             onChange={(event) => onChange({ ...step, fieldKey: event.target.value })}
             placeholder="Ej: tipo_negocio"
             value={step.fieldKey ?? ""}
@@ -688,16 +689,16 @@ function StepEditor({
       ) : null}
 
       {step.type === "options" ? (
-        <div className="mt-3 grid gap-2 rounded-lg border border-[#d9ded3] bg-[#fafbf8] p-3">
+        <div className="mt-3 grid gap-2 rounded-lg border border-line bg-paper-2 p-3">
           <div className="flex items-center justify-between gap-2">
             <div>
               <p className="text-sm font-semibold">Opciones de WhatsApp</p>
-              <p className="text-xs text-[#647067]">
+              <p className="text-xs text-muted">
                 Hasta tres se muestran como botones; cuatro o mas, como lista seleccionable.
               </p>
             </div>
             <button
-              className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#cbd2c6] bg-white px-2 text-xs font-medium"
+              className="inline-flex h-8 items-center gap-1 rounded-lg border border-line bg-white px-2 text-xs font-medium"
               onClick={() => {
                 const optionNumber = (step.options?.length ?? 0) + 1;
                 onChange({
@@ -705,7 +706,7 @@ function StepEditor({
                   options: [
                     ...(step.options ?? []),
                     {
-                      label: `Opcion ${optionNumber}`,
+                      label: `Opción ${optionNumber}`,
                       value: `opcion_${optionNumber}`,
                     },
                   ],
@@ -714,16 +715,16 @@ function StepEditor({
               type="button"
             >
               <Plus size={13} />
-              Opcion
+              Opción
             </button>
           </div>
           {(step.options ?? []).map((option, optionIndex) => (
             <div
-              className="grid gap-2 rounded-lg border border-[#e2e6df] bg-white p-3 md:grid-cols-[1fr_1fr_1fr_auto]"
+              className="grid gap-2 rounded-lg border border-line bg-white p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
               key={`${option.value}-${optionIndex}`}
             >
               <input
-                className="h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+                className="h-9 rounded-lg border border-line px-3 text-sm outline-none"
                 onChange={(event) =>
                   onChange({
                     ...step,
@@ -736,7 +737,7 @@ function StepEditor({
                 value={option.label}
               />
               <input
-                className="h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+                className="h-9 rounded-lg border border-line px-3 text-sm outline-none"
                 onChange={(event) =>
                   onChange({
                     ...step,
@@ -749,7 +750,7 @@ function StepEditor({
                 value={option.value}
               />
               <select
-                className="h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+                className="h-9 rounded-lg border border-line px-3 text-sm outline-none"
                 onChange={(event) =>
                   onChange({
                     ...step,
@@ -790,11 +791,11 @@ function StepEditor({
       ) : null}
 
       {step.type === "question" ? (
-        <div className="mt-3 grid gap-3 rounded-lg border border-[#b9d3c3] bg-[#f3f8ed] p-3">
+        <div className="mt-3 grid gap-3 rounded-lg border border-line-strong bg-yellow-soft p-3">
           <label className="flex items-start gap-2 text-sm">
             <input
               checked={step.validationEnabled !== false}
-              className="mt-0.5 h-4 w-4 accent-[#35735b]"
+              className="mt-0.5 h-4 w-4 accent-ink"
               onChange={(event) =>
                 onChange({ ...step, validationEnabled: event.target.checked })
               }
@@ -802,7 +803,7 @@ function StepEditor({
             />
             <span>
               <span className="block font-semibold">Verificar respuesta con IA</span>
-              <span className="block text-xs text-[#647067]">
+              <span className="block text-xs text-muted">
                 Solo una respuesta aprobada guarda el campo y completa el check.
               </span>
             </span>
@@ -812,18 +813,18 @@ function StepEditor({
               <label className="grid gap-1.5 text-sm font-medium">
                 Criterio esperado
                 <textarea
-                  className="min-h-20 rounded-lg border border-[#cbd2c6] bg-white p-3 text-sm outline-none"
+                  className="min-h-20 rounded-lg border border-line bg-white p-3 text-sm outline-none"
                   onChange={(event) =>
                     onChange({ ...step, validationCriteria: event.target.value })
                   }
-                  placeholder="Que información debe contener para considerarse completa."
+                  placeholder="Qué información debe contener para considerarse completa."
                   value={step.validationCriteria ?? ""}
                 />
               </label>
               <label className="grid gap-1.5 text-sm font-medium">
                 Mensaje cuando no pasa
                 <textarea
-                  className="min-h-20 rounded-lg border border-[#cbd2c6] bg-white p-3 text-sm outline-none"
+                  className="min-h-20 rounded-lg border border-line bg-white p-3 text-sm outline-none"
                   onChange={(event) =>
                     onChange({ ...step, retryMessage: event.target.value })
                   }
@@ -833,7 +834,7 @@ function StepEditor({
               <label className="grid gap-1.5 text-sm font-medium">
                 Mínimo de caracteres útiles
                 <input
-                  className="h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 outline-none"
+                  className="h-10 rounded-lg border border-line bg-white px-3 outline-none"
                   min={1}
                   onChange={(event) =>
                     onChange({
@@ -855,7 +856,7 @@ function StepEditor({
           <label className="grid gap-1.5 text-sm font-medium">
             Cantidad
             <input
-              className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+              className="h-10 rounded-lg border border-line px-3 text-sm outline-none"
               min={1}
               onChange={(event) =>
                 onChange({ ...step, waitAmount: Number(event.target.value) })
@@ -867,7 +868,7 @@ function StepEditor({
           <label className="grid gap-1.5 text-sm font-medium">
             Unidad
             <select
-              className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+              className="h-10 rounded-lg border border-line px-3 text-sm outline-none"
               onChange={(event) =>
                 onChange({
                   ...step,
@@ -888,7 +889,7 @@ function StepEditor({
         <label className="mt-3 grid gap-1.5 text-sm font-medium">
           Agente destino opcional
           <select
-            className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+            className="h-10 rounded-lg border border-line px-3 text-sm outline-none"
             onChange={(event) => onChange({ ...step, agentId: event.target.value })}
             value={step.agentId ?? ""}
           >
@@ -906,7 +907,7 @@ function StepEditor({
         <label className="mt-3 grid gap-1.5 text-sm font-medium">
           URL webhook externo
           <input
-            className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+            className="h-10 rounded-lg border border-line px-3 text-sm outline-none"
             onChange={(event) => onChange({ ...step, webhookUrl: event.target.value })}
             placeholder="https://..."
             value={step.webhookUrl ?? ""}
@@ -918,7 +919,7 @@ function StepEditor({
         <label className="mt-3 grid gap-1.5 text-sm font-medium">
           Siguiente paso
           <select
-            className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+            className="h-10 rounded-lg border border-line px-3 text-sm outline-none"
             onChange={(event) =>
               onChange({ ...step, nextStepId: event.target.value || undefined })
             }
@@ -984,7 +985,7 @@ export function FlowBuilder({
 
     setSaving("save");
     const pipelineSteps = orderAndLinkPipelineSteps(draft.steps, getFlowStages(draft));
-    const response = await fetch("/api/flows", {
+    const response = await clientFetch("/api/flows", {
       body: JSON.stringify({
         action: "save",
         description: draft.description,
@@ -1034,7 +1035,7 @@ export function FlowBuilder({
     }
 
     setSaving("template");
-    const response = await fetch("/api/flows", {
+    const response = await clientFetch("/api/flows", {
       body: JSON.stringify({
         action: "create_levy_template",
         workspaceId,
@@ -1067,14 +1068,14 @@ export function FlowBuilder({
       return;
     }
 
-    const confirmed = window.confirm(`Archivar "${draft.name}"? El flujo dejara de ejecutarse.`);
+    const confirmed = window.confirm(`¿Archivar «${draft.name}»? El flujo dejará de ejecutarse.`);
 
     if (!confirmed) {
       return;
     }
 
     setSaving("archive");
-    const response = await fetch("/api/flows", {
+    const response = await clientFetch("/api/flows", {
       body: JSON.stringify({
         action: "delete",
         flowId: draft.id,
@@ -1195,34 +1196,34 @@ export function FlowBuilder({
   }
 
   return (
-    <section className="grid gap-5 xl:grid-cols-[330px_1fr]">
-      <aside className="rounded-lg border border-[#d9ded3] bg-white p-4">
+    <section className="grid gap-5 xl:grid-cols-[330px_minmax(0,1fr)]">
+      <aside className="rounded-lg border border-line bg-white p-4">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <p className="text-xs font-semibold uppercase text-[#647067]">Builder</p>
+            <p className="text-xs font-semibold uppercase text-muted">Builder</p>
             <h2 className="text-lg font-semibold">Flujos</h2>
           </div>
-          <Workflow className="text-[#35735b]" size={22} />
+          <Workflow className="text-ink" size={22} />
         </div>
         <div className="mt-4 grid grid-cols-3 gap-2">
-          <div className="rounded-lg border border-[#e2e6df] p-2">
+          <div className="rounded-lg border border-line p-2">
             <p className="text-lg font-semibold">{draft?.steps.length ?? 0}</p>
-            <p className="text-xs text-[#647067]">pasos</p>
+            <p className="text-xs text-muted">pasos</p>
           </div>
-          <div className="rounded-lg border border-[#e2e6df] p-2">
+          <div className="rounded-lg border border-line p-2">
             <p className="text-lg font-semibold">{activeFlows}</p>
-            <p className="text-xs text-[#647067]">activos</p>
+            <p className="text-xs text-muted">activos</p>
           </div>
-          <div className="rounded-lg border border-[#e2e6df] p-2">
+          <div className="rounded-lg border border-line p-2">
             <p className="text-lg font-semibold">{runs.length}</p>
-            <p className="text-xs text-[#647067]">runs</p>
+            <p className="text-xs text-muted">runs</p>
           </div>
         </div>
         <div className="mt-4 grid gap-2">
           {!draft ? (
             <>
               <button
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink"
                 onClick={createEmptyFlow}
                 type="button"
               >
@@ -1230,7 +1231,7 @@ export function FlowBuilder({
                 Crear flujo
               </button>
               <button
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium disabled:opacity-60"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line px-3 text-sm font-medium disabled:opacity-60"
                 disabled={saving === "template"}
                 onClick={createTemplate}
                 type="button"
@@ -1240,18 +1241,18 @@ export function FlowBuilder({
               </button>
             </>
           ) : (
-            <p className="rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3 text-xs text-[#647067]">
+            <p className="rounded-lg border border-line bg-paper-2 p-3 text-xs text-muted">
               En esta versión hay un solo flujo por empresa. La lista de abajo es el recorrido paso a paso.
             </p>
           )}
           {draft ? (
             <button
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line px-3 text-sm font-medium"
               onClick={addStage}
               type="button"
             >
               <Plus size={16} />
-              Anadir etapa
+              Añadir etapa
             </button>
           ) : null}
         </div>
@@ -1259,29 +1260,29 @@ export function FlowBuilder({
           {draft
             ? stagesWithSteps.map((stage, stageIndex) => (
                 <div
-                  className="rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-2"
+                  className="rounded-lg border border-line bg-paper-2 p-2"
                   key={stage.key}
                 >
                   <div className="flex items-center justify-between gap-2 px-1 py-1">
                     <div>
-                      <p className="text-xs font-semibold uppercase text-[#647067]">
+                      <p className="text-xs font-semibold uppercase text-muted">
                         Etapa {stageIndex + 1}
                       </p>
                       <input
-                        className="h-8 w-full rounded-lg border border-transparent bg-transparent text-sm font-semibold outline-none focus:border-[#cbd2c6] focus:bg-white focus:px-2"
+                        className="h-8 w-full rounded-lg border border-transparent bg-transparent text-sm font-semibold outline-none focus:border-line focus:bg-white focus:px-2"
                         onChange={(event) =>
                           updateStage(stage.key, { label: event.target.value })
                         }
                         value={stage.label}
                       />
                     </div>
-                    <span className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-[11px] text-[#4d5a51]">
+                    <span className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-[11px] text-ink-2">
                       <Check size={12} />
                       {stage.steps.filter((step) => step.requiredForStage !== false).length}
                     </span>
                   </div>
                   <input
-                    className="mb-2 h-7 w-full rounded-lg border border-transparent bg-transparent px-1 text-[11px] text-[#7a847c] outline-none focus:border-[#cbd2c6] focus:bg-white"
+                    className="mb-2 h-7 w-full rounded-lg border border-transparent bg-transparent px-1 text-[11px] text-muted outline-none focus:border-line focus:bg-white"
                     onChange={(event) =>
                       updateStage(stage.key, { description: event.target.value })
                     }
@@ -1294,8 +1295,8 @@ export function FlowBuilder({
               <button
                 className={`rounded-lg border bg-white p-3 text-left transition ${
                   selectedStep?.id === step.id
-                    ? "border-[#35735b] bg-[#f3f8ed]"
-                    : "border-[#e2e6df] hover:bg-[#fafbf8]"
+                    ? "border-ink bg-yellow-soft"
+                    : "border-line hover:bg-paper-2"
                 }`}
                 key={step.id}
                 onClick={() => setSelectedStepId(step.id)}
@@ -1306,8 +1307,8 @@ export function FlowBuilder({
                     <span
                       className={`inline-flex h-5 w-5 items-center justify-center rounded border ${
                         step.requiredForStage !== false
-                          ? "border-[#35735b] bg-[#e7f3ec] text-[#35735b]"
-                          : "border-[#cbd2c6] text-[#a0aaa2]"
+                          ? "border-ink bg-yellow-soft text-ink"
+                          : "border-line text-faint"
                       }`}
                       title={
                         step.requiredForStage !== false
@@ -1319,25 +1320,25 @@ export function FlowBuilder({
                     </span>
                     Paso {globalIndex + 1}
                   </p>
-                  <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-[11px] text-[#4d5a51]">
+                  <span className="rounded-lg bg-paper-2 px-2 py-1 text-[11px] text-ink-2">
                     {flowStepTypes.find((type) => type.value === step.type)?.label ?? step.type}
                   </span>
                 </div>
-                <p className="mt-1 truncate text-sm text-[#20231f]">{step.name}</p>
-                <p className="mt-1 text-xs text-[#7a847c]">
+                <p className="mt-1 truncate text-sm text-ink">{step.name}</p>
+                <p className="mt-1 text-xs text-muted">
                   {step.type === "question" || step.type === "options"
                     ? "Espera y guarda una respuesta"
                     : step.type === "wait"
                       ? "Continua al cumplirse el tiempo"
                       : step.type === "message" && step.waitForInbound !== false
-                        ? "Continua cuando el cliente escriba"
+                        ? "Continúa cuando el cliente escriba"
                         : "Se completa automáticamente"}
                 </p>
               </button>
                       );
                     })}
                     {stage.steps.length === 0 ? (
-                      <p className="rounded-lg border border-dashed border-[#d9ded3] bg-white p-2 text-xs text-[#7a847c]">
+                      <p className="rounded-lg border border-dashed border-line bg-white p-2 text-xs text-muted">
                         Sin pasos en esta etapa.
                       </p>
                     ) : null}
@@ -1346,7 +1347,7 @@ export function FlowBuilder({
               ))
             : null}
           {!draft ? (
-            <p className="rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
+            <p className="rounded-lg border border-dashed border-line p-3 text-sm text-muted">
               Crea un flujo desde cero o duplica la plantilla Levy.
             </p>
           ) : null}
@@ -1355,17 +1356,17 @@ export function FlowBuilder({
 
       <div className="grid gap-4">
         {!draft ? (
-          <div className="rounded-lg border border-dashed border-[#d9ded3] bg-white p-6 text-sm text-[#647067]">
+          <div className="rounded-lg border border-dashed border-line bg-white p-6 text-sm text-muted">
             Selecciona o crea un flujo para empezar.
           </div>
         ) : (
           <>
-            <div className="rounded-lg border border-[#d9ded3] bg-white p-4">
-              <div className="grid gap-3 lg:grid-cols-[1fr_180px_190px]">
+            <div className="rounded-lg border border-line bg-white p-4">
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_190px]">
                 <label className="grid gap-1.5 text-sm font-medium">
                   Nombre del flujo
                   <input
-                    className="h-10 rounded-lg border border-[#cbd2c6] px-3 outline-none"
+                    className="h-10 w-full min-w-0 rounded-lg border border-line px-3 outline-none"
                     onChange={(event) => updateDraft({ name: event.target.value })}
                     value={draft.name}
                   />
@@ -1373,7 +1374,7 @@ export function FlowBuilder({
                 <label className="grid gap-1.5 text-sm font-medium">
                   Estado
                   <select
-                    className="h-10 rounded-lg border border-[#cbd2c6] px-3 outline-none"
+                    className="h-10 w-full min-w-0 rounded-lg border border-line px-3 outline-none"
                     onChange={(event) =>
                       updateDraft({ status: event.target.value as FlowStatus })
                     }
@@ -1389,7 +1390,7 @@ export function FlowBuilder({
                 <label className="grid gap-1.5 text-sm font-medium">
                   Trigger
                   <select
-                    className="h-10 rounded-lg border border-[#cbd2c6] px-3 outline-none"
+                    className="h-10 w-full min-w-0 rounded-lg border border-line px-3 outline-none"
                     onChange={(event) =>
                       updateDraft({
                         trigger_config: {
@@ -1408,11 +1409,11 @@ export function FlowBuilder({
                   </select>
                 </label>
               </div>
-              <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_280px]">
+              <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_280px]">
                 <label className="grid gap-1.5 text-sm font-medium">
                   Descripción interna
                   <input
-                    className="h-10 rounded-lg border border-[#cbd2c6] px-3 outline-none"
+                    className="h-10 w-full min-w-0 rounded-lg border border-line px-3 outline-none"
                     onChange={(event) => updateDraft({ description: event.target.value })}
                     placeholder="Ej: onboarding para leads frios"
                     value={draft.description}
@@ -1420,17 +1421,17 @@ export function FlowBuilder({
                 </label>
                 <TriggerConfigEditor flow={draft} onChange={updateDraft} tags={crm.tags} />
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[#647067]">
-                <span className="inline-flex items-center gap-1 rounded-lg bg-[#eef2eb] px-2 py-1">
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
+                <span className="inline-flex items-center gap-1 rounded-lg bg-paper-2 px-2 py-1">
                   <GitBranch size={13} />
                   Company code: {workspaceCode ?? "sin código"}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-lg bg-[#eef2eb] px-2 py-1">
+                <span className="inline-flex items-center gap-1 rounded-lg bg-paper-2 px-2 py-1">
                   <MessageSquareText size={13} />
                   WhatsApp por YCloud
                 </span>
                 {counts ? (
-                  <span className="inline-flex items-center gap-1 rounded-lg bg-[#eef2eb] px-2 py-1">
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-paper-2 px-2 py-1">
                     <Clock3 size={13} />
                     {counts.active} activos / {counts.transferred} transferidos
                   </span>
@@ -1438,7 +1439,7 @@ export function FlowBuilder({
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
-                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:opacity-60"
+                  className="inline-flex h-10 items-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink disabled:opacity-60"
                   disabled={saving === "save"}
                   onClick={() => saveFlow()}
                   type="button"
@@ -1447,7 +1448,7 @@ export function FlowBuilder({
                   Guardar
                 </button>
                 <button
-                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium"
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-line px-3 text-sm font-medium"
                   onClick={() => saveFlow(draft.status === "active" ? "paused" : "active")}
                   type="button"
                 >
@@ -1455,7 +1456,7 @@ export function FlowBuilder({
                   {draft.status === "active" ? "Pausar" : "Guardar y activar"}
                 </button>
                 <button
-                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium"
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-line px-3 text-sm font-medium"
                   onClick={() => {
                     const nextStep = {
                       ...createBlankStep(draft.steps.length),
@@ -1472,7 +1473,7 @@ export function FlowBuilder({
                   type="button"
                 >
                   <Plus size={16} />
-                  Anadir paso
+                  Añadir paso
                 </button>
                 <button
                   className="inline-flex h-10 items-center gap-2 rounded-lg border border-red-200 px-3 text-sm font-medium text-red-700 disabled:opacity-60"
@@ -1517,13 +1518,13 @@ export function FlowBuilder({
                   stepOptions={draft.steps}
                 />
               ) : (
-                <div className="rounded-lg border border-dashed border-[#d9ded3] bg-white p-6 text-sm text-[#647067]">
-                  Este flujo no tiene pasos. Anade el primer paso para empezar.
+                <div className="rounded-lg border border-dashed border-line bg-white p-6 text-sm text-muted">
+                  Este flujo no tiene pasos. Añade el primer paso para empezar.
                 </div>
               )}
             </div>
 
-            <div className="rounded-lg border border-[#d9ded3] bg-white p-4">
+            <div className="rounded-lg border border-line bg-white p-4">
               <h3 className="text-sm font-semibold">Preview rápido</h3>
               <div className="mt-3 grid gap-2">
                 {draft.steps
@@ -1531,10 +1532,10 @@ export function FlowBuilder({
                   .slice(0, 4)
                   .map((step) => (
                     <div
-                      className="rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3 text-sm"
+                      className="rounded-lg border border-line bg-paper-2 p-3 text-sm"
                       key={step.id}
                     >
-                      <p className="mb-1 text-xs font-semibold text-[#647067]">{step.name}</p>
+                      <p className="mb-1 text-xs font-semibold text-muted">{step.name}</p>
                       <p className="whitespace-pre-wrap">{step.message}</p>
                     </div>
                   ))}
@@ -1544,7 +1545,7 @@ export function FlowBuilder({
         )}
 
         {status ? (
-          <p className="inline-flex items-center gap-2 rounded-lg bg-[#eef2eb] px-3 py-2 text-sm text-[#4d5a51]">
+          <p className="inline-flex items-center gap-2 rounded-lg bg-paper-2 px-3 py-2 text-sm text-ink-2">
             <Check size={15} />
             {status}
           </p>

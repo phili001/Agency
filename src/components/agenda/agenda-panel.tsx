@@ -15,19 +15,20 @@ import {
 import { AppointmentDialog, BlockDialog, NewAppointmentDialog } from "./agenda-dialogs";
 import { AgendaSettingsDialog } from "./agenda-settings";
 import type { AgendaItem, AppointmentItem, BlockItem } from "./types";
+import { clientFetch } from "@/lib/client-fetch";
 
 const STATUS_STYLES: Record<AppointmentItem["status"], string> = {
-  cancelled: "border-[#e2e6df] bg-[#f5f6f3] text-[#9aa59e] line-through",
-  completed: "border-[#cfe3c1] bg-[#eef7e6]",
+  cancelled: "border-line bg-paper-2 text-faint line-through",
+  completed: "border-line-strong bg-white",
   no_show: "border-[#f1c9bf] bg-[#fbeeea]",
-  rescheduled: "border-[#c9d8f0] bg-[#eef3fb]",
-  scheduled: "border-[#c9d8f0] bg-[#eef3fb]",
+  rescheduled: "border-yellow-strong bg-yellow-soft",
+  scheduled: "border-yellow-strong bg-yellow-soft",
 };
 
 const primaryButton =
-  "inline-flex h-10 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]";
+  "inline-flex h-10 items-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink disabled:opacity-50";
 const secondaryButton =
-  "inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm font-medium disabled:opacity-60";
+  "inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-medium disabled:opacity-60";
 
 function timeIn(value: string, timezone: string) {
   return new Intl.DateTimeFormat("es-ES", { hour: "2-digit", hour12: false, minute: "2-digit", timeZone: timezone }).format(new Date(value));
@@ -101,7 +102,7 @@ export function AgendaPanel({
     setLoading(true);
     setError("");
     void (async () => {
-      const response = await fetch(`/api/agenda/appointments?${params.toString()}`);
+      const response = await clientFetch(`/api/agenda/appointments?${params.toString()}`);
       if (cancelled) return;
       setLoading(false);
       if (!response.ok) {
@@ -134,7 +135,7 @@ export function AgendaPanel({
 
   async function deleteBlock(id: string) {
     if (!window.confirm("¿Quitar este bloqueo?")) return;
-    const response = await fetch(`/api/agenda/blocks/${id}`, { method: "DELETE" });
+    const response = await clientFetch(`/api/agenda/blocks/${id}`, { method: "DELETE" });
     if (!response.ok) {
       setError(await readApiError(response, "No se pudo quitar el bloqueo."));
       return;
@@ -144,9 +145,9 @@ export function AgendaPanel({
 
   if (agendas.length === 0) {
     return (
-      <section className="rounded-lg border border-[#d9ded3] bg-white p-6 text-center">
+      <section className="rounded-lg border border-line bg-white p-6 text-center">
         <h2 className="text-base font-semibold">Todavía no hay ninguna agenda</h2>
-        <p className="mx-auto mt-1 max-w-md text-sm text-[#647067]">
+        <p className="mx-auto mt-1 max-w-md text-sm text-muted">
           Crea tu agenda con tu horario y tus servicios. El agente de WhatsApp la usará para ofrecer huecos y agendar citas.
         </p>
         {canManage ? (
@@ -154,7 +155,7 @@ export function AgendaPanel({
             <Plus size={15} /> Crear agenda
           </button>
         ) : (
-          <p className="mt-3 text-sm text-[#647067]">Pide al dueño o a un admin que la cree.</p>
+          <p className="mt-3 text-sm text-muted">Pide al dueño o a un admin que la cree.</p>
         )}
         {dialog?.kind === "settings" ? (
           <AgendaSettingsDialog
@@ -174,12 +175,12 @@ export function AgendaPanel({
   const step = view === "day" ? 1 : 7;
 
   return (
-    <section className="rounded-lg border border-[#d9ded3] bg-white p-4">
+    <section className="rounded-lg border border-line bg-white p-4">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           <select
             aria-label="Agenda"
-            className="h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm font-medium outline-none"
+            className="h-10 rounded-lg border border-line bg-white px-3 text-sm font-medium outline-none"
             onChange={(event) => setAgendaId(event.target.value)}
             value={agendaId}
           >
@@ -191,11 +192,11 @@ export function AgendaPanel({
               </option>
             ))}
           </select>
-          <div className="inline-flex rounded-lg border border-[#cbd2c6] p-0.5">
+          <div className="inline-flex rounded-lg border border-line p-0.5">
             {(["week", "day"] as const).map((value) => (
               <button
                 aria-pressed={view === value}
-                className={`h-9 rounded-md px-3 text-sm ${view === value ? "bg-[#eef2eb] font-medium" : ""}`}
+                className={`h-9 rounded-md px-3 text-sm ${view === value ? "bg-paper-2 font-medium" : ""}`}
                 key={value}
                 onClick={() => setView(value)}
                 type="button"
@@ -213,10 +214,10 @@ export function AgendaPanel({
           <button aria-label="Siguiente" className={secondaryButton} onClick={() => setAnchor(addDaysToDateKey(anchor, step))} type="button">
             <ChevronRight size={16} />
           </button>
-          {loading ? <Loader2 className="animate-spin text-[#647067]" size={16} /> : null}
+          {loading ? <Loader2 className="animate-spin text-muted" size={16} /> : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="inline-flex items-center gap-1.5 text-sm text-[#4d5a51]">
+          <label className="inline-flex items-center gap-1.5 text-sm text-ink-2">
             <input checked={showCancelled} onChange={(event) => setShowCancelled(event.target.checked)} type="checkbox" />
             Ver canceladas
           </label>
@@ -243,7 +244,7 @@ export function AgendaPanel({
         </div>
       </div>
 
-      <p className="mt-2 text-xs text-[#647067]">
+      <p className="mt-2 text-xs text-muted">
         Horas en {timezone}.{agenda && !agenda.active ? " Esta agenda está desactivada: no se pueden crear citas nuevas." : ""}
       </p>
       {error ? <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
@@ -254,7 +255,7 @@ export function AgendaPanel({
           const isToday = day === dateKeyInTimeZone(timezone);
           const closed = agenda?.closed_dates.includes(day);
           return (
-            <div className={`min-h-32 rounded-lg border p-2 ${isToday ? "border-[#10231c]" : "border-[#e2e6df]"} bg-[#fafbf8]`} key={day}>
+            <div className={`min-h-32 rounded-lg border p-2 ${isToday ? "border-ink" : "border-line"} bg-paper-2`} key={day}>
               <p className="text-xs font-semibold capitalize">{dayLabel(day, timezone)}</p>
               {closed ? <p className="text-[11px] text-[#7a2f1d]">Festivo</p> : null}
               <div className="mt-1.5 grid gap-1.5">
@@ -270,10 +271,10 @@ export function AgendaPanel({
                         {timeIn(entry.item.starts_at, timezone)}–{timeIn(entry.item.ends_at, timezone)}
                       </span>{" "}
                       {entry.item.contact_name ?? entry.item.contact_phone ?? "Contacto"}
-                      {entry.item.service ? <span className="block text-[#647067]">{entry.item.service}</span> : null}
+                      {entry.item.service ? <span className="block text-muted">{entry.item.service}</span> : null}
                     </button>
                   ) : (
-                    <div className="flex items-start justify-between gap-1 rounded-md border border-dashed border-[#cbd2c6] bg-white px-2 py-1.5 text-xs text-[#647067]" key={entry.item.id}>
+                    <div className="flex items-start justify-between gap-1 rounded-md border border-dashed border-line bg-white px-2 py-1.5 text-xs text-muted" key={entry.item.id}>
                       <span>
                         <span className="font-semibold">
                           {timeIn(entry.item.starts_at, timezone)}–{timeIn(entry.item.ends_at, timezone)}
@@ -288,7 +289,7 @@ export function AgendaPanel({
                     </div>
                   ),
                 )}
-                {items.length === 0 ? <p className="text-[11px] text-[#9aa59e]">Sin citas</p> : null}
+                {items.length === 0 ? <p className="text-[11px] text-faint">Sin citas</p> : null}
               </div>
             </div>
           );

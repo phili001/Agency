@@ -3,10 +3,11 @@
 import { Loader2, MessageSquareText, PartyPopper } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import type { OnboardingChecklist } from "@/lib/onboarding-steps";
+import { type OnboardingChecklist, onboardingStepEyebrow } from "@/lib/onboarding-steps";
 
 import { HelpBox, HowTo, Notice, NumberedSteps, StepFooter, StepHeading, secondaryButton } from "./shared";
 import { type StepContext, getIntegrationConfig } from "./wizard";
+import { clientFetch } from "@/lib/client-fetch";
 
 type StatusPayload = {
   checklist: OnboardingChecklist;
@@ -32,7 +33,7 @@ export function StepTest({ ctx }: { ctx: StepContext }) {
 
     async function poll() {
       try {
-        const response = await fetch(
+        const response = await clientFetch(
           `/api/onboarding/status?workspaceId=${encodeURIComponent(ctx.workspace.id)}`,
           { cache: "no-store" },
         );
@@ -82,7 +83,7 @@ export function StepTest({ ctx }: { ctx: StepContext }) {
   return (
     <div className="grid gap-6">
       <StepHeading
-        eyebrow="Paso 5 · Prueba real"
+        eyebrow={onboardingStepEyebrow("test", "Prueba real")}
         title={arrived ? "¡Funciona! Tu primer mensaje ya llegó" : "Hagamos la primera prueba"}
         description={
           arrived
@@ -103,8 +104,8 @@ export function StepTest({ ctx }: { ctx: StepContext }) {
       ) : null}
 
       {!arrived ? (
-        <div className="grid gap-4 rounded-xl border-2 border-[#10231c] bg-[#fafbf8] p-5 text-center">
-          <p className="text-base text-[#4d5a51]">
+        <div className="grid gap-4 rounded-xl border-2 border-ink bg-paper-2 p-5 text-center">
+          <p className="text-base text-ink-2">
             Desde tu celular, escribe <span className="font-semibold">Hola</span> por WhatsApp al número
           </p>
           <p className="text-3xl font-semibold tabular-nums tracking-wide">{phone || "—"}</p>
@@ -119,30 +120,30 @@ export function StepTest({ ctx }: { ctx: StepContext }) {
               Abrir WhatsApp con este número
             </a>
           ) : null}
-          <p className="flex items-center justify-center gap-2 text-sm text-[#647067]">
+          <p className="flex items-center justify-center gap-2 text-sm text-muted">
             <Loader2 className="animate-spin" size={16} />
             Esperando tu mensaje… no cierres esta pantalla.
           </p>
         </div>
       ) : (
-        <div className="grid gap-3 rounded-xl border border-[#b9dc9c] bg-[#eef6df] p-5">
-          <div className="flex items-center gap-2 text-[#31521d]">
+        <div className="grid gap-3 rounded-xl border border-yellow-strong bg-yellow-soft p-5">
+          <div className="flex items-center gap-2 text-ink">
             <PartyPopper size={20} />
             <p className="text-base font-semibold">Conexión confirmada</p>
           </div>
           {status?.lastInbound?.body ? (
             <div className="grid gap-2">
               <div className="max-w-[85%] justify-self-start rounded-2xl rounded-bl-sm bg-white px-4 py-2 text-sm shadow-sm">
-                <p className="text-[11px] font-semibold uppercase text-[#647067]">Cliente</p>
-                <p className="mt-0.5 text-[#20231f]">{status.lastInbound.body}</p>
+                <p className="text-[11px] font-semibold uppercase text-muted">Cliente</p>
+                <p className="mt-0.5 text-ink">{status.lastInbound.body}</p>
               </div>
               {status.lastReply?.body ? (
-                <div className="max-w-[85%] justify-self-end rounded-2xl rounded-br-sm bg-[#10231c] px-4 py-2 text-sm text-white shadow-sm">
-                  <p className="text-[11px] font-semibold uppercase text-[#b7c4bd]">Levy</p>
+                <div className="max-w-[85%] justify-self-end rounded-2xl rounded-br-sm bg-ink px-4 py-2 text-sm text-paper shadow-sm">
+                  <p className="text-[11px] font-semibold uppercase text-muted">Levy</p>
                   <p className="mt-0.5">{status.lastReply.body}</p>
                 </div>
               ) : (
-                <p className="text-sm text-[#4d5a51]">
+                <p className="text-sm text-ink-2">
                   La respuesta de la IA tarda unos 15 segundos en salir (agrupa mensajes
                   antes de contestar). Míralo en tu celular.
                 </p>
@@ -170,7 +171,7 @@ export function StepTest({ ctx }: { ctx: StepContext }) {
             ]}
           />
           <button
-            className="justify-self-start text-sm font-medium text-[#35735b] underline-offset-4 hover:underline"
+            className="justify-self-start text-sm font-medium text-ink underline-offset-4 hover:underline"
             onClick={() => ctx.goTo(4)}
             type="button"
           >

@@ -13,7 +13,7 @@ import {
 import type { BookedMeeting, MeetingDay } from "@/lib/onboarding-meeting";
 import type { Json } from "@/lib/supabase/database.types";
 
-import { SupportContact } from "./shared";
+import { readApiError, SupportContact } from "./shared";
 import { StepAgents } from "./step-agents";
 import { StepBusiness } from "./step-business";
 import { StepDone } from "./step-done";
@@ -23,6 +23,7 @@ import { StepOpenAI } from "./step-openai";
 import { StepTest } from "./step-test";
 import { StepWelcome } from "./step-welcome";
 import { StepWhatsApp } from "./step-whatsapp";
+import { clientFetch } from "@/lib/client-fetch";
 
 export type WizardWorkspace = {
   company_code: string | null;
@@ -130,6 +131,7 @@ export function OnboardingWizard(props: WizardProps) {
     props.defaultConversationMode,
   );
   const [leaving, setLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState("");
 
   // El paso vive en la URL para que recargar o volver atras no pierda el sitio.
   const goTo = useCallback((index: number) => {
@@ -147,11 +149,18 @@ export function OnboardingWizard(props: WizardProps) {
 
   const skipForNow = useCallback(async () => {
     setLeaving(true);
-    await fetch("/api/workspaces", {
+    setLeaveError("");
+    const response = await clientFetch("/api/workspaces", {
       body: JSON.stringify({ action: "skip_onboarding", workspaceId: props.workspace.id }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
+    // Si no se guardó, el inicio devolvería aquí sin explicar nada.
+    if (!response.ok) {
+      setLeaveError(await readApiError(response, "No se pudo guardar. Inténtalo de nuevo."));
+      setLeaving(false);
+      return;
+    }
     window.location.href = "/";
   }, [props.workspace.id]);
 
@@ -198,21 +207,21 @@ export function OnboardingWizard(props: WizardProps) {
   const numberedSteps = onboardingSteps.filter((item) => item.index !== 0);
 
   return (
-    <main className="min-h-screen bg-[#f6f7f3] text-[#20231f]">
-      <header className="border-b border-[#d9ded3] bg-white">
+    <main className="min-h-screen bg-paper-2 text-ink">
+      <header className="border-b border-line bg-white">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-[#10231c] text-[#d2f36b]">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-ink text-yellow">
               <Bot size={22} />
             </div>
             <div>
               <p className="text-sm font-semibold">Levy</p>
-              <p className="text-xs text-[#647067]">Configuración inicial · {props.workspace.name}</p>
+              <p className="text-xs text-muted">Configuración inicial · {props.workspace.name}</p>
             </div>
           </div>
           {!isFirst && !isLast ? (
             <button
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium text-[#4d5a51] disabled:text-[#9aa59e]"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-line px-3 text-sm font-medium text-ink-2 disabled:text-faint"
               disabled={leaving}
               onClick={skipForNow}
               type="button"
@@ -225,20 +234,26 @@ export function OnboardingWizard(props: WizardProps) {
       </header>
 
       <div className="mx-auto grid max-w-3xl gap-5 px-5 py-6 md:py-10">
+        {leaveError ? (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+            {leaveError}
+          </p>
+        ) : null}
         {!isFirst ? (
           <nav aria-label="Progreso" className="grid gap-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="font-semibold text-[#20231f]">
+              <span className="font-semibold text-ink">
                 Paso {step} de {numberedSteps.length}
               </span>
-              <span className="text-[#647067]">{current.shortTitle}</span>
+              <span className="text-muted">{current.shortTitle}</span>
             </div>
             {/* auto-cols-fr: la barra se reparte sola, haya 7 pasos o 9. */}
             <ol className="grid auto-cols-fr grid-flow-col gap-1.5">
               {numberedSteps.map((item) => {
-                // Verde solo si el checklist lo confirma: pasar de largo no cuenta.
+                // Hecho solo si el checklist lo confirma: pasar de largo no cuenta.
                 const done = Boolean(item.checklistKey && checklist[item.checklistKey]);
                 const active = item.index === step;
+                // El paso actual en amarillo; si fuera del mismo tono que los hechos no se distinguiría.
 
                 return (
                   <li key={item.id}>
@@ -247,10 +262,10 @@ export function OnboardingWizard(props: WizardProps) {
                       aria-label={item.shortTitle}
                       className={`h-2.5 w-full rounded-full transition ${
                         active
-                          ? "bg-[#10231c]"
+                          ? "bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)]"
                           : done
-                            ? "bg-[#35735b]"
-                            : "bg-[#d9ded3]"
+                            ? "bg-ink"
+                            : "bg-line"
                       }`}
                       onClick={() => goTo(item.index)}
                       title={item.shortTitle}
@@ -263,7 +278,7 @@ export function OnboardingWizard(props: WizardProps) {
           </nav>
         ) : null}
 
-        <section className="rounded-2xl border border-[#d9ded3] bg-white p-5 shadow-sm md:p-8">
+        <section className="rounded-2xl border border-line bg-white p-5 shadow-sm md:p-8">
           {current.id === "welcome" ? <StepWelcome ctx={context} /> : null}
           {current.id === "business" ? <StepBusiness ctx={context} /> : null}
           {current.id === "agents" ? <StepAgents ctx={context} /> : null}
@@ -282,7 +297,7 @@ export function OnboardingWizard(props: WizardProps) {
         />
 
         {!isFirst && !isLast ? (
-          <p className="flex items-center justify-center gap-2 text-center text-sm text-[#7a847c]">
+          <p className="flex items-center justify-center gap-2 text-center text-sm text-muted">
             <Check size={14} />
             Todo lo que guardas queda guardado: puedes cerrar y seguir otro día.
           </p>

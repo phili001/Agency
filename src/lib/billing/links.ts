@@ -1,19 +1,28 @@
+function parsePaymentLink(baseUrl: string | null | undefined) {
+  const raw = baseUrl?.trim();
+  if (!raw) return null;
+
+  try {
+    const url = new URL(raw);
+    return url.protocol === "https:" ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Enlace al Payment Link para quien compra desde la landing, o null si no es válido. */
+export function publicPaymentLinkUrl(baseUrl: string | null | undefined) {
+  return parsePaymentLink(baseUrl)?.toString() ?? null;
+}
+
 /**
  * Enlace al Payment Link de Levy para pagar o reactivar desde el panel. Lleva
  * `client_reference_id` (la empresa) y `prefilled_email` (el owner): el
  * webhook solo usa la referencia si el correo del pago es el del owner.
  */
 export function buildPaymentLinkUrl(baseUrl: string | null | undefined, { email, workspaceId }: { email: string | null; workspaceId: string }) {
-  const raw = baseUrl?.trim();
-  if (!raw) return null;
-
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    return null;
-  }
-  if (url.protocol !== "https:") return null;
+  const url = parsePaymentLink(baseUrl);
+  if (!url) return null;
 
   url.searchParams.set("client_reference_id", workspaceId);
   if (email) url.searchParams.set("prefilled_email", email.trim().toLowerCase());

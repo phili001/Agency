@@ -232,7 +232,7 @@ async function deliverNotice(
     .select("id, last_message_at")
     .eq("workspace_id", row.workspace_id)
     .eq("contact_id", row.contact_id)
-    .order("last_message_at", { ascending: false })
+    .order("last_message_at", { ascending: false, nullsFirst: false })
     .limit(1);
   const conversation = (conversations ?? [])[0] as { id: string } | undefined;
   const conversationId = row.conversation_id ?? conversation?.id ?? null;

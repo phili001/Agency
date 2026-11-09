@@ -4,11 +4,12 @@ import { CreditCard, ExternalLink, Loader2 } from "lucide-react";
 import { useState } from "react";
 
 import { readApiError } from "@/components/onboarding/shared";
+import { clientFetch } from "@/lib/client-fetch";
 
 const primaryButton =
-  "inline-flex h-10 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white";
+  "inline-flex h-10 items-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink";
 const secondaryButton =
-  "inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm font-medium disabled:opacity-60";
+  "inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-medium disabled:opacity-60";
 
 /** «Pagar / reactivar» (Payment Link) y «Gestionar suscripción» (Customer Portal). */
 export function BillingActions({ canOpenPortal, paymentUrl }: { canOpenPortal: boolean; paymentUrl: string | null }) {
@@ -19,7 +20,7 @@ export function BillingActions({ canOpenPortal, paymentUrl }: { canOpenPortal: b
     setBusy(true);
     setError("");
     try {
-      const response = await fetch("/api/billing/portal", { method: "POST" });
+      const response = await clientFetch("/api/billing/portal", { method: "POST" });
       if (!response.ok) throw new Error(await readApiError(response, "No se pudo abrir el portal de Stripe."));
       const { url } = (await response.json()) as { url: string };
       window.location.href = url;

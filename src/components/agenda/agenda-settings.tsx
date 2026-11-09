@@ -8,14 +8,15 @@ import { getBrowserTimeZone, getTimeZoneOptions } from "@/lib/timezones";
 
 import { Modal } from "./agenda-dialogs";
 import type { AgendaItem, ScheduleSegment } from "./types";
+import { clientFetch } from "@/lib/client-fetch";
 
-const inputClass = "h-10 w-full rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm outline-none";
-const textareaClass = "min-h-20 w-full rounded-lg border border-[#cbd2c6] bg-white px-3 py-2 text-sm outline-none";
+const inputClass = "h-10 w-full rounded-lg border border-line bg-white px-3 text-sm outline-none";
+const textareaClass = "min-h-20 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none";
 const primaryButton =
-  "inline-flex h-10 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]";
+  "inline-flex h-10 items-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink disabled:opacity-50";
 const secondaryButton =
-  "inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm font-medium disabled:opacity-60";
-const iconButton = "grid size-8 place-items-center rounded-lg border border-[#cbd2c6] bg-white text-[#5f6b64]";
+  "inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-medium disabled:opacity-60";
+const iconButton = "grid size-8 place-items-center rounded-lg border border-line bg-white text-muted";
 
 const DAYS: Array<[string, string]> = [
   ["1", "Lunes"],
@@ -54,7 +55,7 @@ function Field({ children, label }: { children: React.ReactNode; label: string }
 
 function Section({ children, title }: { children: React.ReactNode; title: string }) {
   return (
-    <fieldset className="grid gap-3 rounded-lg border border-[#e2e6df] p-3">
+    <fieldset className="grid gap-3 rounded-lg border border-line p-3">
       <legend className="px-1 text-sm font-semibold">{title}</legend>
       {children}
     </fieldset>
@@ -177,7 +178,7 @@ export function AgendaSettingsDialog({
     }
 
     try {
-      const response = await fetch(agenda ? `/api/agenda/agendas/${agenda.id}` : "/api/agenda/agendas", {
+      const response = await clientFetch(agenda ? `/api/agenda/agendas/${agenda.id}` : "/api/agenda/agendas", {
         body: JSON.stringify(body),
         headers: { "content-type": "application/json" },
         method: agenda ? "PATCH" : "POST",
@@ -247,11 +248,11 @@ export function AgendaSettingsDialog({
                   <Plus size={14} />
                 </button>
               </div>
-              {segments.length === 0 ? <p className="text-xs text-[#5f6b64]">Cerrado</p> : null}
+              {segments.length === 0 ? <p className="text-xs text-muted">Cerrado</p> : null}
               {segments.map((segment, index) => (
                 <div className="flex items-center gap-2" key={index}>
                   <input className={inputClass} onChange={(event) => updateSegment(day, index, { start: event.target.value })} type="time" value={segment.start} />
-                  <span className="text-sm text-[#5f6b64]">a</span>
+                  <span className="text-sm text-muted">a</span>
                   <input className={inputClass} onChange={(event) => updateSegment(day, index, { end: event.target.value })} type="time" value={segment.end} />
                   <button className={iconButton} aria-label="Quitar tramo" onClick={() => removeSegment(day, index)} type="button">
                     <Trash2 size={14} />
@@ -264,7 +265,7 @@ export function AgendaSettingsDialog({
       </Section>
 
       <Section title="Servicios">
-        {services.length === 0 ? <p className="text-xs text-[#5f6b64]">Sin servicios: las citas usan la duración por defecto.</p> : null}
+        {services.length === 0 ? <p className="text-xs text-muted">Sin servicios: las citas usan la duración por defecto.</p> : null}
         {services.map((service, index) => (
           <div className="flex items-center gap-2" key={index}>
             <input
@@ -286,7 +287,7 @@ export function AgendaSettingsDialog({
               type="number"
               value={service.duration_minutes}
             />
-            <span className="text-sm text-[#5f6b64]">min</span>
+            <span className="text-sm text-muted">min</span>
             <button
               className={iconButton}
               aria-label="Quitar servicio"
@@ -304,10 +305,10 @@ export function AgendaSettingsDialog({
 
       <Section title="Días cerrados">
         <div className="flex flex-wrap gap-2">
-          {closedDates.length === 0 ? <p className="text-xs text-[#5f6b64]">Ninguno.</p> : null}
+          {closedDates.length === 0 ? <p className="text-xs text-muted">Ninguno.</p> : null}
           {closedDates.map((date) => (
             <button
-              className="rounded-full border border-[#cbd2c6] px-2 py-1 text-xs"
+              className="rounded-full border border-line px-2 py-1 text-xs"
               key={date}
               onClick={() => setClosedDates(closedDates.filter((item) => item !== date))}
               title="Quitar"
@@ -327,11 +328,11 @@ export function AgendaSettingsDialog({
 
       <Section title="Google Calendar">
         {calendars === null ? (
-          <p className="flex items-center gap-2 text-sm text-[#5f6b64]">
+          <p className="flex items-center gap-2 text-sm text-muted">
             <Loader2 className="animate-spin" size={14} /> Cargando calendarios…
           </p>
         ) : calendars.length === 0 ? (
-          <p className="text-sm text-[#5f6b64]">{calendarNote || "No hay calendarios con permiso de escritura."}</p>
+          <p className="text-sm text-muted">{calendarNote || "No hay calendarios con permiso de escritura."}</p>
         ) : (
           <>
             <Field label="Calendario">

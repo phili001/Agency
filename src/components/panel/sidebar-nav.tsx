@@ -83,7 +83,7 @@ export function SidebarNav({ platformAdmin }: { platformAdmin: boolean }) {
     >
       {platformAdmin ? (
         <IntentLink
-          className="flex h-10 shrink-0 items-center gap-3 rounded-lg px-3 text-left text-[#dbe5df] transition hover:bg-white/10"
+          className="flex h-10 shrink-0 items-center gap-3 rounded-full px-3.5 text-left font-semibold text-muted transition hover:bg-paper hover:text-ink"
           href="/admin"
           icon={Shield}
           label="Superadmin"
@@ -94,8 +94,8 @@ export function SidebarNav({ platformAdmin }: { platformAdmin: boolean }) {
 
         return (
           <IntentLink
-            className={`flex h-10 shrink-0 items-center gap-3 rounded-lg px-3 text-left transition ${
-              current ? "bg-white/10 text-white" : "text-[#dbe5df] hover:bg-white/10"
+            className={`flex h-10 shrink-0 items-center gap-3 rounded-full px-3.5 text-left font-semibold transition ${
+              current ? "bg-ink text-paper" : "text-muted hover:bg-paper hover:text-ink"
             }`}
             current={current}
             href={item.href}

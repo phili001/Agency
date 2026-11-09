@@ -18,6 +18,7 @@ import {
   secondaryButton,
 } from "./shared";
 import type { StepContext } from "./wizard";
+import { clientFetch } from "@/lib/client-fetch";
 
 export function StepDone({ ctx }: { ctx: StepContext }) {
   const pending = getPendingSteps(ctx.checklist);
@@ -57,7 +58,7 @@ export function StepDone({ ctx }: { ctx: StepContext }) {
   async function enter() {
     setBusy(true);
     setError("");
-    const response = await fetch("/api/workspaces", {
+    const response = await clientFetch("/api/workspaces", {
       body: JSON.stringify({
         action: complete ? "complete_onboarding" : "skip_onboarding",
         workspaceId: ctx.workspace.id,
@@ -98,22 +99,22 @@ export function StepDone({ ctx }: { ctx: StepContext }) {
       <ul className="grid gap-2">
         {items.map((item) => (
           <li
-            className="flex items-center justify-between gap-3 rounded-xl border border-[#e2e6df] bg-[#fafbf8] px-4 py-3"
+            className="flex items-center justify-between gap-3 rounded-xl border border-line bg-paper-2 px-4 py-3"
             key={item.label}
           >
             <span className="flex items-center gap-3 text-base">
               {item.done ? (
-                <span className="flex size-7 items-center justify-center rounded-full bg-[#35735b] text-white">
+                <span className="flex size-7 items-center justify-center rounded-full bg-ink text-white">
                   <Check size={15} />
                 </span>
               ) : (
-                <Circle className="mx-1 text-[#c3cac2]" size={20} />
+                <Circle className="mx-1 text-line-strong" size={20} />
               )}
               {item.label}
             </span>
             {!item.done ? (
               <button
-                className="text-sm font-medium text-[#35735b] underline-offset-4 hover:underline"
+                className="text-sm font-medium text-ink underline-offset-4 hover:underline"
                 onClick={() => ctx.goTo(item.step)}
                 type="button"
               >
@@ -126,7 +127,7 @@ export function StepDone({ ctx }: { ctx: StepContext }) {
 
       {error ? <Notice tone="error">{error}</Notice> : null}
 
-      <div className="flex flex-col-reverse gap-3 border-t border-[#e2e6df] pt-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col-reverse gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
         <button className={secondaryButton} onClick={ctx.goBack} type="button">
           Atrás
         </button>

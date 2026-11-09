@@ -4,6 +4,10 @@ import { PanelPage } from "@/components/panel/panel-header";
 import { listAgendas, withoutConfig } from "@/lib/agenda/agendas";
 import { getPanelContext } from "@/lib/panel-context";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { Metadata } from "next";
+import { sectionTitles } from "@/lib/panel-data";
+
+export const metadata: Metadata = { title: sectionTitles.agenda.title };
 
 /** Agenda propia: citas por semana/día, bloqueos y configuración de cada agenda. */
 export default async function AgendaPage() {

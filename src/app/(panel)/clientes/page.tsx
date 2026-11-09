@@ -7,6 +7,10 @@ import { listStages } from "@/lib/crm/stages";
 import { listTags } from "@/lib/crm/tags";
 import { getPanelContext } from "@/lib/panel-context";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { Metadata } from "next";
+import { sectionTitles } from "@/lib/panel-data";
+
+export const metadata: Metadata = { title: sectionTitles.clients.title };
 
 /**
  * Clientes = CRM de la empresa: lista con filtros, vista por etapas y ficha.

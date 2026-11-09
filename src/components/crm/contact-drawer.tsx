@@ -6,12 +6,13 @@ import { CalendarClock, Check, Loader2, MessageSquareText, Trash2, X } from "luc
 import { readApiError } from "@/components/onboarding/shared";
 
 import type { ContactCard, CrmFieldOption, CrmPanelOptions } from "./types";
+import { clientFetch } from "@/lib/client-fetch";
 
-const inputClass = "h-9 w-full rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm outline-none";
+const inputClass = "h-9 w-full rounded-lg border border-line bg-white px-3 text-sm outline-none";
 const smallButton =
-  "inline-flex h-9 items-center gap-1 rounded-lg border border-[#cbd2c6] bg-white px-2.5 text-sm font-medium disabled:opacity-60";
+  "inline-flex h-9 items-center gap-1 rounded-lg border border-line bg-white px-2.5 text-sm font-medium disabled:opacity-60";
 const primaryButton =
-  "inline-flex h-9 items-center gap-1 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]";
+  "inline-flex h-9 items-center gap-1 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink disabled:opacity-50";
 
 const ACTIVITY_LABELS: Record<string, string> = {
   appointment_booked: "Cita agendada",
@@ -103,7 +104,7 @@ function FieldInput({
     return (
       <div className="flex flex-wrap gap-1.5">
         {field.options.map((option) => (
-          <label className="inline-flex items-center gap-1 rounded-md border border-[#e2e6df] px-2 py-1 text-xs" key={option}>
+          <label className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs" key={option}>
             <input
               checked={selected.includes(option)}
               onChange={(event) =>
@@ -120,7 +121,7 @@ function FieldInput({
   if (field.type === "long_text") {
     return (
       <textarea
-        className="min-h-20 w-full rounded-lg border border-[#cbd2c6] px-3 py-2 text-sm outline-none"
+        className="min-h-20 w-full rounded-lg border border-line px-3 py-2 text-sm outline-none"
         onChange={(event) => onChange(event.target.value)}
         value={typeof value === "string" ? value : ""}
       />
@@ -162,7 +163,7 @@ export function ContactDrawer({
   const [taskDraft, setTaskDraft] = useState({ dueAt: "", title: "" });
 
   const load = useCallback(async () => {
-    const response = await fetch(`/api/crm/contacts/${contactId}`);
+    const response = await clientFetch(`/api/crm/contacts/${contactId}`);
     if (!response.ok) {
       setError(await readApiError(response, "No se pudo abrir la ficha."));
       return;
@@ -186,7 +187,7 @@ export function ContactDrawer({
   async function call(key: string, url: string, init: RequestInit, fallback: string) {
     setBusy(key);
     setError("");
-    const response = await fetch(url, {
+    const response = await clientFetch(url, {
       ...init,
       headers: init.body && !(init.body instanceof FormData) ? { "Content-Type": "application/json" } : undefined,
     });
@@ -217,7 +218,7 @@ export function ContactDrawer({
       {error ? <p className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</p> : null}
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-[#647067]">{card.contact.phone_e164}</span>
+        <span className="text-muted">{card.contact.phone_e164}</span>
         {card.conversationId ? (
           <a className={smallButton} href={`/?conversacion=${card.conversationId}`}>
             <MessageSquareText size={14} /> Abrir conversación
@@ -245,7 +246,7 @@ export function ContactDrawer({
       <Block title="Etiquetas">
         <div className="flex flex-wrap gap-1.5">
           {card.tags.map((tag) => (
-            <span className="inline-flex items-center gap-1 rounded-md border border-[#e2e6df] px-1.5 py-0.5 text-xs" key={tag.id}>
+            <span className="inline-flex items-center gap-1 rounded-md border border-line px-1.5 py-0.5 text-xs" key={tag.id}>
               <span className="size-2 rounded-full" style={{ backgroundColor: tag.color }} />
               {tag.name}
               <button
@@ -257,7 +258,7 @@ export function ContactDrawer({
               </button>
             </span>
           ))}
-          {card.tags.length === 0 ? <span className="text-xs text-[#647067]">Sin etiquetas.</span> : null}
+          {card.tags.length === 0 ? <span className="text-xs text-muted">Sin etiquetas.</span> : null}
         </div>
         {availableTags.length > 0 ? (
           <select
@@ -285,7 +286,7 @@ export function ContactDrawer({
           <input className={inputClass} onChange={(event) => setDetails({ ...details, email: event.target.value })} placeholder="Correo" type="email" value={details.email} />
           <input className={inputClass} onChange={(event) => setDetails({ ...details, company: event.target.value })} placeholder="Empresa" value={details.company} />
           {card.customFields.map((field) => (
-            <label className="grid gap-1 text-xs font-medium text-[#4d5a51]" key={field.id}>
+            <label className="grid gap-1 text-xs font-medium text-ink-2" key={field.id}>
               {field.label}
               <FieldInput field={field} onChange={(value) => setFields({ ...fields, [field.key]: value })} value={fields[field.key]} />
             </label>
@@ -323,24 +324,24 @@ export function ContactDrawer({
       </Block>
 
       <Block title="Citas">
-        {card.appointments.length === 0 ? <p className="text-xs text-[#647067]">Sin citas.</p> : null}
+        {card.appointments.length === 0 ? <p className="text-xs text-muted">Sin citas.</p> : null}
         <div className="grid gap-1.5">
           {card.appointments.map((appointment) => (
-            <div className="flex items-center gap-2 rounded-lg border border-[#e2e6df] p-2 text-sm" key={appointment.id}>
-              <CalendarClock className="text-[#647067]" size={15} />
+            <div className="flex items-center gap-2 rounded-lg border border-line p-2 text-sm" key={appointment.id}>
+              <CalendarClock className="text-muted" size={15} />
               <span className="font-medium">{when(appointment.starts_at)}</span>
-              <span className="text-[#647067]">{appointment.service}</span>
-              <span className="ml-auto rounded-md bg-[#eef2eb] px-1.5 py-0.5 text-xs">{STATUS_LABELS[appointment.status] ?? appointment.status}</span>
+              <span className="text-muted">{appointment.service}</span>
+              <span className="ml-auto rounded-md bg-paper-2 px-1.5 py-0.5 text-xs">{STATUS_LABELS[appointment.status] ?? appointment.status}</span>
             </div>
           ))}
         </div>
-        {upcoming.length > 0 ? <p className="mt-1 text-xs text-[#647067]">Próxima: {when(upcoming.at(-1)!.starts_at)}</p> : null}
+        {upcoming.length > 0 ? <p className="mt-1 text-xs text-muted">Próxima: {when(upcoming.at(-1)!.starts_at)}</p> : null}
       </Block>
 
       <Block title="Tareas">
         <div className="grid gap-1.5">
           {card.tasks.map((task) => (
-            <label className="flex items-center gap-2 rounded-lg border border-[#e2e6df] p-2 text-sm" key={task.id}>
+            <label className="flex items-center gap-2 rounded-lg border border-line p-2 text-sm" key={task.id}>
               <input
                 checked={Boolean(task.completed_at)}
                 onChange={(event) =>
@@ -348,8 +349,8 @@ export function ContactDrawer({
                 }
                 type="checkbox"
               />
-              <span className={task.completed_at ? "text-[#9aa59e] line-through" : ""}>{task.title}</span>
-              {task.due_at ? <span className="ml-auto text-xs text-[#647067]">{when(task.due_at, false)}</span> : null}
+              <span className={task.completed_at ? "text-faint line-through" : ""}>{task.title}</span>
+              {task.due_at ? <span className="ml-auto text-xs text-muted">{when(task.due_at, false)}</span> : null}
             </label>
           ))}
         </div>
@@ -378,9 +379,9 @@ export function ContactDrawer({
       <Block title="Notas">
         <div className="grid gap-1.5">
           {card.notes.map((note) => (
-            <div className="rounded-lg border border-[#e2e6df] p-2 text-sm" key={note.id}>
+            <div className="rounded-lg border border-line p-2 text-sm" key={note.id}>
               <p className="whitespace-pre-line">{note.body}</p>
-              <div className="mt-1 flex items-center justify-between text-xs text-[#647067]">
+              <div className="mt-1 flex items-center justify-between text-xs text-muted">
                 <span>{when(note.created_at)}</span>
                 <button
                   aria-label="Borrar nota"
@@ -394,7 +395,7 @@ export function ContactDrawer({
           ))}
         </div>
         <textarea
-          className="mt-2 min-h-16 w-full rounded-lg border border-[#cbd2c6] px-3 py-2 text-sm outline-none"
+          className="mt-2 min-h-16 w-full rounded-lg border border-line px-3 py-2 text-sm outline-none"
           onChange={(event) => setNoteDraft(event.target.value)}
           placeholder="Escribe una nota interna…"
           value={noteDraft}
@@ -416,21 +417,21 @@ export function ContactDrawer({
         <ol className="grid gap-1 text-xs">
           {card.activity.map((entry) => (
             <li className="flex gap-2" key={entry.id}>
-              <span className="w-28 shrink-0 text-[#647067]">{when(entry.created_at)}</span>
+              <span className="w-28 shrink-0 text-muted">{when(entry.created_at)}</span>
               <span>
                 <strong className="font-medium">{ACTIVITY_LABELS[entry.kind] ?? entry.kind}</strong>
                 {activityDetail(entry) ? `: ${activityDetail(entry)}` : ""}
-                <span className="text-[#9aa59e]"> · {ACTOR_LABELS[entry.actor] ?? entry.actor}</span>
+                <span className="text-faint"> · {ACTOR_LABELS[entry.actor] ?? entry.actor}</span>
               </span>
             </li>
           ))}
         </ol>
-        {card.activity.length === 0 ? <p className="text-xs text-[#647067]">Sin actividad todavía.</p> : null}
+        {card.activity.length === 0 ? <p className="text-xs text-muted">Sin actividad todavía.</p> : null}
       </Block>
 
       {canDelete ? (
         <Block title="Privacidad">
-          <p className="text-xs text-[#647067]">
+          <p className="text-xs text-muted">
             Borra el contacto y todo lo suyo: conversaciones, mensajes, notas, tareas, citas y su copia en Google
             Calendar. No se puede deshacer.
           </p>
@@ -441,7 +442,7 @@ export function ContactDrawer({
               const label = card.contact.full_name ?? card.contact.phone_e164;
               if (!window.confirm(`¿Borrar a ${label} y todos sus datos? No se puede deshacer.`)) return;
               setBusy("delete");
-              const response = await fetch(`/api/crm/contacts/${contactId}`, { method: "DELETE" });
+              const response = await clientFetch(`/api/crm/contacts/${contactId}`, { method: "DELETE" });
               setBusy("");
               if (!response.ok) {
                 setError(await readApiError(response, "No se pudo borrar el contacto."));
@@ -461,7 +462,7 @@ export function ContactDrawer({
 
 function Shell({ children, onClose, title }: { children: React.ReactNode; onClose: () => void; title: string }) {
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-[#10231c]/35" onClick={onClose} role="dialog">
+    <div className="fixed inset-0 z-50 flex justify-end bg-ink/35" onClick={onClose} role="dialog">
       <aside
         className="flex h-full w-full max-w-xl flex-col gap-3 overflow-y-auto bg-white p-4 shadow-xl"
         onClick={(event) => event.stopPropagation()}
@@ -480,7 +481,7 @@ function Shell({ children, onClose, title }: { children: React.ReactNode; onClos
 
 function Block({ children, title }: { children: React.ReactNode; title: string }) {
   return (
-    <section className="rounded-lg border border-[#e2e6df] p-3">
+    <section className="rounded-lg border border-line p-3">
       <p className="mb-2 text-sm font-semibold">{title}</p>
       {children}
     </section>

@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { clientFetch } from "@/lib/client-fetch";
 
 type Company = {
   activeProviders: string[];
@@ -49,7 +50,7 @@ export function AdminConsole({
   const [saving, setSaving] = useState("");
 
   async function postJson(url: string, body: Record<string, unknown>) {
-    const response = await fetch(url, {
+    const response = await clientFetch(url, {
       body: JSON.stringify(body),
       headers: { "Content-Type": "application/json" },
       method: "POST",
@@ -62,7 +63,7 @@ export function AdminConsole({
   }
 
   async function deleteJson(url: string, body: Record<string, unknown>) {
-    const response = await fetch(url, {
+    const response = await clientFetch(url, {
       body: JSON.stringify(body),
       headers: { "Content-Type": "application/json" },
       method: "DELETE",
@@ -78,7 +79,7 @@ export function AdminConsole({
     setSaving(`billing:${workspaceId}`);
     setStatus("");
     try {
-      const response = await fetch("/api/admin/companies/billing", {
+      const response = await clientFetch("/api/admin/companies/billing", {
         body: JSON.stringify({ workspaceId, ...change }),
         headers: { "Content-Type": "application/json" },
         method: "PATCH",
@@ -124,7 +125,7 @@ export function AdminConsole({
         workspaceId: linkWorkspaceId,
       });
       setStatus(
-        "Owner vinculado a la empresa existente. Si el usuario no existia, ya puede entrar con la contraseña temporal.",
+        "Owner vinculado a la empresa existente. Si el usuario no existía, ya puede entrar con la contraseña temporal.",
       );
       window.location.reload();
     } catch (error) {
@@ -144,7 +145,7 @@ export function AdminConsole({
         temporaryPassword: newAdminPassword,
       });
       setStatus(
-        "Superadmin agregado. Si el usuario no existia, ya puede entrar con la contraseña temporal.",
+        "Superadmin agregado. Si el usuario no existía, ya puede entrar con la contraseña temporal.",
       );
       window.location.reload();
     } catch (error) {
@@ -176,21 +177,21 @@ export function AdminConsole({
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f7f3] p-5 text-[#20231f]">
+    <main className="min-h-screen bg-paper-2 p-5 text-ink">
       <div className="mx-auto grid max-w-7xl gap-5">
-        <header className="rounded-lg border border-[#d9ded3] bg-white p-5">
+        <header className="rounded-lg border border-line bg-white p-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase text-[#647067]">
+              <p className="text-xs font-semibold uppercase text-muted">
                 Consola privada
               </p>
               <h1 className="mt-1 text-2xl font-semibold">Superadmin</h1>
-              <p className="mt-1 text-sm text-[#647067]">
+              <p className="mt-1 text-sm text-muted">
                 Crea empresas, asigna owners y revisa el onboarding de clientes.
               </p>
             </div>
             <Link
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium"
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium"
               href="/"
             >
               Volver al panel
@@ -199,34 +200,34 @@ export function AdminConsole({
         </header>
 
         <section className="grid gap-5 xl:grid-cols-3">
-          <div className="rounded-lg border border-[#d9ded3] bg-white p-4">
+          <div className="rounded-lg border border-line bg-white p-4">
             <h2 className="flex items-center gap-2 text-base font-semibold">
               <Plus size={17} />
               Crear empresa
             </h2>
             <div className="mt-4 grid gap-3">
               <input
-                className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+                className="h-10 rounded-lg border border-line px-3 text-sm outline-none"
                 onChange={(event) => setCompanyName(event.target.value)}
                 placeholder="Nombre de empresa"
                 value={companyName}
               />
               <input
-                className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+                className="h-10 rounded-lg border border-line px-3 text-sm outline-none"
                 onChange={(event) => setOwnerEmail(event.target.value)}
                 placeholder="correo@empresa.com"
                 type="email"
                 value={ownerEmail}
               />
               <input
-                className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+                className="h-10 rounded-lg border border-line px-3 text-sm outline-none"
                 onChange={(event) => setTemporaryPassword(event.target.value)}
                 placeholder="Contraseña temporal"
                 type="password"
                 value={temporaryPassword}
               />
               <button
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink disabled:opacity-50"
                 disabled={saving === "company"}
                 onClick={createCompany}
                 type="button"
@@ -237,14 +238,14 @@ export function AdminConsole({
             </div>
           </div>
 
-          <div className="rounded-lg border border-[#d9ded3] bg-white p-4">
+          <div className="rounded-lg border border-line bg-white p-4">
             <h2 className="flex items-center gap-2 text-base font-semibold">
               <UserPlus size={17} />
               Vincular owner
             </h2>
             <div className="mt-4 grid gap-3">
               <select
-                className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+                className="h-10 rounded-lg border border-line px-3 text-sm outline-none"
                 onChange={(event) => setLinkWorkspaceId(event.target.value)}
                 value={linkWorkspaceId}
               >
@@ -255,21 +256,21 @@ export function AdminConsole({
                 ))}
               </select>
               <input
-                className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+                className="h-10 rounded-lg border border-line px-3 text-sm outline-none"
                 onChange={(event) => setLinkOwnerEmail(event.target.value)}
                 placeholder="owner@empresa.com"
                 type="email"
                 value={linkOwnerEmail}
               />
               <input
-                className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+                className="h-10 rounded-lg border border-line px-3 text-sm outline-none"
                 onChange={(event) => setLinkOwnerPassword(event.target.value)}
                 placeholder="Contraseña temporal si no existe"
                 type="password"
                 value={linkOwnerPassword}
               />
               <button
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink disabled:opacity-50"
                 disabled={saving === "link" || !linkWorkspaceId}
                 onClick={linkOwner}
                 type="button"
@@ -280,7 +281,7 @@ export function AdminConsole({
             </div>
           </div>
 
-          <div className="rounded-lg border border-[#d9ded3] bg-white p-4">
+          <div className="rounded-lg border border-line bg-white p-4">
             <h2 className="flex items-center gap-2 text-base font-semibold">
               <ShieldCheck size={17} />
               Superadmins
@@ -288,12 +289,12 @@ export function AdminConsole({
             <div className="mt-4 grid gap-2">
               {superadmins.map((email) => (
                 <span
-                  className="flex items-center justify-between gap-2 rounded-lg bg-[#eef2eb] px-3 py-2 text-sm"
+                  className="flex items-center justify-between gap-2 rounded-lg bg-paper-2 px-3 py-2 text-sm"
                   key={email}
                 >
                   <span className="min-w-0 truncate">{email}</span>
                   <button
-                    className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-[#4d5a51] hover:bg-white disabled:opacity-40"
+                    className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-ink-2 hover:bg-white disabled:opacity-40"
                     disabled={
                       bootstrapSuperadmins.includes(email) ||
                       saving === `remove:${email}`
@@ -311,21 +312,21 @@ export function AdminConsole({
                 </span>
               ))}
               <input
-                className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+                className="h-10 rounded-lg border border-line px-3 text-sm outline-none"
                 onChange={(event) => setNewAdminEmail(event.target.value)}
                 placeholder="nuevo@admin.com"
                 type="email"
                 value={newAdminEmail}
               />
               <input
-                className="h-10 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none"
+                className="h-10 rounded-lg border border-line px-3 text-sm outline-none"
                 onChange={(event) => setNewAdminPassword(event.target.value)}
                 placeholder="Contraseña temporal si no existe"
                 type="password"
                 value={newAdminPassword}
               />
               <button
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink disabled:opacity-50"
                 disabled={saving === "superadmin"}
                 onClick={addSuperadmin}
                 type="button"
@@ -337,40 +338,40 @@ export function AdminConsole({
         </section>
 
         {status ? (
-          <p className="rounded-lg bg-[#eef2eb] px-3 py-2 text-sm text-[#4d5a51]">
+          <p className="rounded-lg bg-paper-2 px-3 py-2 text-sm text-ink-2">
             {status}
           </p>
         ) : null}
 
-        <section className="rounded-lg border border-[#d9ded3] bg-white p-4">
+        <section className="rounded-lg border border-line bg-white p-4">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-base font-semibold">Empresas</h2>
-            <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs text-[#4d5a51]">
+            <span className="rounded-lg bg-paper-2 px-2 py-1 text-xs text-ink-2">
               {companies.length}
             </span>
           </div>
           <div className="mt-4 grid gap-3">
             {companies.map((company) => (
               <div
-                className="grid gap-3 rounded-lg border border-[#e2e6df] p-3 md:grid-cols-[1fr_auto]"
+                className="grid gap-3 rounded-lg border border-line p-3 md:grid-cols-[1fr_auto]"
                 key={company.id}
               >
                 <div className="min-w-0">
                   <p className="font-semibold">{company.name}</p>
-                  <p className="mt-1 text-sm text-[#647067]">
+                  <p className="mt-1 text-sm text-muted">
                     {company.ownerEmail || "Sin owner visible"} - {company.companyCode ?? company.slug}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs">
+                    <span className="rounded-lg bg-paper-2 px-2 py-1 text-xs">
                       {company.onboardingCompletedAt ? "Onboarding completo" : "Pendiente"}
                     </span>
-                    <span className="rounded-lg bg-[#eef2eb] px-2 py-1 text-xs">
+                    <span className="rounded-lg bg-paper-2 px-2 py-1 text-xs">
                       {company.memberCount} miembros
                     </span>
                     <span
                       className={`rounded-lg px-2 py-1 text-xs ${
                         company.billing.exempt || company.billing.status === "active" || company.billing.status === "trialing"
-                          ? "bg-[#e7f6ce] text-[#31521d]"
+                          ? "bg-yellow-soft text-ink"
                           : "bg-[#fbeeea] text-[#7a2a1d]"
                       }`}
                     >
@@ -380,8 +381,8 @@ export function AdminConsole({
                       <span
                         className={`rounded-lg px-2 py-1 text-xs ${
                           company.activeProviders.includes(provider)
-                            ? "bg-[#e7f6ce] text-[#31521d]"
-                            : "bg-[#eef2eb] text-[#647067]"
+                            ? "bg-yellow-soft text-ink"
+                            : "bg-paper-2 text-muted"
                         }`}
                         key={provider}
                       >
@@ -400,13 +401,13 @@ export function AdminConsole({
                       Exenta de pago
                     </label>
                     <input
-                      className="h-9 w-56 rounded-lg border border-[#cbd2c6] px-2 text-sm"
+                      className="h-9 w-56 rounded-lg border border-line px-2 text-sm"
                       onChange={(event) => setCustomerDrafts((current) => ({ ...current, [company.id]: event.target.value }))}
                       placeholder="cus_… (cliente de Stripe)"
                       value={customerDrafts[company.id] ?? company.billing.stripeCustomerId ?? ""}
                     />
                     <button
-                      className="h-9 rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium disabled:opacity-60"
+                      className="h-9 rounded-lg border border-line px-3 text-sm font-medium disabled:opacity-60"
                       disabled={saving === `billing:${company.id}` || customerDrafts[company.id] === undefined}
                       onClick={() => updateBilling(company.id, { stripeCustomerId: (customerDrafts[company.id] ?? "").trim() || null })}
                       type="button"
@@ -416,7 +417,7 @@ export function AdminConsole({
                   </div>
                 </div>
                 <button
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line px-3 text-sm font-medium"
                   disabled={saving === `open:${company.id}`}
                   onClick={() => openCompany(company.id)}
                   type="button"

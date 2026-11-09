@@ -76,8 +76,14 @@ pedir el teléfono: sin teléfono ni un contacto con ese correo, el comprador no
 se puede crear en el CRM de AAA001 (la cuenta sí se crea).
 
 Tras el pago, el Payment Link tiene que redirigir a
-`https://agentelevi.com/bienvenida?session_id={CHECKOUT_SESSION_ID}` (la landing,
-`activa.agentelevi.com`, no interviene). Esa página solo lee: la cuenta la crea el webhook.
+`https://agentelevi.com/bienvenida?session_id={CHECKOUT_SESSION_ID}`. Esa página solo
+lee: la cuenta la crea el webhook.
+
+La landing es esta app y es la página por defecto: `src/proxy.ts` sirve `src/app/inicio`
+en `/` salvo a quien tiene una sesión válida de Supabase (una cookie caducada también ve
+la landing). Sus botones de compra usan `STRIPE_PAYMENT_LINK_URL`, que se lee al construir:
+tras cambiarla hay que volver a desplegar. Sin ella, los botones abren un correo a
+`hola@agentelevi.com`. `activa.agentelevi.com` ya no se usa.
 
 Si vienes de la versión con GoHighLevel, borra de Vercel `LEVY_PURCHASE_WEBHOOK_SECRET`,
 `GHL_AGENCY_TOKEN`, `GHL_AGENCY_LOCATION_ID`, `LEVY_MEETING_CALENDAR_ID`,

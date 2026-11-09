@@ -40,10 +40,10 @@ export function ContactCrmSummary({ contactId }: { contactId: string }) {
   const upcoming = nextAppointment(summary.appointments);
 
   return (
-    <div className="mt-3 grid gap-2 rounded-lg border border-[#e2e6df] p-2 text-xs text-[#647067]">
+    <div className="mt-3 grid gap-2 rounded-lg border border-line p-2 text-xs text-muted">
       <div className="flex flex-wrap items-center gap-1.5">
         {summary.stage ? (
-          <span className="inline-flex items-center gap-1 rounded-lg bg-[#fafbf8] px-2 py-1 font-medium text-[#20231f]">
+          <span className="inline-flex items-center gap-1 rounded-lg bg-paper-2 px-2 py-1 font-medium text-ink">
             <span className="size-2 rounded-full" style={{ backgroundColor: summary.stage.color }} />
             {summary.stage.name}
           </span>
@@ -60,7 +60,7 @@ export function ContactCrmSummary({ contactId }: { contactId: string }) {
           ? `${upcoming.service || "Cita"} · ${new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short" }).format(new Date(upcoming.starts_at))}`
           : "Sin citas próximas"}
       </p>
-      <Link className="font-medium text-[#35735b] underline" href="/clientes">
+      <Link className="font-medium text-ink underline" href="/clientes">
         Ver en Clientes
       </Link>
     </div>

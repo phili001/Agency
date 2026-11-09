@@ -264,8 +264,8 @@ export function buildDirectBookingAnswer(
     const firstName = runtime.contact.fullName?.trim().split(/\s+/)[0];
 
     return result.reagendada === true
-      ? `Listo${firstName ? `, ${firstName}` : ""}. Tu cita quedo cambiada para ${when}.`
-      : `Listo${firstName ? `, ${firstName}` : ""}. Tu cita quedo agendada para ${when}.`;
+      ? `Listo${firstName ? `, ${firstName}` : ""}. Tu cita quedó cambiada para ${when}.`
+      : `Listo${firstName ? `, ${firstName}` : ""}. Tu cita quedó agendada para ${when}.`;
   }
 
   const alternatives = Array.isArray(result.horarios_libres)
@@ -283,10 +283,10 @@ export function buildDirectBookingAnswer(
     : [];
 
   if (alternatives.length > 0) {
-    return `Ese horario ya no está libre. Para ese mismo dia tengo:\n${alternatives.map((time) => `- ${time}`).join("\n")}\nCual prefieres?`;
+    return `Ese horario ya no está libre. Para ese mismo día tengo:\n${alternatives.map((time) => `- ${time}`).join("\n")}\n¿Cuál prefieres?`;
   }
 
-  return "No pude registrar la cita en la agenda en este momento y no quedo agendada. Intenta de nuevo en un momento para volver a validarla.";
+  return "No pude registrar la cita en la agenda en este momento y no quedó agendada. Intenta de nuevo en un momento para volver a validarla.";
 }
 
 /** Respuesta a cancelar_cita, redactada por el servidor. */
@@ -352,12 +352,12 @@ export function buildDirectAvailabilityAnswer(
 
   if (requestedTime && requestedAvailable === false) {
     return slots.length > 0
-      ? `${requestedTime} no está disponible el ${dateLabel}. Los horarios libres reales son:\n${slots.map((time) => `- ${time}`).join("\n")}\nCual prefieres?`
-      : `${requestedTime} no está disponible el ${dateLabel} y no quedan otros horarios libres para ese dia.`;
+      ? `${requestedTime} no está disponible el ${dateLabel}. Los horarios libres reales son:\n${slots.map((time) => `- ${time}`).join("\n")}\n¿Cuál prefieres?`
+      : `${requestedTime} no está disponible el ${dateLabel} y no quedan otros horarios libres para ese día.`;
   }
 
   return slots.length > 0
-    ? `Para el ${dateLabel}, los horarios libres reales son:\n${slots.map((time) => `- ${time}`).join("\n")}\nCual prefieres?`
+    ? `Para el ${dateLabel}, los horarios libres reales son:\n${slots.map((time) => `- ${time}`).join("\n")}\n¿Cuál prefieres?`
     : `No hay horarios libres para el ${dateLabel}. ¿Quieres que revise otro día?`;
 }
 

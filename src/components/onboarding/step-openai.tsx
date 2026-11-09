@@ -18,6 +18,8 @@ import {
   readApiError,
 } from "./shared";
 import { type StepContext, getIntegrationConfig } from "./wizard";
+import { onboardingStepEyebrow } from "@/lib/onboarding-steps";
+import { clientFetch } from "@/lib/client-fetch";
 
 const DEFAULT_MODEL = "gpt-5.4-mini";
 
@@ -71,7 +73,7 @@ export function StepOpenAI({ ctx }: { ctx: StepContext }) {
     setBusy("save");
     setError("");
     setSuccess("");
-    const saveResponse = await fetch("/api/integrations/openai", {
+    const saveResponse = await clientFetch("/api/integrations/openai", {
       body: JSON.stringify({
         apiKey: cleanKey,
         defaultModel: model.trim() || DEFAULT_MODEL,
@@ -105,7 +107,7 @@ export function StepOpenAI({ ctx }: { ctx: StepContext }) {
     setBusy("test");
     setError("");
     setSuccess("");
-    const response = await fetch("/api/integrations/openai/test", {
+    const response = await clientFetch("/api/integrations/openai/test", {
       body: JSON.stringify({ workspaceId: ctx.workspace.id }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
@@ -125,7 +127,7 @@ export function StepOpenAI({ ctx }: { ctx: StepContext }) {
   return (
     <div className="grid gap-6">
       <StepHeading
-        eyebrow="Paso 3 · El cerebro"
+        eyebrow={onboardingStepEyebrow("openai", "El cerebro")}
         title="Conecta la inteligencia que escribe las respuestas"
         description={
           <>
@@ -191,7 +193,7 @@ export function StepOpenAI({ ctx }: { ctx: StepContext }) {
                 <>
                   Entra en{" "}
                   <a
-                    className="font-medium text-[#35735b] underline"
+                    className="font-medium text-ink underline"
                     href="https://platform.openai.com/api-keys"
                     rel="noreferrer"
                     target="_blank"

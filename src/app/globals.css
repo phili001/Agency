@@ -1,20 +1,45 @@
 @import "tailwindcss";
 
-:root {
-  --background: #f6f7f3;
-  --foreground: #20231f;
+/*
+ * Sistema de diseño de Levy: papel y crema, texto en tinta y el amarillo de la
+ * estrella solo para la acción principal, insignias y selección.
+ */
+@theme {
+  --color-ink: #111111;
+  --color-ink-2: #4a4943;
+  --color-muted: #6b6a63;
+  /* Solo placeholders y detalles: 3,5:1 no basta para texto que hay que leer. */
+  --color-faint: #8a8980;
+  --color-line: #e7e6e0;
+  --color-line-strong: #cfcec6;
+  --color-paper: #ffffff;
+  --color-paper-2: #f7f6f1;
+  --color-dark: #171616;
+  --color-yellow: #f6e469;
+  --color-yellow-strong: #efd63a;
+  --color-yellow-soft: #fdf7d6;
+  --color-red: #e5484d;
+  --color-green: #1e7b34;
+
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 20px;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter), "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-figtree), "Segoe UI", system-ui, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
 }
 
 button {

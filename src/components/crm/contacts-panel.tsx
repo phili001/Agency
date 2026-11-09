@@ -19,6 +19,7 @@ import { readApiError } from "@/components/onboarding/shared";
 import { ContactDrawer } from "./contact-drawer";
 import { CrmSettings } from "./crm-settings";
 import type { ContactListItem, CrmFieldOption, CrmPanelOptions } from "./types";
+import { clientFetch } from "@/lib/client-fetch";
 
 const SOURCE_LABELS: Record<string, string> = {
   import: "Importado",
@@ -27,11 +28,11 @@ const SOURCE_LABELS: Record<string, string> = {
   whatsapp: "WhatsApp",
 };
 
-const inputClass = "h-10 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm outline-none";
+const inputClass = "h-10 rounded-lg border border-line bg-white px-3 text-sm outline-none";
 const primaryButton =
-  "inline-flex h-10 items-center gap-2 rounded-lg bg-[#10231c] px-3 text-sm font-medium text-white disabled:bg-[#9aa59e]";
+  "inline-flex h-10 items-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink disabled:opacity-50";
 const secondaryButton =
-  "inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm font-medium disabled:opacity-60";
+  "inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-medium disabled:opacity-60";
 
 function formatWhen(value: string | null) {
   if (!value) return "—";
@@ -42,7 +43,7 @@ function formatWhen(value: string | null) {
 
 function TagChip({ color, name }: { color: string; name: string }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-md border border-[#e2e6df] bg-white px-1.5 py-0.5 text-xs">
+    <span className="inline-flex items-center gap-1 rounded-md border border-line bg-white px-1.5 py-0.5 text-xs">
       <span className="size-2 rounded-full" style={{ backgroundColor: color }} />
       {name}
     </span>
@@ -90,7 +91,7 @@ export function ContactsPanel({
     if (tagId) params.set("tagId", tagId);
     if (source) params.set("source", source);
 
-    const response = await fetch(`/api/crm/contacts?${params.toString()}`);
+    const response = await clientFetch(`/api/crm/contacts?${params.toString()}`);
 
     if (!response.ok) {
       setError(await readApiError(response, "No se pudieron cargar los contactos."));
@@ -122,7 +123,7 @@ export function ContactsPanel({
   }, [contacts, options.stages]);
 
   async function moveStage(contactId: string, nextStageId: string) {
-    const response = await fetch(`/api/crm/contacts/${contactId}/stage`, {
+    const response = await clientFetch(`/api/crm/contacts/${contactId}/stage`, {
       body: JSON.stringify({ stageId: nextStageId }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
@@ -139,7 +140,7 @@ export function ContactsPanel({
     setError("");
     const form = new FormData();
     form.set("file", file);
-    const response = await fetch("/api/crm/contacts/import", { body: form, method: "POST" });
+    const response = await clientFetch("/api/crm/contacts/import", { body: form, method: "POST" });
 
     if (!response.ok) {
       setError(await readApiError(response, "No se pudo importar el archivo."));
@@ -156,19 +157,19 @@ export function ContactsPanel({
   }
 
   return (
-    <section className="rounded-lg border border-[#d9ded3] bg-white p-4" id="clients">
+    <section className="rounded-lg border border-line bg-white p-4" id="clients">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-base font-semibold">Clientes</h2>
-          <p className="mt-1 text-sm text-[#647067]">
+          <p className="mt-1 text-sm text-muted">
             Contactos de esta empresa: etapa, etiquetas, notas, tareas y citas.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-lg border border-[#cbd2c6] p-0.5">
+          <div className="inline-flex rounded-lg border border-line p-0.5">
             <button
               aria-pressed={view === "list"}
-              className={`inline-flex h-9 items-center gap-1 rounded-md px-2 text-sm ${view === "list" ? "bg-[#eef2eb] font-medium" : ""}`}
+              className={`inline-flex h-9 items-center gap-1 rounded-md px-2 text-sm ${view === "list" ? "bg-paper-2 font-medium" : ""}`}
               onClick={() => {
                 setView("list");
                 setPage(1);
@@ -179,7 +180,7 @@ export function ContactsPanel({
             </button>
             <button
               aria-pressed={view === "kanban"}
-              className={`inline-flex h-9 items-center gap-1 rounded-md px-2 text-sm ${view === "kanban" ? "bg-[#eef2eb] font-medium" : ""}`}
+              className={`inline-flex h-9 items-center gap-1 rounded-md px-2 text-sm ${view === "kanban" ? "bg-paper-2 font-medium" : ""}`}
               onClick={() => {
                 setView("kanban");
                 setPage(1);
@@ -234,7 +235,7 @@ export function ContactsPanel({
       </div>
 
       {showSettings && canManage ? (
-        <div className="mt-4 rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-3">
+        <div className="mt-4 rounded-lg border border-line bg-paper-2 p-3">
           <CrmSettings
             initialFields={allFields}
             initialStages={options.stages}
@@ -247,7 +248,7 @@ export function ContactsPanel({
 
       <div className="mt-4 grid gap-2 md:grid-cols-[1fr_180px_180px_150px]">
         <label className="relative">
-          <Search className="pointer-events-none absolute left-3 top-3 text-[#9aa59e]" size={16} />
+          <Search className="pointer-events-none absolute left-3 top-3 text-faint" size={16} />
           <input
             aria-label="Buscar"
             className={`${inputClass} w-full pl-9`}
@@ -287,10 +288,10 @@ export function ContactsPanel({
 
       {error ? <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
       {notice ? (
-        <p className="mt-3 whitespace-pre-line rounded-lg border border-[#d9ded3] bg-[#fafbf8] p-3 text-sm">{notice}</p>
+        <p className="mt-3 whitespace-pre-line rounded-lg border border-line bg-paper-2 p-3 text-sm">{notice}</p>
       ) : null}
 
-      <div className="mt-2 flex items-center gap-2 text-xs text-[#647067]">
+      <div className="mt-2 flex items-center gap-2 text-xs text-muted">
         {loading ? <Loader2 className="animate-spin" size={13} /> : null}
         <span>{total} contacto(s)</span>
       </div>
@@ -298,8 +299,8 @@ export function ContactsPanel({
       {view === "list" ? (
         <div className="mt-2 overflow-x-auto">
           <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="text-xs text-[#647067]">
-              <tr className="border-b border-[#e2e6df]">
+            <thead className="text-xs text-muted">
+              <tr className="border-b border-line">
                 <th className="py-2 pr-3 font-medium">Contacto</th>
                 <th className="py-2 pr-3 font-medium">Etapa</th>
                 <th className="py-2 pr-3 font-medium">Etiquetas</th>
@@ -310,13 +311,13 @@ export function ContactsPanel({
             <tbody>
               {contacts.map((contact) => (
                 <tr
-                  className="cursor-pointer border-b border-[#eef0ec] hover:bg-[#fafbf8]"
+                  className="cursor-pointer border-b border-line hover:bg-paper-2"
                   key={contact.id}
                   onClick={() => setOpenContactId(contact.id)}
                 >
                   <td className="py-2.5 pr-3">
                     <p className="font-semibold">{contact.full_name ?? "Sin nombre"}</p>
-                    <p className="text-xs text-[#647067]">
+                    <p className="text-xs text-muted">
                       {contact.phone_e164}
                       {contact.company ? ` · ${contact.company}` : ""}
                     </p>
@@ -337,14 +338,16 @@ export function ContactsPanel({
                     </div>
                   </td>
                   <td className="py-2.5 pr-3 text-xs">{SOURCE_LABELS[contact.source ?? ""] ?? "—"}</td>
-                  <td className="py-2.5 text-xs text-[#647067]">{formatWhen(contact.last_message_at)}</td>
+                  <td className="py-2.5 text-xs text-muted">{formatWhen(contact.last_message_at)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
           {contacts.length === 0 && !loading ? (
-            <p className="mt-3 rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
-              No hay contactos con estos filtros. Los que escriban por WhatsApp aparecerán aquí solos.
+            <p className="mt-3 rounded-lg border border-dashed border-line p-3 text-sm text-muted">
+              {query.trim() || stageId || tagId || source
+                ? "No hay contactos con estos filtros."
+                : "Aún no hay contactos. Los que escriban por WhatsApp aparecerán aquí solos."}
             </p>
           ) : null}
           {totalPages > 1 ? (
@@ -352,7 +355,7 @@ export function ContactsPanel({
               <button className={secondaryButton} disabled={page <= 1} onClick={() => setPage(page - 1)} type="button">
                 Anterior
               </button>
-              <span className="text-[#647067]">
+              <span className="text-muted">
                 Página {page} de {totalPages}
               </span>
               <button className={secondaryButton} disabled={page >= totalPages} onClick={() => setPage(page + 1)} type="button">
@@ -366,18 +369,18 @@ export function ContactsPanel({
           {options.stages.map((stage) => {
             const column = byStage.get(stage.id) ?? [];
             return (
-              <div className="flex min-h-40 flex-col rounded-lg border border-[#e2e6df] bg-[#fafbf8] p-2" key={stage.id}>
+              <div className="flex min-h-40 flex-col rounded-lg border border-line bg-paper-2 p-2" key={stage.id}>
                 <p className="flex items-center gap-1.5 px-1 py-1 text-sm font-semibold">
                   <span className="size-2 rounded-full" style={{ backgroundColor: stage.color }} />
                   {stage.name}
-                  <span className="ml-auto text-xs font-normal text-[#647067]">{column.length}</span>
+                  <span className="ml-auto text-xs font-normal text-muted">{column.length}</span>
                 </p>
                 <div className="mt-1 grid gap-2">
                   {column.map((contact) => (
-                    <div className="rounded-lg border border-[#e2e6df] bg-white p-2 text-sm" key={contact.id}>
+                    <div className="rounded-lg border border-line bg-white p-2 text-sm" key={contact.id}>
                       <button className="w-full text-left" onClick={() => setOpenContactId(contact.id)} type="button">
                         <p className="truncate font-semibold">{contact.full_name ?? "Sin nombre"}</p>
-                        <p className="text-xs text-[#647067]">{contact.phone_e164}</p>
+                        <p className="text-xs text-muted">{contact.phone_e164}</p>
                       </button>
                       <div className="mt-1 flex flex-wrap gap-1">
                         {contact.tags.map((tag) => (
@@ -386,7 +389,7 @@ export function ContactsPanel({
                       </div>
                       <select
                         aria-label="Mover a etapa"
-                        className="mt-2 h-8 w-full rounded-md border border-[#e2e6df] px-2 text-xs outline-none"
+                        className="mt-2 h-8 w-full rounded-md border border-line px-2 text-xs outline-none"
                         onChange={(event) => void moveStage(contact.id, event.target.value)}
                         value={stage.id}
                       >
@@ -403,7 +406,7 @@ export function ContactsPanel({
             );
           })}
           {total > contacts.length ? (
-            <p className="col-span-full text-xs text-[#647067]">
+            <p className="col-span-full text-xs text-muted">
               Se muestran los {contacts.length} contactos más recientes. Usa los filtros para afinar.
             </p>
           ) : null}
@@ -456,7 +459,7 @@ function NewContactDialog({
     event.preventDefault();
     setSaving(true);
     setError("");
-    const response = await fetch("/api/crm/contacts", {
+    const response = await clientFetch("/api/crm/contacts", {
       body: JSON.stringify({ ...form, stageId: form.stageId || null }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
@@ -472,7 +475,7 @@ function NewContactDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-[#10231c]/35 p-4 backdrop-blur-sm" role="dialog">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/35 p-4 backdrop-blur-sm" role="dialog">
       <form className="w-full max-w-md rounded-lg bg-white p-4 shadow-xl" onSubmit={submit}>
         <div className="flex items-center justify-between">
           <h3 className="text-base font-semibold">Nuevo contacto</h3>

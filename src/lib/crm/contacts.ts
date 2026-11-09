@@ -354,7 +354,8 @@ export async function searchContacts(client: CrmClient, workspaceId: string, sea
 
   const from = (page - 1) * pageSize;
   const { count, data, error } = await query
-    .order("last_message_at", { ascending: false })
+    // Sin nullsFirst:false, Postgres pone arriba a quien nunca escribió.
+    .order("last_message_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
     .range(from, from + pageSize - 1);
 
@@ -402,7 +403,7 @@ export async function getContactCard(client: CrmClient, workspaceId: string, con
         .select("id, status, last_message_at")
         .eq("workspace_id", workspaceId)
         .eq("contact_id", contactId)
-        .order("last_message_at", { ascending: false })
+        .order("last_message_at", { ascending: false, nullsFirst: false })
         .limit(1),
     ]);
 

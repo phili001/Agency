@@ -1,9 +1,13 @@
-import { Bot, KeyRound } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { updatePassword } from "../login/actions";
+import { brandButton, brandCard, brandError, brandInput, brandLink, PublicShell } from "@/components/brand/public-shell";
 import { createClient } from "@/lib/supabase/server";
+
+import { updatePassword } from "../login/actions";
+
+export const metadata: Metadata = { title: "Nueva contraseña" };
 
 export default async function ResetPasswordPage({
   searchParams,
@@ -30,82 +34,45 @@ export default async function ResetPasswordPage({
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f6f7f3] p-5 text-[#20231f]">
-      <section className="w-full max-w-md rounded-lg border border-[#d9ded3] bg-white p-6 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="flex size-11 items-center justify-center rounded-lg bg-[#10231c] text-[#d2f36b]">
-            <Bot size={23} />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-[#647067]">Levy</p>
-            <h1 className="text-xl font-semibold">
-              {isWelcome ? "Crea tu contraseña" : "Nueva contraseña"}
-            </h1>
-          </div>
-        </div>
+    <PublicShell>
+      <section className={`${brandCard} my-auto w-full max-w-md`}>
+        <h1 className="text-3xl font-extrabold tracking-tight">{isWelcome ? "Crea tu contraseña" : "Nueva contraseña"}</h1>
 
-        <p className="mt-4 text-sm text-[#647067]">
+        <p className="mt-2 leading-7 text-muted">
           {isWelcome ? (
             <>
-              Bienvenido a Levy. Crea la contraseña con la que vas a entrar como{" "}
-              <strong>{user.email}</strong>. Después te llevamos a la configuración guiada.
+              Bienvenido a Levy. Crea la contraseña con la que vas a entrar como <strong className="[overflow-wrap:anywhere] text-ink">{user.email}</strong>. Después te llevamos a la configuración guiada.
             </>
           ) : (
             <>
-              Estás cambiando la contraseña de <strong>{user.email}</strong>.
+              Estás cambiando la contraseña de <strong className="[overflow-wrap:anywhere] text-ink">{user.email}</strong>.
             </>
           )}
         </p>
 
-        <form action={updatePassword} className="mt-5 grid gap-4">
+        <form action={updatePassword} className="mt-6 grid gap-4">
           {isWelcome ? <input name="bienvenida" type="hidden" value="1" /> : null}
-          <label className="grid gap-1.5 text-sm font-medium">
+          <label className="grid gap-1.5 text-sm font-bold">
             {isWelcome ? "Tu contraseña" : "Contraseña nueva"}
-            <input
-              autoComplete="new-password"
-              className="h-11 rounded-lg border border-[#cbd2c6] px-3 outline-none transition focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
-              minLength={8}
-              name="password"
-              placeholder="Mínimo 8 caracteres"
-              required
-              type="password"
-            />
+            <input autoComplete="new-password" className={brandInput} minLength={8} name="password" placeholder="Mínimo 8 caracteres" required type="password" />
           </label>
 
-          <label className="grid gap-1.5 text-sm font-medium">
+          <label className="grid gap-1.5 text-sm font-bold">
             Repite la contraseña
-            <input
-              autoComplete="new-password"
-              className="h-11 rounded-lg border border-[#cbd2c6] px-3 outline-none transition focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50"
-              minLength={8}
-              name="confirmation"
-              placeholder="Mínimo 8 caracteres"
-              required
-              type="password"
-            />
+            <input autoComplete="new-password" className={brandInput} minLength={8} name="confirmation" placeholder="Mínimo 8 caracteres" required type="password" />
           </label>
 
-          {error ? (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error}
-            </p>
-          ) : null}
+          {error ? <p className={brandError}>{error}</p> : null}
 
-          <button className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#10231c] px-4 text-sm font-semibold text-white">
-            <KeyRound size={17} />
-            {isWelcome ? "Crear contraseña y entrar" : "Guardar contraseña"}
-          </button>
+          <button className={brandButton}>{isWelcome ? "Crear contraseña y entrar" : "Guardar contraseña"}</button>
         </form>
 
         {!isWelcome ? (
-          <Link
-            className="mt-4 inline-block text-sm font-medium text-[#35735b] underline underline-offset-4"
-            href="/login"
-          >
+          <Link className={`${brandLink} mt-5 inline-block text-sm`} href="/login">
             Cancelar
           </Link>
         ) : null}
       </section>
-    </main>
+    </PublicShell>
   );
 }

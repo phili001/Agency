@@ -44,7 +44,7 @@ export const getPanelContext = cache(async () => {
 
     redirect(
       `/login?error=${encodeURIComponent(
-        "Tu usuario aun no tiene una empresa asignada. Pide al administrador que cree o vincule tu empresa.",
+        "Tu usuario aún no tiene una empresa asignada. Pide al administrador que cree o vincule tu empresa.",
       )}`,
     );
   }

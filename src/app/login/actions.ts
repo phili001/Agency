@@ -52,7 +52,7 @@ async function redirectAfterAuth(user: User): Promise<never> {
     await supabase.auth.signOut();
     redirect(
       `/login?error=${encodeURIComponent(
-        "Tu usuario aun no tiene una empresa asignada. Pide al administrador que cree o vincule tu empresa.",
+        "Tu usuario aún no tiene una empresa asignada. Pide al administrador que cree o vincule tu empresa.",
       )}`,
     );
   }

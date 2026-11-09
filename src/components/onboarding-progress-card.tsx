@@ -29,10 +29,10 @@ export function OnboardingProgressCard({
   const next = pending[0];
 
   return (
-    <section className="rounded-lg border border-[#b9dc9c] bg-[#eef6df] p-4">
+    <section className="rounded-lg border border-yellow-strong bg-yellow-soft p-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex items-start gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#10231c] text-[#d2f36b]">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-ink text-yellow">
             <Sparkles size={20} />
           </span>
           <div>
@@ -41,7 +41,7 @@ export function OnboardingProgressCard({
                 ? "Ya tienes todo listo. Confirma para cerrar la configuración."
                 : `Te faltan ${pending.length} ${pending.length === 1 ? "paso" : "pasos"} para que Levy responda solo`}
             </h2>
-            <p className="mt-1 text-sm text-[#4d5a51]">
+            <p className="mt-1 text-sm text-ink-2">
               {!checklist.ycloudReady
                 ? "Aún no recibes mensajes: conecta tu WhatsApp para empezar."
                 : !checklist.openaiReady
@@ -51,7 +51,7 @@ export function OnboardingProgressCard({
           </div>
         </div>
         <Link
-          className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#10231c] px-4 text-sm font-semibold text-white"
+          className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-4 text-sm font-bold text-ink"
           href={`/onboarding?paso=${next?.index ?? onboardingSteps.length - 1}`}
         >
           {next ? `Continuar: ${next.shortTitle}` : "Terminar configuración"}
@@ -67,15 +67,15 @@ export function OnboardingProgressCard({
               <Link
                 className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
                   done
-                    ? "border-transparent bg-white/60 text-[#4d5a51]"
-                    : "border-[#cbd2c6] bg-white font-medium text-[#20231f] hover:border-[#35735b]"
+                    ? "border-transparent bg-white/60 text-ink-2"
+                    : "border-line bg-white font-medium text-ink hover:border-ink"
                 }`}
                 href={`/onboarding?paso=${step.index}`}
               >
                 {done ? (
-                  <Check className="shrink-0 text-[#35735b]" size={16} />
+                  <Check className="shrink-0 text-ink" size={16} />
                 ) : (
-                  <Circle className="shrink-0 text-[#c3cac2]" size={16} />
+                  <Circle className="shrink-0 text-line-strong" size={16} />
                 )}
                 <span className="truncate">{step.shortTitle}</span>
               </Link>
@@ -83,10 +83,10 @@ export function OnboardingProgressCard({
           );
         })}
       </ul>
-      <p className="mt-3 text-sm text-[#4d5a51]">
+      <p className="mt-3 text-sm text-ink-2">
         ¿Te atascaste? Escríbenos al WhatsApp{" "}
         <a
-          className="font-semibold text-[#20231f] underline-offset-4 hover:underline"
+          className="font-semibold text-ink underline-offset-4 hover:underline"
           href={buildSupportLink(
             buildSupportMessage({
               companyName,

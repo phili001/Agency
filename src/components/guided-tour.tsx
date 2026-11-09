@@ -216,7 +216,7 @@ export function GuidedTour({
       <div className="absolute inset-0" />
       {rect ? (
         <div
-          className="pointer-events-none absolute rounded-xl border-2 border-[#d2f36b] transition-all duration-300"
+          className="pointer-events-none absolute rounded-xl border-2 border-yellow transition-all duration-300"
           style={{
             boxShadow: "0 0 0 9999px rgba(16, 35, 28, 0.6)",
             height: rect.height,
@@ -227,18 +227,18 @@ export function GuidedTour({
         />
       ) : null}
       <div
-        className="absolute grid gap-3 rounded-2xl border border-[#d9ded3] bg-white p-4 text-[#20231f] shadow-2xl"
+        className="absolute grid gap-3 rounded-2xl border border-line bg-white p-4 text-ink shadow-2xl"
         ref={cardRef}
         style={cardStyle}
       >
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[#647067]">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
             <CircleHelp size={14} />
             {tour.title} · {index + 1} de {visibleSteps.length}
           </div>
           <button
             aria-label="Cerrar guía"
-            className="rounded-lg p-1 text-[#647067] hover:bg-[#f3f4ef]"
+            className="rounded-lg p-1 text-muted hover:bg-paper-2"
             onClick={() => void finish()}
             type="button"
           >
@@ -247,11 +247,11 @@ export function GuidedTour({
         </div>
         <div>
           <p className="text-base font-semibold">{step.title}</p>
-          <p className="mt-1 text-sm leading-relaxed text-[#4d5a51]">{step.body}</p>
+          <p className="mt-1 text-sm leading-relaxed text-ink-2">{step.body}</p>
         </div>
         <div className="flex items-center justify-between gap-2">
           <button
-            className="text-sm font-medium text-[#647067] underline-offset-4 hover:underline"
+            className="text-sm font-medium text-muted underline-offset-4 hover:underline"
             onClick={() => void finish()}
             type="button"
           >
@@ -260,7 +260,7 @@ export function GuidedTour({
           <div className="flex gap-2">
             {index > 0 ? (
               <button
-                className="inline-flex h-9 items-center gap-1 rounded-lg border border-[#cbd2c6] px-3 text-sm font-medium"
+                className="inline-flex h-9 items-center gap-1 rounded-lg border border-line px-3 text-sm font-medium"
                 onClick={() => setIndex(index - 1)}
                 type="button"
               >
@@ -269,7 +269,7 @@ export function GuidedTour({
               </button>
             ) : null}
             <button
-              className="inline-flex h-9 items-center gap-1 rounded-lg bg-[#10231c] px-3 text-sm font-semibold text-white"
+              className="inline-flex h-9 items-center gap-1 rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] px-3 text-sm font-bold text-ink"
               onClick={() => (isLast ? void finish() : setIndex(index + 1))}
               type="button"
             >
@@ -287,7 +287,7 @@ export function GuidedTour({
 export function TourLauncher({ tourKey }: { tourKey: TourKey }) {
   return (
     <button
-      className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm font-medium"
+      className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-medium"
       onClick={() =>
         window.dispatchEvent(new CustomEvent(START_TOUR_EVENT, { detail: { tourKey } }))
       }

@@ -23,6 +23,7 @@ import {
 
 import { ContactCrmSummary } from "@/components/crm/contact-crm-summary";
 import { createClient } from "@/lib/supabase/client";
+import { clientFetch } from "@/lib/client-fetch";
 
 /** Ritmo del polling del inbox: rapido mientras hay movimiento, lento en reposo. */
 const SNAPSHOT_POLL_MIN_MS = 3500;
@@ -88,6 +89,9 @@ type ConversationItem = {
 
 type InboxView = "ai" | "handoff" | "onboarding";
 
+/** Igual que el `.limit(100)` del panel y de /api/inbox/snapshot. */
+const INBOX_CONVERSATION_LIMIT = 100;
+
 const handoffSourceLabel: Record<string, string> = {
   flow_review: "Revisión de onboarding",
   keyword: "Lo pidió el contacto",
@@ -121,7 +125,7 @@ function messageTypeLabel(type: string) {
     case "file":
       return "Documento sin archivo";
     case "event":
-      return "Evento de WhatsApp";
+      return "Mensaje que no se puede mostrar aquí; míralo en WhatsApp";
     default:
       return "Mensaje sin texto";
   }
@@ -178,7 +182,7 @@ function MessageAttachment({ message }: { message: MessageItem }) {
         {/* eslint-disable-next-line @next/next/no-img-element -- origen dinamico y privado, no pasa por el optimizador */}
         <img
           alt={message.body ?? "Imagen enviada por WhatsApp"}
-          className="max-h-72 w-auto max-w-full rounded-md border border-[#d9ded3] object-contain"
+          className="max-h-72 w-auto max-w-full rounded-md border border-line object-contain"
           loading="lazy"
           src={src}
         />
@@ -186,10 +190,10 @@ function MessageAttachment({ message }: { message: MessageItem }) {
     );
   } else if (kind === "audio") {
     attachment = (
-      <div className="flex items-center gap-2 rounded-md border border-[#d9ded3] bg-[#f6f7f3] px-3 py-2">
-        <Mic className="shrink-0 text-[#35735b]" size={16} />
+      <div className="flex items-center gap-2 rounded-md border border-line bg-paper-2 px-3 py-2">
+        <Mic className="shrink-0 text-ink" size={16} />
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-[#20231f]">Nota de voz</p>
+          <p className="text-xs font-semibold text-ink">Nota de voz</p>
           <audio className="mt-1 h-8 w-full max-w-xs" controls preload="none" src={src}>
             <a href={src}>Escuchar</a>
           </audio>
@@ -199,12 +203,12 @@ function MessageAttachment({ message }: { message: MessageItem }) {
   } else {
     attachment = (
       <a
-        className="flex items-center gap-2 rounded-md border border-[#d9ded3] bg-[#f6f7f3] px-3 py-2 text-[#20231f] hover:bg-[#eef2eb]"
+        className="flex items-center gap-2 rounded-md border border-line bg-paper-2 px-3 py-2 text-ink hover:bg-paper-2"
         href={src}
         rel="noreferrer"
         target="_blank"
       >
-        <Paperclip className="shrink-0 text-[#35735b]" size={16} />
+        <Paperclip className="shrink-0 text-ink" size={16} />
         <span className="truncate text-xs font-semibold">{filename ?? "Documento adjunto"}</span>
       </a>
     );
@@ -214,12 +218,12 @@ function MessageAttachment({ message }: { message: MessageItem }) {
     <div className="mb-2 grid gap-1">
       {attachment}
       {/* WhatsApp conserva el archivo 30 dias; despues el enlace deja de servir. */}
-      <p className="flex items-center gap-1 text-[11px] text-[#7a847c]">
+      <p className="flex items-center gap-1 text-[11px] text-muted">
         <Clock3 className="shrink-0" size={11} />
         <span>
           Disponible 30 días ·{" "}
           <a
-            className="font-medium text-[#35735b] underline-offset-2 hover:underline"
+            className="font-medium text-ink underline-offset-2 hover:underline"
             download={downloadName}
             href={src}
           >
@@ -237,6 +241,12 @@ function isPendingOnboarding(conversation: ConversationItem) {
     conversation.onboarding &&
       pendingOnboardingStatuses.has(conversation.onboarding.status),
   );
+}
+
+function inboxViewOf(conversation: ConversationItem | undefined): InboxView {
+  if (!conversation) return "ai";
+  if (isPendingOnboarding(conversation)) return "onboarding";
+  return conversation.aiEnabled ? "ai" : "handoff";
 }
 
 function onboardingStatusLabel(status: string) {
@@ -318,12 +328,12 @@ export function InboxPanel({
 }: InboxPanelProps) {
   const supabase = createClient();
   const [localConversations, setLocalConversations] = useState(conversations);
-  const [selectedConversationId, setSelectedConversationId] = useState(
-    conversations.find((conversation) => conversation.id === initialConversationId)?.id ??
-      conversations[0]?.id ??
-      "",
-  );
-  const [inboxView, setInboxView] = useState<InboxView>("ai");
+  const initialConversation =
+    conversations.find((conversation) => conversation.id === initialConversationId) ?? conversations[0];
+  const [selectedConversationId, setSelectedConversationId] = useState(initialConversation?.id ?? "");
+  // Abre en la pestaña de la conversación elegida: si no, un enlace a un chat en
+  // handoff (o una bandeja sin chats con IA) enseñaría una lista vacía.
+  const [inboxView, setInboxView] = useState<InboxView>(() => inboxViewOf(initialConversation));
   const [draft, setDraft] = useState("");
   const [noteDraft, setNoteDraft] = useState("");
   const [error, setError] = useState("");
@@ -504,7 +514,7 @@ export function InboxPanel({
       let text: string;
 
       try {
-        const response = await fetch(`/api/inbox/snapshot?${query.toString()}`);
+        const response = await clientFetch(`/api/inbox/snapshot?${query.toString()}`);
 
         if (!response.ok) {
           delay = SNAPSHOT_POLL_MAX_MS;
@@ -641,7 +651,7 @@ export function InboxPanel({
     resetPollingRef.current();
 
     if (direction === "outbound") {
-      const response = await fetch("/api/messages/send", {
+      const response = await clientFetch("/api/messages/send", {
         body: JSON.stringify({
           body,
           conversationId: selectedConversation.id,
@@ -757,7 +767,7 @@ export function InboxPanel({
 
     setError("");
     setReviewAction(action);
-    const response = await fetch("/api/flows/review", {
+    const response = await clientFetch("/api/flows/review", {
       body: JSON.stringify({
         action,
         contactId: selectedConversation.contactId,
@@ -770,7 +780,7 @@ export function InboxPanel({
     const payload = (await response.json()) as { error?: string };
 
     if (!response.ok) {
-      setError(payload.error ?? "No se pudo procesar la decision.");
+      setError(payload.error ?? "No se pudo procesar la decisión.");
     } else {
       setLocalConversations((current) =>
         current.map((conversation) =>
@@ -806,7 +816,7 @@ export function InboxPanel({
     if (
       selectedConversation.onboarding &&
       pendingOnboardingStatuses.has(selectedConversation.onboarding.status) &&
-      !window.confirm("Este contacto ya está en onboarding. Reiniciar desde el primer paso?")
+      !window.confirm("Este contacto ya está en onboarding. ¿Reiniciar desde el primer paso?")
     ) {
       return;
     }
@@ -814,7 +824,7 @@ export function InboxPanel({
     setError("");
     setNotice("");
     setFlowAction("start");
-    const response = await fetch("/api/flows/start", {
+    const response = await clientFetch("/api/flows/start", {
       body: JSON.stringify({
         contactId: selectedConversation.contactId,
         conversationId: selectedConversation.id,
@@ -884,7 +894,7 @@ export function InboxPanel({
     setNotice(
       payload.delivered
         ? `${payload.flowName ?? "Flujo"} iniciado. Primer mensaje enviado.`
-        : `${payload.flowName ?? "Flujo"} iniciado. El mensaje quedo en cola.`,
+        : `${payload.flowName ?? "Flujo"} iniciado. El mensaje quedó en cola.`,
     );
     setFlowAction("");
   }
@@ -900,7 +910,7 @@ export function InboxPanel({
 
     if (
       !window.confirm(
-        "Sacar a este contacto del flujo? Se cancelan los mensajes pendientes y la conversación pasa a una persona.",
+        "¿Sacar a este contacto del flujo? Se cancelan los mensajes pendientes y la conversación pasa a una persona.",
       )
     ) {
       return;
@@ -909,7 +919,7 @@ export function InboxPanel({
     setError("");
     setNotice("");
     setFlowAction("stop");
-    const response = await fetch("/api/flows/stop", {
+    const response = await clientFetch("/api/flows/stop", {
       body: JSON.stringify({
         contactId: selectedConversation.contactId,
         conversationId: selectedConversation.id,
@@ -968,7 +978,7 @@ export function InboxPanel({
     );
     setInboxView("handoff");
     setSelectedConversationId(selectedConversation.id);
-    setNotice("Contacto fuera del flujo. La conversación quedo con una persona.");
+    setNotice("Contacto fuera del flujo. La conversación quedó con una persona.");
     setFlowAction("");
   }
 
@@ -1048,80 +1058,89 @@ export function InboxPanel({
   }
 
   return (
-    <div className="grid overflow-hidden xl:h-[calc(100vh-260px)] xl:min-h-[430px] xl:grid-cols-[280px_1fr_240px]">
-      <div className="flex max-h-[50vh] min-h-0 flex-col border-b border-[#e2e6df] xl:max-h-none xl:border-b-0 xl:border-r">
+    <div className="grid overflow-hidden lg:grid-cols-[240px_minmax(0,1fr)] lg:grid-rows-[minmax(430px,calc(100vh-260px))_auto] xl:h-[calc(100vh-260px)] xl:min-h-[430px] xl:grid-cols-[260px_minmax(0,1fr)_240px] xl:grid-rows-1 2xl:grid-cols-[280px_minmax(0,1fr)_260px]">
+      <div className="flex max-h-[50vh] min-h-0 flex-col border-b border-line lg:max-h-none lg:border-b-0 lg:border-r">
         <div
-          className="grid shrink-0 grid-cols-3 gap-1 border-b border-[#e2e6df] bg-white p-2"
+          className="grid shrink-0 grid-cols-3 gap-1 border-b border-line bg-white p-2"
           data-tour="inbox-tabs"
         >
           <button
-            className={`flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition ${
+            className={`flex min-h-9 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1.5 py-1 text-xs font-semibold transition 2xl:flex-row 2xl:gap-1.5 2xl:px-2 ${
               inboxView === "ai"
-                ? "bg-[#10231c] text-white"
-                : "bg-[#f3f4ef] text-[#4d5a51] hover:bg-[#e8ece5]"
+                ? "bg-ink text-white"
+                : "bg-paper-2 text-ink-2 hover:bg-line"
             }`}
             onClick={() => selectInboxView("ai")}
             type="button"
           >
-            <Bot size={14} />
-            <span className="truncate">Respondiendo IA</span>
+            <Bot className="hidden shrink-0 2xl:block" size={14} />
+            <span className="truncate">
+              <span className="2xl:hidden">Con IA</span>
+              <span className="hidden 2xl:inline">Respondiendo IA</span>
+            </span>
             <span
               className={`rounded-md px-1.5 py-0.5 text-[10px] ${
-                inboxView === "ai" ? "bg-white/15" : "bg-white text-[#4d5a51]"
+                inboxView === "ai" ? "bg-white/15" : "bg-white text-ink-2"
               }`}
             >
               {aiConversations.length}
             </span>
           </button>
           <button
-            className={`flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition ${
+            className={`flex min-h-9 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1.5 py-1 text-xs font-semibold transition 2xl:flex-row 2xl:gap-1.5 2xl:px-2 ${
               inboxView === "handoff"
                 ? "bg-[#8a5a12] text-white"
-                : "bg-[#f3f4ef] text-[#4d5a51] hover:bg-[#e8ece5]"
+                : "bg-paper-2 text-ink-2 hover:bg-line"
             }`}
             onClick={() => selectInboxView("handoff")}
             type="button"
           >
-            <Hand size={14} />
+            <Hand className="hidden shrink-0 2xl:block" size={14} />
             <span className="truncate">Handoff</span>
             <span
               className={`rounded-md px-1.5 py-0.5 text-[10px] ${
-                inboxView === "handoff" ? "bg-white/15" : "bg-white text-[#4d5a51]"
+                inboxView === "handoff" ? "bg-white/15" : "bg-white text-ink-2"
               }`}
             >
               {handoffConversations.length}
             </span>
           </button>
           <button
-            className={`flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition ${
+            className={`flex min-h-9 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1.5 py-1 text-xs font-semibold transition 2xl:flex-row 2xl:gap-1.5 2xl:px-2 ${
               inboxView === "onboarding"
-                ? "bg-[#35735b] text-white"
-                : "bg-[#f3f4ef] text-[#4d5a51] hover:bg-[#e8ece5]"
+                ? "bg-ink text-white"
+                : "bg-paper-2 text-ink-2 hover:bg-line"
             }`}
             onClick={() => selectInboxView("onboarding")}
             type="button"
           >
-            <GitBranch size={14} />
+            <GitBranch className="hidden shrink-0 2xl:block" size={14} />
             <span className="truncate">Onboarding</span>
             <span
               className={`rounded-md px-1.5 py-0.5 text-[10px] ${
                 inboxView === "onboarding"
                   ? "bg-white/15"
-                  : "bg-white text-[#4d5a51]"
+                  : "bg-white text-ink-2"
               }`}
             >
               {onboardingConversations.length}
             </span>
           </button>
         </div>
-        <label className="relative block shrink-0 border-b border-[#e2e6df] bg-white px-2 py-2">
+        {localConversations.length >= INBOX_CONVERSATION_LIMIT ? (
+          // Las pestañas cuentan solo lo cargado; sin esto no cuadran con las métricas.
+          <p className="shrink-0 border-b border-line bg-paper-2 px-3 py-1.5 text-[11px] text-muted">
+            Se muestran las {INBOX_CONVERSATION_LIMIT} conversaciones más recientes.
+          </p>
+        ) : null}
+        <label className="relative block shrink-0 border-b border-line bg-white px-2 py-2">
           <span className="sr-only">Buscar conversación</span>
           <Search
-            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#7a847c]"
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted"
             size={14}
           />
           <input
-            className="h-9 w-full rounded-lg border border-[#e2e6df] bg-[#fafbf8] pl-8 pr-8 text-sm outline-none transition placeholder:text-[#9aa59e] focus:border-[#35735b] focus:bg-white"
+            className="h-9 w-full rounded-lg border border-line bg-paper-2 pl-8 pr-8 text-sm outline-none transition placeholder:text-faint focus:border-ink focus:bg-white"
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder="Buscar por nombre o teléfono"
             type="search"
@@ -1130,7 +1149,7 @@ export function InboxPanel({
           {searchQuery ? (
             <button
               aria-label="Limpiar búsqueda"
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-[#7a847c] hover:text-[#20231f]"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-muted hover:text-ink"
               onClick={() => setSearchQuery("")}
               type="button"
             >
@@ -1139,7 +1158,7 @@ export function InboxPanel({
           ) : null}
         </label>
         <div
-          className="min-h-0 flex-1 divide-y divide-[#edf0ea] overflow-y-auto"
+          className="min-h-0 flex-1 divide-y divide-line overflow-y-auto"
           data-tour="conversation-list"
         >
         {visibleConversations.map((conversation) => {
@@ -1157,8 +1176,8 @@ export function InboxPanel({
 
           return (
           <button
-            className={`block w-full px-3 py-2.5 text-left transition hover:bg-[#f6f7f3] ${
-              conversation.id === selectedConversation?.id ? "bg-[#eef6df]" : ""
+            className={`block w-full px-3 py-2.5 text-left transition hover:bg-paper-2 ${
+              conversation.id === selectedConversation?.id ? "bg-yellow-soft" : ""
             }`}
             key={conversation.id}
             onClick={() => setSelectedConversationId(conversation.id)}
@@ -1170,19 +1189,19 @@ export function InboxPanel({
                   <h3 className="truncate text-sm font-semibold">
                     {conversation.name}
                   </h3>
-                  <span className="rounded-md bg-[#eef2eb] px-1.5 py-0.5 text-[11px] text-[#4d5a51]">
+                  <span className="rounded-md bg-paper-2 px-1.5 py-0.5 text-[11px] text-ink-2">
                     {conversation.business}
                   </span>
                 </div>
-                <p className="mt-1 line-clamp-1 text-xs text-[#5d685f]">
+                <p className="mt-1 line-clamp-1 text-xs text-muted">
                   {conversation.summary}
                 </p>
               </div>
-              <span className="shrink-0 text-right text-xs text-[#7a847c]">
+              <span className="shrink-0 text-right text-xs text-muted">
                 {conversation.time}
               </span>
             </div>
-            <span className="mt-2 inline-flex rounded-md border border-[#d9ded3] px-2 py-0.5 text-[11px]">
+            <span className="mt-2 inline-flex rounded-md border border-line px-2 py-0.5 text-[11px]">
               {conversation.status}
             </span>
             {inboxView === "handoff" && conversation.handoff ? (
@@ -1191,13 +1210,13 @@ export function InboxPanel({
               </span>
             ) : null}
             {inboxView === "handoff" && conversation.handoff ? (
-              <p className="mt-1.5 line-clamp-1 text-[11px] text-[#7a847c]">
+              <p className="mt-1.5 line-clamp-1 text-[11px] text-muted">
                 {conversation.handoff.reason}
               </p>
             ) : null}
             {pendingOnboarding && conversation.onboarding ? (
               <>
-                <span className="ml-1.5 mt-2 inline-flex max-w-full rounded-md bg-[#dff0e5] px-2 py-0.5 text-[11px] font-medium text-[#285844]">
+                <span className="ml-1.5 mt-2 inline-flex max-w-full rounded-md bg-yellow-soft px-2 py-0.5 text-[11px] font-medium text-ink-2">
                   Onboarding · {conversation.onboarding.stageLabel}
                 </span>
                 <span
@@ -1207,7 +1226,7 @@ export function InboxPanel({
                       ? "bg-red-50 text-red-700"
                       : conversation.onboarding.status === "review_pending"
                         ? "bg-amber-50 text-amber-800"
-                        : "bg-[#eef2eb] text-[#4d5a51]"
+                        : "bg-paper-2 text-ink-2"
                   }`}
                 >
                   {onboardingStatusLabel(conversation.onboarding.status)}
@@ -1218,7 +1237,7 @@ export function InboxPanel({
                 Fuera del flujo
               </span>
             ) : completedOnboarding ? (
-              <span className="ml-1.5 mt-2 inline-flex rounded-md bg-[#eef2eb] px-2 py-0.5 text-[11px] text-[#4d5a51]">
+              <span className="ml-1.5 mt-2 inline-flex rounded-md bg-paper-2 px-2 py-0.5 text-[11px] text-ink-2">
                 Onboarding completado
               </span>
             ) : null}
@@ -1229,13 +1248,13 @@ export function InboxPanel({
           <div className="flex min-h-48 items-center justify-center p-5 text-center">
             <div>
               {inboxView === "onboarding" ? (
-                <GitBranch className="mx-auto text-[#a8b0aa]" size={22} />
+                <GitBranch className="mx-auto text-faint" size={22} />
               ) : inboxView === "handoff" ? (
-                <Hand className="mx-auto text-[#a8b0aa]" size={22} />
+                <Hand className="mx-auto text-faint" size={22} />
               ) : (
-                <Bot className="mx-auto text-[#a8b0aa]" size={22} />
+                <Bot className="mx-auto text-faint" size={22} />
               )}
-              <p className="mt-2 text-sm font-semibold text-[#4d5a51]">
+              <p className="mt-2 text-sm font-semibold text-ink-2">
                 {searchQuery
                   ? `Nada coincide con «${searchQuery}»`
                   : inboxView === "onboarding"
@@ -1244,7 +1263,7 @@ export function InboxPanel({
                       ? "No hay conversaciones esperando a una persona"
                       : "No hay conversaciones con IA activa"}
               </p>
-              <p className="mt-1 text-xs text-[#7a847c]">
+              <p className="mt-1 text-xs text-muted">
                 {searchQuery
                   ? "Prueba con otro nombre o con el teléfono."
                   : "Esta vista se actualiza automáticamente."}
@@ -1255,21 +1274,21 @@ export function InboxPanel({
         </div>
       </div>
 
-      <div className="flex min-h-[70vh] min-w-0 flex-col bg-[#fafbf8] xl:min-h-0">
-        <div className="border-b border-[#e2e6df] bg-white px-4 py-3">
+      <div className="flex min-h-[70vh] min-w-0 flex-col bg-paper-2 lg:min-h-0">
+        <div className="border-b border-line bg-white px-4 py-3">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <p className="font-semibold">
                 {selectedConversation?.name ?? "Selecciona una conversación"}
               </p>
-              <p className="mt-1 text-sm text-[#647067]">
+              <p className="mt-1 text-sm text-muted">
                 {selectedConversation?.contactPhone ??
                   "Cuando haya mensajes, aparecerán aquí."}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#35735b] bg-white px-3 text-sm font-medium text-[#245943] disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-ink bg-white px-3 text-sm font-medium text-ink-2 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={
                   !canSend ||
                   !selectedConversation?.contactId ||
@@ -1309,8 +1328,8 @@ export function InboxPanel({
               <button
                 className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium ${
                   selectedConversation?.aiEnabled
-                    ? "bg-[#e7f6ce] text-[#31521d]"
-                    : "bg-[#eef2eb] text-[#4d5a51]"
+                    ? "bg-yellow-soft text-ink"
+                    : "bg-paper-2 text-ink-2"
                 }`}
                 data-tour="ai-toggle"
                 disabled={!canReply}
@@ -1331,7 +1350,7 @@ export function InboxPanel({
                 {selectedConversation?.aiEnabled ? "IA activa" : "IA apagada"}
               </button>
               <button
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm font-medium"
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-medium"
                 data-tour="handoff-button"
                 disabled={!canReply}
                 onClick={() =>
@@ -1371,19 +1390,19 @@ export function InboxPanel({
                       isInternal
                         ? "border-amber-200 bg-amber-50 text-amber-950"
                         : isOutbound
-                        ? "border-[#b7d889] bg-[#e7f6ce]"
-                        : "border-[#d9ded3] bg-white"
+                        ? "border-yellow-strong bg-yellow-soft"
+                        : "border-line bg-white"
                     }`}
                   >
                     <MessageAttachment message={message} />
                     {message.body ? (
                       <p className="whitespace-pre-wrap">{message.body}</p>
                     ) : message.media_url ? null : (
-                      <p className="italic text-[#647067]">
+                      <p className="italic text-muted">
                         {messageTypeLabel(message.message_type)}
                       </p>
                     )}
-                    <div className="mt-2 flex items-center justify-between gap-4 text-[11px] text-[#647067]">
+                    <div className="mt-2 flex items-center justify-between gap-4 text-[11px] text-muted">
                                   <span>{isInternal ? "nota interna" : message.role}</span>
                       <span>
                         {message.displayTime ?? stableTime(message.created_at)}
@@ -1394,14 +1413,13 @@ export function InboxPanel({
               );
             })
           ) : (
-            <div className="flex h-full min-h-[260px] items-center justify-center text-center text-sm text-[#647067]">
+            <div className="flex h-full min-h-[260px] items-center justify-center text-center text-sm text-muted">
               <div>
-                <MessageSquareText className="mx-auto mb-3 text-[#a8b0aa]" />
-                <p className="font-medium text-[#20231f]">
-                  No hay mensajes para esta conversación.
-                </p>
-                <p className="mt-1">
-                  Revisa que el seed haya insertado filas en `public.messages`.
+                <MessageSquareText className="mx-auto mb-3 text-faint" />
+                <p className="font-medium text-ink">
+                  {selectedConversation
+                    ? "Esta conversación aún no tiene mensajes."
+                    : "Elige una conversación de la lista para ver sus mensajes."}
                 </p>
               </div>
             </div>
@@ -1410,7 +1428,7 @@ export function InboxPanel({
 
         <form
           action={handleSend}
-          className="border-t border-[#e2e6df] bg-white p-3"
+          className="border-t border-line bg-white p-3"
           data-tour="composer"
         >
           {error ? (
@@ -1431,7 +1449,7 @@ export function InboxPanel({
           ) : null}
           <div className="flex gap-2">
             <input
-              className="h-11 min-w-0 flex-1 rounded-lg border border-[#cbd2c6] px-3 text-sm outline-none transition focus:border-[#35735b] focus:ring-2 focus:ring-[#d2f36b]/50 disabled:bg-[#f3f4ef]"
+              className="h-11 min-w-0 flex-1 rounded-lg border border-line px-3 text-sm outline-none transition focus:border-ink focus:ring-2 focus:ring-yellow/50 disabled:bg-paper-2"
               disabled={!canReply}
               name="body"
               onChange={(event) => setDraft(event.target.value)}
@@ -1446,7 +1464,7 @@ export function InboxPanel({
             />
             <button
               aria-label="Enviar mensaje"
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#10231c] text-white disabled:cursor-not-allowed disabled:bg-[#9aa59e]"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-yellow shadow-[inset_0_0_0_1.5px_var(--color-ink)] text-ink disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!canReply || draft.trim().length === 0}
               title="Enviar"
               type="submit"
@@ -1462,20 +1480,20 @@ export function InboxPanel({
 
         <form
           action={handleInternalNote}
-          className="border-t border-[#edf0ea] bg-[#fbfcf8] p-3"
+          className="border-t border-line bg-paper-2 p-3"
           data-tour="internal-note"
         >
           <div className="flex gap-2">
             <input
-              className="h-10 min-w-0 flex-1 rounded-lg border border-amber-200 bg-amber-50 px-3 text-sm outline-none transition placeholder:text-amber-700/70 focus:border-amber-400 focus:ring-2 focus:ring-amber-200 disabled:bg-[#f3f4ef]"
+              className="h-10 min-w-0 flex-1 rounded-lg border border-amber-200 bg-amber-50 px-3 text-sm outline-none transition placeholder:text-amber-700/70 focus:border-amber-400 focus:ring-2 focus:ring-amber-200 disabled:bg-paper-2"
               disabled={!canSend}
               name="note"
               onChange={(event) => setNoteDraft(event.target.value)}
-              placeholder="Nota interna: no se envia al contacto"
+              placeholder="Nota interna: no se envía al contacto"
               value={noteDraft}
             />
             <button
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-amber-200 bg-white px-3 text-sm font-medium text-amber-900 disabled:cursor-not-allowed disabled:bg-[#f3f4ef]"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-amber-200 bg-white px-3 text-sm font-medium text-amber-900 disabled:cursor-not-allowed disabled:bg-paper-2"
               disabled={!canSend || noteDraft.trim().length === 0}
               type="submit"
             >
@@ -1491,36 +1509,36 @@ export function InboxPanel({
       </div>
 
       <aside
-        className="min-h-0 border-t border-[#e2e6df] bg-white p-4 xl:overflow-y-auto xl:border-l xl:border-t-0"
+        className="min-h-0 border-t border-line bg-white p-4 lg:col-span-2 xl:col-span-1 xl:overflow-y-auto xl:border-l xl:border-t-0"
         data-tour="contact-panel"
       >
         <div className="flex items-center gap-2">
-          <UserRound className="text-[#35735b]" size={18} />
+          <UserRound className="text-ink" size={18} />
           <h3 className="text-sm font-semibold">Contacto</h3>
         </div>
-        <div className="mt-4 rounded-lg border border-[#e2e6df] p-3">
+        <div className="mt-4 rounded-lg border border-line p-3">
           <p className="font-semibold">
             {selectedConversation?.name ?? "Sin selección"}
           </p>
-          <p className="mt-2 flex items-center gap-2 text-sm text-[#647067]">
+          <p className="mt-2 flex items-center gap-2 text-sm text-muted">
             <Phone size={14} />
             {selectedConversation?.contactPhone ?? "Sin teléfono"}
           </p>
-          <p className="mt-2 text-xs text-[#7a847c]">
+          <p className="mt-2 text-xs text-muted">
             Workspace: {selectedConversation?.business ?? "-"}
           </p>
           {selectedConversation?.contactMetadata?.flow_progress ? (
-            <div className="mt-3 rounded-lg border border-[#b9d3c3] bg-[#f3f8ed] p-3">
-              <p className="text-[11px] font-semibold uppercase text-[#647067]">
+            <div className="mt-3 rounded-lg border border-line-strong bg-yellow-soft p-3">
+              <p className="text-[11px] font-semibold uppercase text-muted">
                 Etapa actual
               </p>
               <div className="mt-1 flex items-center justify-between gap-2">
-                <span className="rounded-lg bg-[#35735b] px-2 py-1 text-xs font-semibold text-white">
+                <span className="rounded-lg bg-ink px-2 py-1 text-xs font-semibold text-white">
                   {selectedConversation.contactMetadata.flow_progress.currentStageLabel ??
                     selectedConversation.contactMetadata.flow_progress.currentStageKey ??
                     "Inicio"}
                 </span>
-                <span className="text-xs font-semibold text-[#31521d]">
+                <span className="text-xs font-semibold text-ink">
                   {selectedConversation.contactMetadata.flow_progress.completedSteps ?? 0}/
                   {selectedConversation.contactMetadata.flow_progress.totalSteps ?? 0} checks
                 </span>
@@ -1546,7 +1564,7 @@ export function InboxPanel({
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
-                  className="h-9 rounded-lg bg-[#10231c] px-3 text-xs font-semibold text-white disabled:opacity-60"
+                  className="h-9 rounded-lg bg-ink px-3 text-xs font-semibold text-paper disabled:opacity-60"
                   disabled={Boolean(reviewAction)}
                   onClick={() => handleReviewAction("approve")}
                   type="button"
@@ -1570,8 +1588,8 @@ export function InboxPanel({
                 Toda atención bloqueada
               </p>
               <p className="mt-1 text-xs text-red-700">
-                El contacto agoto los intentos de respuestas validas. Los mensajes
-                entrantes se guardan, pero no se envia ninguna respuesta.
+                El contacto agotó los intentos de respuestas válidas. Los mensajes
+                entrantes se guardan, pero no se envía ninguna respuesta.
               </p>
               {activeRole === "owner" || activeRole === "admin" ? (
                 <button
@@ -1586,7 +1604,7 @@ export function InboxPanel({
             </div>
           ) : null}
           {selectedConversation?.contactMetadata?.ai_summary ? (
-            <div className="mt-3 rounded-lg bg-[#fafbf8] p-2 text-sm text-[#4d5a51]">
+            <div className="mt-3 rounded-lg bg-paper-2 p-2 text-sm text-ink-2">
               {selectedConversation.contactMetadata.ai_summary}
             </div>
           ) : null}
@@ -1594,7 +1612,7 @@ export function InboxPanel({
             <div className="mt-3 flex flex-wrap gap-1.5">
               {selectedConversation.contactMetadata.ai_tags.map((tag) => (
                 <span
-                  className="rounded-lg bg-[#e7f6ce] px-2 py-1 text-xs text-[#31521d]"
+                  className="rounded-lg bg-yellow-soft px-2 py-1 text-xs text-ink"
                   key={tag}
                 >
                   {tag}
@@ -1606,7 +1624,7 @@ export function InboxPanel({
             <div className="mt-3 flex flex-wrap gap-1.5">
               {selectedConversation.contactMetadata.automation_labels.map((label) => (
                 <span
-                  className="rounded-lg border border-[#cbd2c6] bg-white px-2 py-1 text-xs text-[#4d5a51]"
+                  className="rounded-lg border border-line bg-white px-2 py-1 text-xs text-ink-2"
                   key={label}
                 >
                   {label}
@@ -1620,7 +1638,7 @@ export function InboxPanel({
         </div>
 
         <div className="mt-5 flex items-center gap-2">
-          <CircleDollarSign className="text-[#35735b]" size={18} />
+          <CircleDollarSign className="text-ink" size={18} />
           <h3 className="text-sm font-semibold">Observabilidad</h3>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
@@ -1632,31 +1650,31 @@ export function InboxPanel({
             ["Notas", String(internalCount)],
             ["Eventos", String(selectedUsageEvents.length)],
           ].map(([label, value]) => (
-            <div className="rounded-lg border border-[#e2e6df] p-3" key={label}>
-              <p className="text-xs text-[#647067]">{label}</p>
+            <div className="rounded-lg border border-line p-3" key={label}>
+              <p className="text-xs text-muted">{label}</p>
               <p className="mt-1 text-sm font-semibold">{value}</p>
             </div>
           ))}
         </div>
 
         <div className="mt-5 flex items-center gap-2">
-          <Clock3 className="text-[#35735b]" size={18} />
+          <Clock3 className="text-ink" size={18} />
           <h3 className="text-sm font-semibold">Eventos IA</h3>
         </div>
         <div className="mt-3 grid gap-2">
           {selectedUsageEvents.length > 0 ? (
             selectedUsageEvents.slice(0, 4).map((event) => (
               <div
-                className="rounded-lg border border-[#e2e6df] p-3 text-sm"
+                className="rounded-lg border border-line p-3 text-sm"
                 key={event.id}
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium">{event.provider}</span>
-                  <span className="text-xs text-[#647067]">
+                  <span className="text-xs text-muted">
                     ${Number(event.cost_usd ?? 0).toFixed(4)}
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-[#647067]">
+                <p className="mt-1 text-xs text-muted">
                   {event.model ?? "sin modelo"} ·{" "}
                   {event.displayTokenTotal ??
                     stableNumber(
@@ -1670,21 +1688,21 @@ export function InboxPanel({
               </div>
             ))
           ) : (
-            <p className="rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
-              Aun no hay eventos de IA para esta conversación.
+            <p className="rounded-lg border border-dashed border-line p-3 text-sm text-muted">
+              Aún no hay eventos de IA para esta conversación.
             </p>
           )}
         </div>
 
         <div className="mt-5 flex items-center gap-2">
-          <MessageSquareText className="text-[#35735b]" size={18} />
+          <MessageSquareText className="text-ink" size={18} />
           <h3 className="text-sm font-semibold">Webhooks</h3>
         </div>
         <div className="mt-3 grid gap-2">
           {webhookEvents.length > 0 ? (
             webhookEvents.slice(0, 4).map((event) => (
               <div
-                className="rounded-lg border border-[#e2e6df] p-3 text-sm"
+                className="rounded-lg border border-line p-3 text-sm"
                 key={event.id}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -1692,16 +1710,16 @@ export function InboxPanel({
                   <span
                     className={`rounded-lg px-2 py-1 text-xs ${
                       event.status === "stored"
-                        ? "bg-[#e7f6ce] text-[#31521d]"
+                        ? "bg-yellow-soft text-ink"
                         : event.status === "error"
                         ? "bg-red-50 text-red-700"
-                        : "bg-[#eef2eb] text-[#4d5a51]"
+                        : "bg-paper-2 text-ink-2"
                     }`}
                   >
                     {event.status}
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-[#647067]">
+                <p className="mt-1 text-xs text-muted">
                   {event.provider} -{" "}
                   {event.displayTime ?? stableTime(event.created_at)}
                 </p>
@@ -1711,8 +1729,8 @@ export function InboxPanel({
               </div>
             ))
           ) : (
-            <p className="rounded-lg border border-dashed border-[#d9ded3] p-3 text-sm text-[#647067]">
-              Sin webhooks recibidos aun.
+            <p className="rounded-lg border border-dashed border-line p-3 text-sm text-muted">
+              Sin webhooks recibidos aún.
             </p>
           )}
         </div>

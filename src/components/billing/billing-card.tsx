@@ -41,9 +41,9 @@ export async function BillingCard({ email, role, workspaceId }: { email: string 
   const message = billingMessage(state);
 
   return (
-    <section className="mx-5 mt-5 rounded-lg border border-[#d9ded3] bg-white p-4">
+    <section className="mx-5 mt-5 rounded-lg border border-line bg-white p-4">
       <h2 className="text-base font-semibold">Facturación</h2>
-      <p className="mt-1 text-sm text-[#647067]">
+      <p className="mt-1 text-sm text-muted">
         {exempt
           ? "Esta empresa no paga suscripción (exenta)."
           : row?.status
@@ -55,7 +55,7 @@ export async function BillingCard({ email, role, workspaceId }: { email: string 
             : "Todavía no hay una suscripción a Levy."}
       </p>
       {message && !exempt ? <p className="mt-1 text-sm">{message}</p> : null}
-      {!isOwner && !exempt ? <p className="mt-2 text-xs text-[#647067]">Solo el dueño de la cuenta puede pagar o cambiar la suscripción.</p> : null}
+      {!isOwner && !exempt ? <p className="mt-2 text-xs text-muted">Solo el dueño de la cuenta puede pagar o cambiar la suscripción.</p> : null}
       {isOwner && !exempt ? (
         <div className="mt-3">
           <BillingActions canOpenPortal={Boolean(row?.stripe_customer_id) && config.secretKey !== null} paymentUrl={paymentUrl} />

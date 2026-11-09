@@ -6,15 +6,16 @@ import { ArrowDown, ArrowUp, Loader2, Plus, Trash2 } from "lucide-react";
 import { readApiError } from "@/components/onboarding/shared";
 
 import type { CrmFieldOption, CrmStageOption, CrmTagOption } from "./types";
+import { clientFetch } from "@/lib/client-fetch";
 
 /**
  * Ajustes del CRM (owner/admin): etapas del embudo (orden, nombre, color,
  * tipo), etiquetas y campos personalizados. Vive dentro de Clientes.
  */
 
-const inputClass = "h-9 rounded-lg border border-[#cbd2c6] bg-white px-2.5 text-sm outline-none";
+const inputClass = "h-9 rounded-lg border border-line bg-white px-2.5 text-sm outline-none";
 const smallButton =
-  "inline-flex h-9 items-center gap-1 rounded-lg border border-[#cbd2c6] bg-white px-2.5 text-sm font-medium disabled:opacity-60";
+  "inline-flex h-9 items-center gap-1 rounded-lg border border-line bg-white px-2.5 text-sm font-medium disabled:opacity-60";
 
 const KIND_LABELS: Record<CrmStageOption["kind"], string> = { lost: "Perdido", open: "Abierta", won: "Ganado" };
 const FIELD_TYPES: Array<[string, string]> = [
@@ -32,7 +33,7 @@ const FIELD_TYPES: Array<[string, string]> = [
 ];
 
 async function send(url: string, method: string, body?: unknown) {
-  const response = await fetch(url, {
+  const response = await clientFetch(url, {
     body: body === undefined ? undefined : JSON.stringify(body),
     headers: body === undefined ? undefined : { "Content-Type": "application/json" },
     method,
@@ -91,13 +92,13 @@ export function CrmSettings({
 
       <section>
         <h3 className="text-sm font-semibold">Etapas del embudo</h3>
-        <p className="text-xs text-[#647067]">Los contactos sin etapa están en la primera «Abierta».</p>
+        <p className="text-xs text-muted">Los contactos sin etapa están en la primera «Abierta».</p>
         <div className="mt-2 grid gap-1.5">
           {stages.map((stage, index) => (
             <div className="grid grid-cols-[auto_1fr_120px_auto] items-center gap-2" key={stage.id}>
               <input
                 aria-label="Color"
-                className="size-9 rounded-lg border border-[#cbd2c6]"
+                className="size-9 rounded-lg border border-line"
                 defaultValue={stage.color}
                 onBlur={(event) =>
                   event.target.value !== stage.color &&
@@ -183,10 +184,10 @@ export function CrmSettings({
 
       <section>
         <h3 className="text-sm font-semibold">Etiquetas</h3>
-        <p className="text-xs text-[#647067]">Ponerle una etiqueta a un contacto puede lanzar un flujo (disparador «Tag»).</p>
+        <p className="text-xs text-muted">Ponerle una etiqueta a un contacto puede lanzar un flujo (disparador «Tag»).</p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {tags.map((tag) => (
-            <span className="inline-flex items-center gap-1 rounded-md border border-[#e2e6df] px-2 py-1 text-sm" key={tag.id}>
+            <span className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-sm" key={tag.id}>
               <span className="size-2.5 rounded-full" style={{ backgroundColor: tag.color }} />
               {tag.name}
               <button
@@ -204,10 +205,10 @@ export function CrmSettings({
               </button>
             </span>
           ))}
-          {tags.length === 0 ? <span className="text-xs text-[#647067]">Aún no hay etiquetas.</span> : null}
+          {tags.length === 0 ? <span className="text-xs text-muted">Aún no hay etiquetas.</span> : null}
         </div>
         <div className="mt-2 flex gap-2">
-          <input aria-label="Color" className="size-9 rounded-lg border border-[#cbd2c6]" onChange={(event) => setNewTag({ ...newTag, color: event.target.value })} type="color" value={newTag.color} />
+          <input aria-label="Color" className="size-9 rounded-lg border border-line" onChange={(event) => setNewTag({ ...newTag, color: event.target.value })} type="color" value={newTag.color} />
           <input className={`${inputClass} flex-1`} onChange={(event) => setNewTag({ ...newTag, name: event.target.value })} placeholder="Nueva etiqueta" value={newTag.name} />
           <button
             className={smallButton}
@@ -228,14 +229,14 @@ export function CrmSettings({
 
       <section>
         <h3 className="text-sm font-semibold">Campos personalizados</h3>
-        <p className="text-xs text-[#647067]">
+        <p className="text-xs text-muted">
           Datos propios de tu negocio en cada ficha. Marca «La IA lo puede leer» solo si el agente lo necesita para atender.
         </p>
         <div className="mt-2 grid gap-1.5">
           {fields.map((field) => (
-            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[#e2e6df] p-2 text-sm" key={field.id}>
-              <span className={`font-medium ${field.active ? "" : "text-[#9aa59e] line-through"}`}>{field.label}</span>
-              <span className="text-xs text-[#647067]">
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line p-2 text-sm" key={field.id}>
+              <span className={`font-medium ${field.active ? "" : "text-faint line-through"}`}>{field.label}</span>
+              <span className="text-xs text-muted">
                 {FIELD_TYPES.find(([value]) => value === field.type)?.[1] ?? field.type} · {field.key}
               </span>
               <label className="ml-auto inline-flex items-center gap-1 text-xs">

@@ -3,6 +3,7 @@
 import { CalendarCheck, Clock3, Info, Sparkles } from "lucide-react";
 
 import { defaultAgentPresets } from "@/lib/default-agents";
+import { onboardingStepNumber as stepNumber, onboardingSteps } from "@/lib/onboarding-steps";
 
 import { HelpBox, HowTo, NumberedSteps, StepFooter, StepHeading } from "./shared";
 import type { StepContext } from "./wizard";
@@ -21,6 +22,9 @@ const roleCopy: Record<string, { icon: typeof Info; what: string }> = {
     what: "Responde dudas: horarios, ubicación, servicios, precios y políticas.",
   },
 };
+
+// Los números salen de la lista real de pasos: si se añade uno, el texto no se desfasa.
+const totalSteps = onboardingSteps.filter((step) => step.index !== 0).length;
 
 export function StepWelcome({ ctx }: { ctx: StepContext }) {
   return (
@@ -45,7 +49,7 @@ export function StepWelcome({ ctx }: { ctx: StepContext }) {
       <HowTo
         title="Cómo funciona esta configuración"
         items={[
-          <>Son 7 pasos cortos. En cada uno lees qué hacer, rellenas lo que se pide y pulsas el botón verde oscuro de abajo.</>,
+          <>Son {totalSteps} pasos cortos. En cada uno lees qué hacer, rellenas lo que se pide y pulsas el botón amarillo de abajo.</>,
           <>Todo se guarda al pulsar ese botón: puedes cerrar y volver otro día donde lo dejaste.</>,
           <>Si te atascas, escríbenos por WhatsApp (el contacto está al pie de cada pantalla) y te ayudamos a completarlo.</>,
         ]}
@@ -53,7 +57,7 @@ export function StepWelcome({ ctx }: { ctx: StepContext }) {
 
       <div>
         <h3 className="text-base font-semibold">Tu equipo de agentes ya está creado</h3>
-        <p className="mt-1 text-sm text-[#647067]">
+        <p className="mt-1 text-sm text-muted">
           Tres asistentes se reparten los chats según lo que pida cada cliente. Más
           adelante podrás cambiarles el nombre.
         </p>
@@ -64,14 +68,14 @@ export function StepWelcome({ ctx }: { ctx: StepContext }) {
 
             return (
               <div
-                className="grid content-start gap-2 rounded-xl border border-[#e2e6df] bg-[#fafbf8] p-4"
+                className="grid content-start gap-2 rounded-xl border border-line bg-paper-2 p-4"
                 key={preset.key}
               >
-                <span className="flex size-10 items-center justify-center rounded-full bg-[#10231c] text-[#d2f36b]">
+                <span className="flex size-10 items-center justify-center rounded-full bg-ink text-yellow">
                   <Icon size={18} />
                 </span>
                 <p className="text-base font-semibold">{preset.agentName}</p>
-                <p className="text-sm text-[#4d5a51]">{copy.what}</p>
+                <p className="text-sm text-ink-2">{copy.what}</p>
               </div>
             );
           })}
@@ -89,7 +93,7 @@ export function StepWelcome({ ctx }: { ctx: StepContext }) {
             items={[
               <>Entra en <span className="font-medium">ycloud.com</span> con tu usuario.</>,
               <>Ten a mano el número de WhatsApp que conectaste allí.</>,
-              <>En el paso 4 te diremos exactamente de dónde copiar la llave.</>,
+              <>En el paso {stepNumber("whatsapp")} te diremos exactamente de dónde copiar la llave.</>,
             ]}
           />
         </HelpBox>
@@ -102,13 +106,13 @@ export function StepWelcome({ ctx }: { ctx: StepContext }) {
             items={[
               <>Crea una cuenta en <span className="font-medium">platform.openai.com</span> si no tienes.</>,
               <>Carga un poco de saldo (con 5 USD alcanza para empezar).</>,
-              <>En el paso 3 te guiamos para sacar la llave.</>,
+              <>En el paso {stepNumber("openai")} te guiamos para sacar la llave.</>,
             ]}
           />
         </HelpBox>
       </div>
 
-      <p className="flex items-center gap-2 rounded-xl bg-[#eef2eb] px-4 py-3 text-sm text-[#4d5a51]">
+      <p className="flex items-center gap-2 rounded-xl bg-paper-2 px-4 py-3 text-sm text-ink-2">
         <Clock3 size={16} />
         Toma unos 10 minutos. Puedes parar cuando quieras y seguir después.
       </p>

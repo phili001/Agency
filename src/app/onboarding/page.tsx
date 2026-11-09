@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { OnboardingWizard } from "@/components/onboarding/wizard";
@@ -14,6 +15,8 @@ import { isPlatformAdmin } from "@/lib/platform-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveWorkspaceId, getOnboardingChecklist } from "@/lib/workspaces";
+
+export const metadata: Metadata = { title: "Configuración" };
 
 export default async function OnboardingPage({
   searchParams,
@@ -44,7 +47,7 @@ export default async function OnboardingPage({
 
     redirect(
       `/login?error=${encodeURIComponent(
-        "Tu usuario aun no tiene una empresa asignada. Pide al administrador que cree o vincule tu empresa.",
+        "Tu usuario aún no tiene una empresa asignada. Pide al administrador que cree o vincule tu empresa.",
       )}`,
     );
   }

@@ -175,7 +175,7 @@ describe("tools del agente", () => {
     assert.match(String(result.error), /no está libre/);
     const answer = buildDirectBookingAnswer(result, runtime);
     assert.match(answer, /ya no está libre/);
-    assert.doesNotMatch(answer, /quedo agendada/);
+    assert.doesNotMatch(answer, /qued[oó] agendada/);
   });
 
   it("hora ambigua: pregunta antes de reservar", async () => {
@@ -192,7 +192,7 @@ describe("tools del agente", () => {
     assert.equal(moved.confirmada, true);
     assert.equal(moved.reagendada, true);
     assert.equal(moved.inicio, "2026-09-08T10:00:00.000Z");
-    assert.match(buildDirectBookingAnswer(moved, runtime), /quedo cambiada/);
+    assert.match(buildDirectBookingAnswer(moved, runtime), /quedó cambiada/);
 
     await runAgendaTool(client, runtime, call("agendar_cita", { horario_iso: "x", motivo: "Cita", nombre: "Ana" }), ask("y otra el martes a las 16:00"), deps);
     const ambiguous = await runAgendaTool(client, runtime, call("reagendar_cita", { cita_actual_inicio: null, horario_iso: "x" }), ask("el martes a las 17:00"), deps);

@@ -5,6 +5,9 @@ import { GuidedTour, TourLauncher } from "@/components/guided-tour";
 import { type TourKey, getSeenTours } from "@/lib/tours";
 import { type AppSection, sectionTitles } from "@/lib/panel-data";
 
+// Secciones que aprovechan todo el ancho (calendario semanal, editor de flujos).
+const wideSections = new Set<AppSection>(["agenda", "flows"]);
+
 /**
  * Cabecera y rejilla de una seccion del panel. El sidebar vive en el layout y
  * no se vuelve a pedir al navegar; esto es lo que cambia de una seccion a otra.
@@ -28,20 +31,20 @@ export function PanelPage({
 
   return (
     <>
-      <header className="border-b border-[#d9ded3] bg-white px-5 py-4">
+      <header className="border-b border-line bg-paper px-5 py-4 sm:px-7">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase text-[#647067]">
+            <p className="text-xs font-bold tracking-[0.6px] uppercase text-muted">
               {header.eyebrow}
             </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-normal">
+            <h1 className="mt-1 text-[28px] font-extrabold tracking-[-0.6px]">
               {header.title}
             </h1>
           </div>
           <div className="flex flex-wrap gap-2">
             {tourKey ? <TourLauncher tourKey={tourKey} /> : null}
             <form action={signOut}>
-              <button className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd2c6] bg-white px-3 text-sm font-medium">
+              <button className="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-ink-2 transition hover:bg-paper-2">
                 <LogOut size={16} />
                 Salir
               </button>
@@ -51,8 +54,14 @@ export function PanelPage({
       </header>
 
       <div
-        className={`grid min-w-0 gap-5 p-5 ${
-          section === "dashboard" ? "xl:grid-cols-[1fr_280px]" : ""
+        className={`grid min-w-0 gap-5 p-5 sm:px-7 ${
+          section === "dashboard"
+            ? // La bandeja necesita el ancho: las métricas solo van al lado en pantallas grandes.
+              "min-[1680px]:grid-cols-[minmax(0,1fr)_280px]"
+            : wideSections.has(section)
+              ? ""
+              : // Formularios y listas: en monitores anchos no se estiran de lado a lado.
+                "mx-auto w-full max-w-[1240px]"
         }`}
       >
         <div className="grid min-w-0 content-start gap-5">

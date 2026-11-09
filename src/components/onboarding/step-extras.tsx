@@ -18,6 +18,8 @@ import {
 import { GoogleCalendarCard } from "@/components/crm/google-calendar-card";
 
 import { type StepContext } from "./wizard";
+import { onboardingStepEyebrow } from "@/lib/onboarding-steps";
+import { clientFetch } from "@/lib/client-fetch";
 
 const roleOptions = [
   { description: "Responde chats y ve los clientes.", label: "Atiende chats", value: "agent" },
@@ -49,7 +51,7 @@ export function StepExtras({ ctx }: { ctx: StepContext }) {
     setTeamBusy(true);
     setTeamError("");
     setTeamSuccess("");
-    const response = await fetch("/api/team/members", {
+    const response = await clientFetch("/api/team/members", {
       body: JSON.stringify({
         email: cleanEmail,
         role,
@@ -78,7 +80,7 @@ export function StepExtras({ ctx }: { ctx: StepContext }) {
   return (
     <div className="grid gap-6">
       <StepHeading
-        eyebrow="Paso 6 · Extras"
+        eyebrow={onboardingStepEyebrow("extras", "Extras")}
         title="Dos cosas opcionales"
         description="Ninguna es obligatoria para que Levy funcione. Si no aplican a tu negocio, pasa al siguiente paso."
       />
@@ -134,15 +136,15 @@ export function StepExtras({ ctx }: { ctx: StepContext }) {
               aria-pressed={role === option.value}
               className={`grid gap-1 rounded-xl border-2 p-3 text-left ${
                 role === option.value
-                  ? "border-[#10231c] bg-[#eef6df]"
-                  : "border-[#e2e6df] bg-white"
+                  ? "border-ink bg-yellow-soft"
+                  : "border-line bg-white"
               }`}
               key={option.value}
               onClick={() => setRole(option.value)}
               type="button"
             >
               <span className="text-sm font-semibold">{option.label}</span>
-              <span className="text-xs text-[#4d5a51]">{option.description}</span>
+              <span className="text-xs text-ink-2">{option.description}</span>
             </button>
           ))}
         </div>
@@ -157,7 +159,7 @@ export function StepExtras({ ctx }: { ctx: StepContext }) {
       </HelpBox>
 
       <HelpBox title="Conectar Google Calendar (opcional)">
-        <p className="text-sm text-[#4d5a51]">
+        <p className="text-sm text-ink-2">
           Si usas Google Calendar, Levy copia allí las citas que agenda y, si quieres, respeta lo que ya
           tengas ocupado. Luego eliges el calendario en la <span className="font-medium">Agenda</span>.
         </p>

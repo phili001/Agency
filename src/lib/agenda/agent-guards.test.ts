@@ -118,7 +118,7 @@ describe("tools e instrucciones", () => {
 describe("respuestas directas", () => {
   it("cita confirmada con nombre y fecha en la zona", () => {
     const answer = buildDirectBookingAnswer({ cita_id: "x", confirmada: true, inicio: "2026-09-08T08:00:00Z", zona_horaria: "Europe/Madrid" }, runtime);
-    assert.match(answer, /^Listo, Ana\. Tu cita quedo agendada para martes, 8 de septiembre de 2026, 10:00/);
+    assert.match(answer, /^Listo, Ana\. Tu cita quedó agendada para martes, 8 de septiembre de 2026, 10:00/);
   });
 
   it("si falla, nunca dice que quedó agendada", () => {
@@ -126,7 +126,7 @@ describe("respuestas directas", () => {
     assert.match(alternatives, /ya no está libre/);
     assert.match(alternatives, /- 11:00\n- 12:00/);
     const failure = buildDirectBookingAnswer({ error: "boom" }, runtime);
-    assert.match(failure, /no quedo agendada/);
+    assert.match(failure, /no quedó agendada/);
   });
 
   it("disponibilidad: hora pedida libre, ocupada o lista del día", () => {

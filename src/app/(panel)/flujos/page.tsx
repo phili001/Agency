@@ -2,6 +2,10 @@ import { FlowBuilder } from "@/components/flow-builder";
 import { PanelPage } from "@/components/panel/panel-header";
 import { getPanelContext } from "@/lib/panel-context";
 import { syncDefaultAgentPrompts } from "@/lib/panel-data";
+import type { Metadata } from "next";
+import { sectionTitles } from "@/lib/panel-data";
+
+export const metadata: Metadata = { title: sectionTitles.flows.title };
 
 const emptyResult = { data: [], error: null };
 
