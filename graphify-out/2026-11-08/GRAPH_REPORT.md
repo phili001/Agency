@@ -1,7 +1,7 @@
 # Graph Report - Agency  (2026-11-08)
 
 ## Corpus Check
-- 301 files · ~198,749 words
+- 301 files · ~198,767 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 2, .example 1, .ico 1)
 
@@ -483,7 +483,7 @@ Cohesion: 0.50
 Nodes (4): /auth/confirm create-password flow, GHL purchase webhook auto-provisioning (/api/webhooks/ghl/purchase), GHL tags cliente-levy / levy-acceso-listo / levy-activo, LEVY_PURCHASE_WEBHOOK_SECRET
 
 ## Knowledge Gaps
-- **24 isolated node(s):** `RFC-4180`, `File/Document Icon (gray 16x16, page with folded corner and text lines)`, `Globe Icon (gray 16x16, world/web symbol)`, `Browser Window Icon (gray 16x16, window with three dots)`, `idx_conversations_workspace_last_message index (not applied)` (+19 more)
+- **24 isolated node(s):** `RFC-4180`, `/auth/confirm create-password flow`, `GHL tags cliente-levy / levy-acceso-listo / levy-activo`, `LEVY_PURCHASE_WEBHOOK_SECRET`, `File/Document Icon (gray 16x16, page with folded corner and text lines)` (+19 more)
   These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 565 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **19 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -491,15 +491,15 @@ Nodes (4): /auth/confirm create-password flow, GHL purchase webhook auto-provisi
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `next` connect `next` to `buffer/route.ts`, `Dependencias y ESLint`, `google-sync.ts`, `createAdminClient`, `panel-data.ts`, `WorkspaceSectionPage`, `billing.test.ts`, `crm-jobs.ts`, `inicio/page.tsx`, `test-prompt/route.ts`, `agent-agenda.ts`, `lucide-react`, `admin-companies.ts`, `wizard.tsx`, `meeting/route.ts`, `workspaces.ts`, `ycloud-webhook.ts`, `send/route.ts`, `contacts.ts`, `snapshot/route.ts`, `agenda-panel.tsx`, `bienvenida/page.tsx`, `login/actions.ts`, `public-shell.tsx`, `api-error.ts`, `api/flows/route.ts`, `createClient`?**
-  _High betweenness centrality (0.148) - this node is a cross-community bridge._
+  _High betweenness centrality (0.149) - this node is a cross-community bridge._
 - **Are the 2 inferred relationships involving `createAdminClient()` (e.g. with `Decisiones tomadas` and `Reglas para cada iteración`) actually correct?**
   _`createAdminClient()` has 2 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `RFC-4180`, `File/Document Icon (gray 16x16, page with folded corner and text lines)`, `Globe Icon (gray 16x16, world/web symbol)` to the rest of the system?**
+- **What connects `RFC-4180`, `/auth/confirm create-password flow`, `GHL tags cliente-levy / levy-acceso-listo / levy-activo` to the rest of the system?**
   _24 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `FakeQuery` be split into smaller, more focused modules?**
   _Cohesion score 0.06794871794871794 - nodes in this community are weakly interconnected._
 - **Why does `createAdminClient()` connect `createAdminClient` to `buffer/route.ts`, `CRM y Agenda dentro de AgenteLevy (todo en Supabase) — instrucciones para Claude Code`, `panel-data.ts`, `billing.test.ts`, `crm-jobs.ts`, `agent-agenda.ts`, `admin-companies.ts`, `agendas.ts`, `meeting/route.ts`, `workspaces.ts`, `ycloud-webhook.ts`, `send/route.ts`, `contacts.ts`, `next`, `snapshot/route.ts`, `agenda-panel.tsx`, `bienvenida/page.tsx`, `login/actions.ts`, `ref_node_test`, `api-error.ts`, `api/flows/route.ts`, `createClient`?**
-  _High betweenness centrality (0.077) - this node is a cross-community bridge._
+  _High betweenness centrality (0.078) - this node is a cross-community bridge._
 - **Are the 3 inferred relationships involving `apiErrorResponse()` (e.g. with `Decisiones tomadas` and `Registro de iteraciones`) actually correct?**
   _`apiErrorResponse()` has 3 INFERRED edges - model-reasoned connections that need verification._
 - **Should `custom-fields.ts` be split into smaller, more focused modules?**
