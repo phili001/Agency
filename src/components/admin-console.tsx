@@ -176,6 +176,32 @@ export function AdminConsole({
     router.push("/");
   }
 
+  async function deleteCompany(company: Company) {
+    const confirmName = window.prompt(
+      `Esto borra "${company.name}" con todos sus datos (contactos, agentes, conversaciones, integraciones) y no se puede deshacer.\n\nEscribe el nombre exacto de la empresa para confirmar:`,
+    );
+
+    if (confirmName === null) {
+      return;
+    }
+
+    setSaving(`delete:${company.id}`);
+    setStatus("");
+
+    try {
+      await deleteJson("/api/admin/companies", {
+        confirmName,
+        workspaceId: company.id,
+      });
+      setStatus(`Empresa "${company.name}" eliminada.`);
+      window.location.reload();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Error desconocido.");
+    } finally {
+      setSaving("");
+    }
+  }
+
   return (
     <main className="min-h-screen bg-paper-2 p-5 text-ink">
       <div className="mx-auto grid max-w-7xl gap-5">
@@ -416,15 +442,30 @@ export function AdminConsole({
                     </button>
                   </div>
                 </div>
-                <button
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line px-3 text-sm font-medium"
-                  disabled={saving === `open:${company.id}`}
-                  onClick={() => openCompany(company.id)}
-                  type="button"
-                >
-                  {saving === `open:${company.id}` ? <Loader2 className="animate-spin" size={16} /> : null}
-                  Abrir empresa
-                </button>
+                <div className="flex flex-col gap-2 md:items-stretch">
+                  <button
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line px-3 text-sm font-medium"
+                    disabled={saving === `open:${company.id}`}
+                    onClick={() => openCompany(company.id)}
+                    type="button"
+                  >
+                    {saving === `open:${company.id}` ? <Loader2 className="animate-spin" size={16} /> : null}
+                    Abrir empresa
+                  </button>
+                  <button
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#e7c3bb] px-3 text-sm font-medium text-[#7a2a1d] hover:bg-[#fbeeea] disabled:opacity-50"
+                    disabled={saving === `delete:${company.id}`}
+                    onClick={() => deleteCompany(company)}
+                    type="button"
+                  >
+                    {saving === `delete:${company.id}` ? (
+                      <Loader2 className="animate-spin" size={16} />
+                    ) : (
+                      <Trash2 size={16} />
+                    )}
+                    Eliminar
+                  </button>
+                </div>
               </div>
             ))}
           </div>

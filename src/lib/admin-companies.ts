@@ -1,6 +1,6 @@
 import "server-only";
 
-import { badRequest } from "@/lib/api-error";
+import { badRequest, notFound } from "@/lib/api-error";
 import {
   buildDefaultAgentConfig,
   buildDefaultAgentPrompt,
@@ -205,4 +205,68 @@ export async function linkOwnerToWorkspace({
   await createDefaultAgentsForWorkspace(admin, workspaceId);
 
   return owner;
+}
+
+/** Suscripciones de Stripe que siguen cobrando: borrar la empresa no las cancela. */
+const LIVE_SUBSCRIPTION_STATUSES = new Set(["active", "trialing", "past_due", "unpaid"]);
+
+/**
+ * Borra una empresa con todos sus datos (las tablas hijas caen por `on delete cascade`).
+ * Exige escribir el nombre exacto y se niega si hay una suscripción de Stripe viva.
+ */
+export async function deleteCompany({
+  confirmName,
+  workspaceId,
+}: {
+  confirmName: string;
+  workspaceId: string;
+}) {
+  const admin = createAdminClient();
+
+  if (!workspaceId) {
+    throw badRequest("Falta la empresa.");
+  }
+
+  const { data: workspace, error } = await admin
+    .from("workspaces")
+    .select("id, name")
+    .eq("id", workspaceId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!workspace) {
+    throw notFound("La empresa ya no existe.");
+  }
+
+  if (confirmName.trim() !== workspace.name.trim()) {
+    throw badRequest("El nombre escrito no coincide con el de la empresa.");
+  }
+
+  const { data: billing } = await admin
+    .from("workspace_billing")
+    .select("stripe_subscription_id, status, cancel_at_period_end")
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+
+  if (
+    billing?.stripe_subscription_id &&
+    billing.status &&
+    LIVE_SUBSCRIPTION_STATUSES.has(billing.status) &&
+    !billing.cancel_at_period_end
+  ) {
+    throw badRequest(
+      "Esta empresa tiene una suscripción de Stripe activa. Cancélala en Stripe antes de eliminarla.",
+    );
+  }
+
+  const { error: deleteError } = await admin.from("workspaces").delete().eq("id", workspaceId);
+
+  if (deleteError) {
+    throw deleteError;
+  }
+
+  return workspace;
 }

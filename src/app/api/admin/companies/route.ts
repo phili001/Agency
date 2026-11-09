@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { apiErrorResponse } from "@/lib/api-error";
-import { createCompanyWithOwner } from "@/lib/admin-companies";
+import { createCompanyWithOwner, deleteCompany } from "@/lib/admin-companies";
 import { requirePlatformAdmin } from "@/lib/platform-admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -30,5 +30,29 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     return apiErrorResponse(error, "admin/companies");
+  }
+}
+
+/** Elimina una empresa y todos sus datos. Pide el nombre exacto como confirmación. */
+export async function DELETE(request: Request) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    await requirePlatformAdmin(user);
+
+    const { confirmName, workspaceId } = (await request.json()) as {
+      confirmName?: string;
+      workspaceId?: string;
+    };
+    const workspace = await deleteCompany({
+      confirmName: confirmName ?? "",
+      workspaceId: workspaceId ?? "",
+    });
+
+    return NextResponse.json({ deleted: workspace.id });
+  } catch (error) {
+    return apiErrorResponse(error, "admin/companies:delete");
   }
 }
