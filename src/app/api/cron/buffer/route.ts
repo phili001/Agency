@@ -138,11 +138,38 @@ function getAgentIdentity(agent: AgentRow) {
 
 function getAgentIntroduction(agent: AgentRow) {
   const identity = getAgentIdentity(agent);
+  // Presentacion fija por agente (p. ej. para dejar claro que es una IA). Si
+  // no hay, se mantiene la presentacion generica de siempre.
+  const config = getConfigRecord(agent.config);
+  const customIntroduction =
+    typeof config.introduction === "string" ? config.introduction.trim() : "";
+
+  if (customIntroduction) {
+    return customIntroduction.replaceAll("{agent_name}", identity.agentName);
+  }
+
   const jobTitle = identity.jobTitle.replace(/\s+IA$/i, "").trim();
 
   return jobTitle
     ? `Soy ${identity.agentName}, del equipo de ${jobTitle.toLocaleLowerCase("es")}.`
     : `Soy ${identity.agentName}.`;
+}
+
+/**
+ * Por defecto cada agente se presenta al tomar la conversacion. Con
+ * `introduce_once` los agentes del workspace actuan como un solo asistente:
+ * solo se presenta el primero que responde y los cambios de agente no se notan.
+ */
+function shouldIntroduceAgent(
+  agent: AgentRow,
+  currentAgentId: string | null,
+  messages: MessageRow[],
+) {
+  if (getConfigRecord(agent.config).introduce_once === true) {
+    return !currentAgentId && !messages.some((message) => message.role === "assistant");
+  }
+
+  return !currentAgentId || currentAgentId !== agent.id;
 }
 
 function ensureAgentIntroduction(
@@ -157,7 +184,17 @@ function ensureAgentIntroduction(
   const identity = getAgentIdentity(agent);
   const opening = normalizeRoutingText(answer.slice(0, 160));
 
-  if (opening.includes(normalizeRoutingText(identity.agentName))) {
+  const config = getConfigRecord(agent.config);
+  const hasCustomIntroduction =
+    typeof config.introduction === "string" && Boolean(config.introduction.trim());
+  // Con presentacion propia (agentes que deben declararse IA) no basta con que
+  // diga su nombre: tambien tiene que dejar claro que es una IA.
+  const declaresAi = /\b(ia|ai)\b|inteligencia artificial|artificial intelligence/.test(opening);
+
+  if (
+    opening.includes(normalizeRoutingText(identity.agentName)) &&
+    (!hasCustomIntroduction || declaresAi)
+  ) {
     return answer;
   }
 
@@ -1181,7 +1218,7 @@ export async function POST(request: Request) {
         (knowledgeAssets ?? []) as KnowledgeAsset[],
         businessProfile as BusinessProfileAsset | null,
         calendarRuntime,
-        !conversation.agent_id || conversation.agent_id !== typedAgent.id,
+        shouldIntroduceAgent(typedAgent, conversation.agent_id, chronologicalMessages),
       );
       const insights = await generateContactInsights(
         typedAgent,

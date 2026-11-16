@@ -1,17 +1,17 @@
 # Graph Report - Agency  (2026-11-15)
 
 ## Corpus Check
-- 301 files · ~199,321 words
+- 301 files · ~199,419 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 2, .example 1, .ico 1)
 
 ## Summary
-- 2161 nodes · 6777 edges · 105 communities (86 shown, 19 thin omitted)
+- 2161 nodes · 6779 edges · 105 communities (86 shown, 19 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 188 edges (avg confidence: 0.93)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `f0c256c4`
+- Built from commit: `7e2f556f`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 

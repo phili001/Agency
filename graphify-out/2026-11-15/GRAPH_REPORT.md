@@ -1,7 +1,7 @@
 # Graph Report - Agency  (2026-11-15)
 
 ## Corpus Check
-- 301 files · ~199,299 words
+- 301 files · ~199,321 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 2, .example 1, .ico 1)
 
