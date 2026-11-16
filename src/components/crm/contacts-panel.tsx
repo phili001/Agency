@@ -246,7 +246,7 @@ export function ContactsPanel({
         </div>
       ) : null}
 
-      <div className="mt-4 grid gap-2 md:grid-cols-[1fr_180px_180px_150px]">
+      <div className="mt-4 grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_180px_150px]">
         <label className="relative">
           <Search className="pointer-events-none absolute left-3 top-3 text-faint" size={16} />
           <input

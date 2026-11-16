@@ -95,7 +95,7 @@ export function CrmSettings({
         <p className="text-xs text-muted">Los contactos sin etapa están en la primera «Abierta».</p>
         <div className="mt-2 grid gap-1.5">
           {stages.map((stage, index) => (
-            <div className="grid grid-cols-[auto_1fr_120px_auto] items-center gap-2" key={stage.id}>
+            <div className="grid grid-cols-[auto_minmax(0,1fr)_120px_auto] items-center gap-2" key={stage.id}>
               <input
                 aria-label="Color"
                 className="size-9 rounded-lg border border-line"
@@ -267,7 +267,7 @@ export function CrmSettings({
             </div>
           ))}
         </div>
-        <div className="mt-2 grid gap-2 md:grid-cols-[1fr_160px_1fr_auto]">
+        <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_160px_minmax(0,1fr)_auto]">
           <input className={inputClass} onChange={(event) => setNewField({ ...newField, label: event.target.value })} placeholder="Nombre del campo" value={newField.label} />
           <select className={inputClass} onChange={(event) => setNewField({ ...newField, type: event.target.value })} value={newField.type}>
             {FIELD_TYPES.map(([value, label]) => (

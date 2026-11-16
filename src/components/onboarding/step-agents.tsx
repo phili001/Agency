@@ -253,7 +253,7 @@ export function StepAgents({ ctx }: { ctx: StepContext }) {
               }`}
               key={agent.id}
             >
-              <div className="grid gap-3 md:grid-cols-[1fr_220px_auto] md:items-start">
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-start">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-ink">
                     Agente de {copy.label.toLowerCase()}

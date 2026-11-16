@@ -68,7 +68,7 @@ export function LegalOwner() {
   ].filter(([, value]) => value);
 
   return (
-    <dl className="grid gap-x-6 gap-y-1.5 rounded-lg bg-paper-2 p-4 text-sm sm:grid-cols-[120px_1fr]">
+    <dl className="grid gap-x-6 gap-y-1.5 rounded-lg bg-paper-2 p-4 text-sm sm:grid-cols-[120px_minmax(0,1fr)]">
       {rows.map(([label, value]) => (
         <div className="contents" key={label}>
           <dt className="font-bold text-ink">{label}</dt>

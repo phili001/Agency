@@ -1201,7 +1201,7 @@ export function WorkspaceSettings({
                   className="grid gap-2 rounded-lg border border-line bg-white p-3"
                   key={`${index}-${field.key}`}
                 >
-                  <div className="grid gap-2 md:grid-cols-[1fr_180px]">
+                  <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_180px]">
                     <label className="grid gap-1.5 text-sm font-medium">
                       Nombre visible
                       <input
@@ -1857,7 +1857,7 @@ export function WorkspaceSettings({
                 {localMembers.length} miembros
               </span>
             </div>
-            <div className="mt-4 grid gap-3 rounded-lg border border-line bg-paper-2 p-3 md:grid-cols-[1fr_180px_150px_auto]">
+            <div className="mt-4 grid gap-3 rounded-lg border border-line bg-paper-2 p-3 md:grid-cols-[minmax(0,1fr)_180px_150px_auto]">
               <label className="grid gap-1.5 text-sm font-medium">
                 Email
                 <input
@@ -1931,7 +1931,7 @@ export function WorkspaceSettings({
                 </div>
                 <KeyRound className="shrink-0 text-ink" size={18} />
               </div>
-              <div className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
+              <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
                 <label className="grid gap-1.5 text-sm font-medium">
                   Contraseña actual
                   <input

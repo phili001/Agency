@@ -587,7 +587,7 @@ export function AgentSettings({
         </div>
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[220px_1fr]">
+      <div className="mt-4 grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
         <div className="grid content-start gap-2" data-tour="agent-list">
           {localAgents.map((agent) => (
             <button

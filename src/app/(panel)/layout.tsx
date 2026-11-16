@@ -38,7 +38,9 @@ export default async function PanelLayout({
               activeWorkspaceId={workspaceId ?? null}
               workspaces={workspaceOptions}
             />
-            <p className="mt-3 text-xs text-muted">{user.email}</p>
+            <p className="mt-3 truncate text-xs text-muted" title={user.email ?? undefined}>
+              {user.email}
+            </p>
           </div>
         </aside>
 

@@ -354,7 +354,7 @@ export function ContactDrawer({
             </label>
           ))}
         </div>
-        <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_150px_auto]">
+        <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_150px_auto]">
           <input className={inputClass} onChange={(event) => setTaskDraft({ ...taskDraft, title: event.target.value })} placeholder="Nueva tarea" value={taskDraft.title} />
           <input className={inputClass} onChange={(event) => setTaskDraft({ ...taskDraft, dueAt: event.target.value })} type="date" value={taskDraft.dueAt} />
           <button

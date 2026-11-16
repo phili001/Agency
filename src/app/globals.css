@@ -45,3 +45,15 @@ h3 {
 button {
   cursor: pointer;
 }
+
+/* Un campo dentro de un grid o una fila flex no encoge por debajo de su ancho
+   natural (~20 caracteres) porque su min-width es `auto`: en columnas fijas
+   estrechas (p. ej. `grid-cols-[1fr_180px]`) se salía de la tarjeta. Con 0
+   ocupa la columna que le toca. En `base` para que `min-w-*` lo siga pisando. */
+@layer base {
+  input,
+  select,
+  textarea {
+    min-width: 0;
+  }
+}
