@@ -96,9 +96,9 @@
     "semantic_hash": ""
   },
   "src/app/(panel)/page.tsx": {
-    "mtime": 1794248700.386274,
-    "seen": 1794248703.273088,
-    "ast_hash": "6979cef7a0857233d343b1490e4b7ff3",
+    "mtime": 1794802830.659323,
+    "seen": 1794802853.504173,
+    "ast_hash": "1bab6f73ed07273708190b05f4713fca",
     "semantic_hash": ""
   },
   "src/app/(panel)/templates/page.tsx": {
@@ -360,9 +360,9 @@
     "semantic_hash": ""
   },
   "src/components/admin-console.tsx": {
-    "mtime": 1794250748.8239539,
-    "seen": 1794250783.917571,
-    "ast_hash": "9de3ac150cd18245d4bb2fb694f24282",
+    "mtime": 1794802353.6316462,
+    "seen": 1794802363.5525382,
+    "ast_hash": "33b65c6bdd995f7be03b88f251d50591",
     "semantic_hash": ""
   },
   "src/components/agent-settings.tsx": {

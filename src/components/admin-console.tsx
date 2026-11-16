@@ -48,6 +48,9 @@ export function AdminConsole({
   const [status, setStatus] = useState("");
   const [customerDrafts, setCustomerDrafts] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState("");
+  // Confirmación de borrado en la propia tarjeta: `window.prompt` no existe en
+  // algunos navegadores (lanza o se bloquea) y el botón quedaba sin hacer nada.
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; confirmName: string } | null>(null);
 
   async function postJson(url: string, body: Record<string, unknown>) {
     const response = await clientFetch(url, {
@@ -176,15 +179,7 @@ export function AdminConsole({
     router.push("/");
   }
 
-  async function deleteCompany(company: Company) {
-    const confirmName = window.prompt(
-      `Esto borra "${company.name}" con todos sus datos (contactos, agentes, conversaciones, integraciones) y no se puede deshacer.\n\nEscribe el nombre exacto de la empresa para confirmar:`,
-    );
-
-    if (confirmName === null) {
-      return;
-    }
-
+  async function deleteCompany(company: Company, confirmName: string) {
     setSaving(`delete:${company.id}`);
     setStatus("");
 
@@ -454,18 +449,57 @@ export function AdminConsole({
                   </button>
                   <button
                     className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#e7c3bb] px-3 text-sm font-medium text-[#7a2a1d] hover:bg-[#fbeeea] disabled:opacity-50"
-                    disabled={saving === `delete:${company.id}`}
-                    onClick={() => deleteCompany(company)}
+                    disabled={deleteTarget?.id === company.id}
+                    onClick={() => setDeleteTarget({ id: company.id, confirmName: "" })}
                     type="button"
                   >
-                    {saving === `delete:${company.id}` ? (
-                      <Loader2 className="animate-spin" size={16} />
-                    ) : (
-                      <Trash2 size={16} />
-                    )}
+                    <Trash2 size={16} />
                     Eliminar
                   </button>
                 </div>
+                {deleteTarget?.id === company.id ? (
+                  <form
+                    className="grid gap-2 rounded-lg border border-[#e7c3bb] bg-[#fbeeea] p-3 text-sm md:col-span-2"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void deleteCompany(company, deleteTarget.confirmName);
+                    }}
+                  >
+                    <p className="text-[#7a2a1d]">
+                      Esto borra <strong>{company.name}</strong> con todos sus datos (contactos, agentes,
+                      conversaciones, integraciones) y no se puede deshacer. Escribe el nombre exacto de la
+                      empresa para confirmar.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        autoFocus
+                        className="h-9 w-64 rounded-lg border border-[#e7c3bb] bg-white px-2 text-sm"
+                        onChange={(event) => setDeleteTarget({ id: company.id, confirmName: event.target.value })}
+                        placeholder={company.name}
+                        value={deleteTarget.confirmName}
+                      />
+                      <button
+                        className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#7a2a1d] px-3 text-sm font-medium text-white disabled:opacity-50"
+                        disabled={
+                          saving === `delete:${company.id}` ||
+                          deleteTarget.confirmName.trim() !== company.name.trim()
+                        }
+                        type="submit"
+                      >
+                        {saving === `delete:${company.id}` ? <Loader2 className="animate-spin" size={16} /> : null}
+                        Eliminar definitivamente
+                      </button>
+                      <button
+                        className="h-9 rounded-lg border border-line bg-white px-3 text-sm font-medium"
+                        disabled={saving === `delete:${company.id}`}
+                        onClick={() => setDeleteTarget(null)}
+                        type="button"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
               </div>
             ))}
           </div>

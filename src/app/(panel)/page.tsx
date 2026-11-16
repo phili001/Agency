@@ -352,9 +352,11 @@ export default async function Home({
 
   const aside = (
     <aside className="grid min-w-0 content-start gap-5">
-      {/* Una tarjeta por fila: en columna estrecha la cifra va al lado
-          del texto, no debajo, para no dejar la mitad derecha vacía. */}
-      <section className="grid min-w-0 content-start gap-2 md:grid-cols-2 xl:grid-cols-4 min-[1680px]:grid-cols-1">
+      {/* Las columnas salen del ancho real, no del viewport: cada tarjeta
+          mide al menos 15rem, así el texto nunca se sale aunque el panel
+          sea estrecho (sidebar abierta, zoom). En la columna lateral de
+          280px queda una por fila, con la cifra al lado del texto. */}
+      <section className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] content-start gap-2">
         {dashboardMetrics.map((item) => (
           <div
             className="flex min-w-0 items-center gap-3 rounded-lg border border-line bg-white px-4 py-3"
@@ -364,7 +366,7 @@ export default async function Home({
               <item.icon size={18} />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm text-muted">{item.label}</p>
+              <p className="text-sm leading-snug text-muted">{item.label}</p>
               <p className="truncate text-xs text-muted">{item.detail}</p>
             </div>
             <p className="shrink-0 text-xl font-semibold tabular-nums">
