@@ -5,8 +5,8 @@ import type { WelcomeState } from "@/lib/billing/welcome-page";
 export type WelcomeViewState = WelcomeState | { status: "unavailable" };
 
 const contact = (
-  <a className={brandLink} href="mailto:hola@agentelevi.com">
-    hola@agentelevi.com
+  <a className={brandLink} href="mailto:info@agentelevi.com">
+    info@agentelevi.com
   </a>
 );
 

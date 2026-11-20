@@ -196,7 +196,7 @@ describe("sendWelcomeAccess", () => {
     };
 
     await sendWelcomeAccess(admin, { companyName: "Clínica Ana", email: "ana@ejemplo.com" }, {
-      env: { NEXT_PUBLIC_APP_URL: "https://agentelevi.com", SMTP_HOST: "smtp.levy.test", SMTP_PASSWORD: "clave", SMTP_USER: "hola@agentelevi.com" },
+      env: { NEXT_PUBLIC_APP_URL: "https://agentelevi.com", SMTP_HOST: "smtp.levy.test", SMTP_PASSWORD: "clave", SMTP_USER: "info@agentelevi.com" },
       transport: async (mail) => {
         requests.push({ html: mail.html, to: mail.to });
         return { messageId: "em_1" };

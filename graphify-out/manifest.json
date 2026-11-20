@@ -876,9 +876,9 @@
     "semantic_hash": "025d045b7246971286c49110a2af25c7"
   },
   "DEPLOY_RUNBOOK.md": {
-    "mtime": 1794248700.3446681,
-    "seen": 1794248703.2732449,
-    "ast_hash": "fb4b6258ac828c91c6711d3d9678c8c4",
+    "mtime": 1795149363.050286,
+    "seen": 1795149379.172555,
+    "ast_hash": "33bdca898044cd2fabd5e47e94115f45",
     "semantic_hash": ""
   },
   "PERFORMANCE_AUDIT.md": {
@@ -936,9 +936,9 @@
     "semantic_hash": ""
   },
   "PROGRESO_CRM_SUPABASE.md": {
-    "mtime": 1794248700.3453684,
-    "seen": 1794248703.273246,
-    "ast_hash": "0e457748b47b95b8be38dca4dbd4c657",
+    "mtime": 1795149363.0513084,
+    "seen": 1795149379.172556,
+    "ast_hash": "fd63a81076b27ec8135149d680f0efaf",
     "semantic_hash": ""
   },
   "PROMPT_CRM_SUPABASE.md": {
@@ -1692,9 +1692,9 @@
     "semantic_hash": ""
   },
   "src/app/api/billing/welcome-resend/route.ts": {
-    "mtime": 1794248700.391715,
-    "seen": 1794248703.273101,
-    "ast_hash": "bad7ea5b4056178f0e91752d6db56681",
+    "mtime": 1795149363.0486784,
+    "seen": 1795149379.172408,
+    "ast_hash": "dc101aa7beb8c9a4a584ef6d6863c086",
     "semantic_hash": ""
   },
   "src/app/bienvenida/page.tsx": {
@@ -1704,15 +1704,15 @@
     "semantic_hash": ""
   },
   "src/components/billing/welcome-actions.tsx": {
-    "mtime": 1794248700.410411,
-    "seen": 1794248703.2731452,
-    "ast_hash": "b298368eca2f3dcf8222df7a5183bfc6",
+    "mtime": 1795149363.0489802,
+    "seen": 1795149379.172448,
+    "ast_hash": "11d854316a773f4a05fed12e6961f0e4",
     "semantic_hash": ""
   },
   "src/lib/billing/welcome-page.test.ts": {
-    "mtime": 1794248700.4350526,
-    "seen": 1794248703.273185,
-    "ast_hash": "d06ebca7e48c447d5fc848f833d0912f",
+    "mtime": 1795149363.0497355,
+    "seen": 1795149379.172493,
+    "ast_hash": "e9dadeace72459937eb5643161c81280",
     "semantic_hash": ""
   },
   "src/lib/billing/welcome-page.ts": {
@@ -1758,9 +1758,9 @@
     "semantic_hash": ""
   },
   "src/app/inicio/page.tsx": {
-    "mtime": 1795030479.7392313,
-    "seen": 1795030610.011032,
-    "ast_hash": "804004c1bb586e97ec1d08d05c963e2d",
+    "mtime": 1795149363.0480764,
+    "seen": 1795149379.172438,
+    "ast_hash": "e756c5e45589b7beea4d7ee2e58bd7ab",
     "semantic_hash": ""
   },
   "src/components/landing/loss-calculator.tsx": {
@@ -1788,9 +1788,9 @@
     "semantic_hash": ""
   },
   "src/components/billing/welcome-view.tsx": {
-    "mtime": 1794248700.410516,
-    "seen": 1794248703.2731462,
-    "ast_hash": "4232ec47562b81798b6152229609b238",
+    "mtime": 1795149363.049271,
+    "seen": 1795149379.172449,
+    "ast_hash": "f62bd2d5cb75b571aa18a102be8762bf",
     "semantic_hash": ""
   },
   "src/components/brand/public-shell.tsx": {

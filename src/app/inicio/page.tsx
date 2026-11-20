@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   title: { absolute: title },
 };
 
-const contactEmail = "hola@agentelevi.com";
+const contactEmail = "info@agentelevi.com";
 
 const team = [
   {

@@ -212,7 +212,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecha · `[!]` bloqueada (con motivo) · **[ST
   - «Lista» exige que el webhook ya haya guardado la facturación y que el correo del pago sea el del owner de esa empresa.
   - Reenviar: máx. 3/hora **por empresa**, atómico en la base (`claim_welcome_resend` + 2 columnas en `workspace_billing`). Un correo fallido gasta intento. El correo automático del webhook no cuenta.
   - `sendWelcomeAccess` es ahora el envío común del webhook y de «Reenviar»; F6.8 cambiará el remitente en `email.ts`.
-  - Aspecto de la landing: Figtree servida por la app, colores `#F5E46B`/`#111111`/`#F7F6F1`, logo copiado a `public/levy-logo.png`, contacto `hola@agentelevi.com`, sin scripts ni recursos de terceros. `referrer: no-referrer` porque la URL lleva el id de la sesión.
+  - Aspecto de la landing: Figtree servida por la app, colores `#F5E46B`/`#111111`/`#F7F6F1`, logo copiado a `public/levy-logo.png`, contacto `info@agentelevi.com`, sin scripts ni recursos de terceros. `referrer: no-referrer` porque la URL lleva el id de la sesión.
   - Migración `welcome_resend` aplicada con aprobación del usuario (el primer intento lo denegó el clasificador de permisos): 6 comprobaciones de `supabase/tests/welcome_resend_checks.sql` en verde antes y después, contadores a 0 en las 5 empresas y advisors sin avisos nuevos.
   - Verificado en dev: los estados con datos de prueba temporales (ya quitados), móvil, y que sin `STRIPE_SECRET_KEY` la página no se rompe. **Sin probar con Stripe real.**
 - **F6.8 Correo por Gmail (2026-11-03).**

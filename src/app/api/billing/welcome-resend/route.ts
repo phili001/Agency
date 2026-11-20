@@ -10,7 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 const FAILURES = {
   not_ready: { error: "Tu cuenta aún se está preparando. Prueba otra vez en un momento.", status: 409 },
   rate_limited: { error: "Ya lo hemos reenviado varias veces. Mira en spam o prueba dentro de una hora.", status: 429 },
-  send_failed: { error: "No hemos podido enviarlo. Prueba en un rato o escríbenos a hola@agentelevi.com.", status: 502 },
+  send_failed: { error: "No hemos podido enviarlo. Prueba en un rato o escríbenos a info@agentelevi.com.", status: 502 },
 } as const;
 
 /**

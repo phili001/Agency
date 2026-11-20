@@ -32,8 +32,8 @@ export function WelcomeAutoRefresh() {
   return (
     <p className="mt-4 text-sm leading-6 text-ink-2">
       Está tardando más de lo normal. Tu pago está bien: si en unos minutos no te llega nada, escríbenos a{" "}
-      <a className="font-semibold text-ink underline" href="mailto:hola@agentelevi.com">
-        hola@agentelevi.com
+      <a className="font-semibold text-ink underline" href="mailto:info@agentelevi.com">
+        info@agentelevi.com
       </a>
       .
     </p>
