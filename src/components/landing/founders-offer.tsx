@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 
 import {
   FOUNDERS_DAY_LABEL,
@@ -23,15 +23,24 @@ const perks = [
   "Tu precio no sube mientras tu suscripción siga activa",
 ];
 
-// Revisa la fecha cada minuto: la oferta abre y cierra a medianoche de Madrid.
-function subscribe(onChange: () => void) {
-  const timer = window.setInterval(onChange, 60_000);
-  return () => window.clearInterval(timer);
+/**
+ * Estado de la oferta según la hora del navegador. La página se construye una
+ * vez en el servidor, así que empieza en null (botones desactivados) y mira la
+ * hora al montar y cada minuto: la oferta abre y cierra a medianoche de Madrid.
+ */
+function useFoundersStatus() {
+  const [status, setStatus] = useState<FoundersStatus | null>(null);
+  useEffect(() => {
+    const tick = () => setStatus(foundersStatus(new Date()));
+    const first = window.setTimeout(tick, 0);
+    const timer = window.setInterval(tick, 60_000);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(timer);
+    };
+  }, []);
+  return status;
 }
-
-const currentStatus = () => foundersStatus(new Date());
-// En el servidor la página se construye una vez: se pinta cerrada hasta que el navegador mira la hora.
-const serverStatus = (): FoundersStatus | null => null;
 
 const buttonBase = "inline-flex h-13 w-full items-center justify-center rounded-full border-2 px-6 text-center font-bold transition";
 
@@ -51,7 +60,7 @@ function BuyButton({ href, label, open }: { href: string; label: string; open: b
 }
 
 export function FoundersOffer({ contactEmail, monthlyUrl, yearlyUrl }: Props) {
-  const status = useSyncExternalStore(subscribe, currentStatus, serverStatus);
+  const status = useFoundersStatus();
   const open = status === "open";
   const mail = (plan: string) => `mailto:${contactEmail}?subject=${encodeURIComponent(`Quiero LEVYFOUNDERS ${plan}`)}`;
 
