@@ -51,6 +51,8 @@ export function AdminConsole({
   // Confirmación de borrado en la propia tarjeta: `window.prompt` no existe en
   // algunos navegadores (lanza o se bloquea) y el botón quedaba sin hacer nada.
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; confirmName: string } | null>(null);
+  // El error va dentro del formulario: el aviso general queda arriba, fuera de vista.
+  const [deleteError, setDeleteError] = useState("");
 
   async function postJson(url: string, body: Record<string, unknown>) {
     const response = await clientFetch(url, {
@@ -182,6 +184,7 @@ export function AdminConsole({
   async function deleteCompany(company: Company, confirmName: string) {
     setSaving(`delete:${company.id}`);
     setStatus("");
+    setDeleteError("");
 
     try {
       await deleteJson("/api/admin/companies", {
@@ -191,7 +194,7 @@ export function AdminConsole({
       setStatus(`Empresa "${company.name}" eliminada.`);
       window.location.reload();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Error desconocido.");
+      setDeleteError(error instanceof Error ? error.message : "Error desconocido.");
     } finally {
       setSaving("");
     }
@@ -450,7 +453,10 @@ export function AdminConsole({
                   <button
                     className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#e7c3bb] px-3 text-sm font-medium text-[#7a2a1d] hover:bg-[#fbeeea] disabled:opacity-50"
                     disabled={deleteTarget?.id === company.id}
-                    onClick={() => setDeleteTarget({ id: company.id, confirmName: "" })}
+                    onClick={() => {
+                      setDeleteError("");
+                      setDeleteTarget({ id: company.id, confirmName: "" });
+                    }}
                     type="button"
                   >
                     <Trash2 size={16} />
@@ -498,6 +504,11 @@ export function AdminConsole({
                         Cancelar
                       </button>
                     </div>
+                    {deleteError ? (
+                      <p className="font-medium text-[#7a2a1d]" role="alert">
+                        {deleteError}
+                      </p>
+                    ) : null}
                   </form>
                 ) : null}
               </div>

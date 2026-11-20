@@ -37,8 +37,18 @@ export default function TermsPage() {
 
       <LegalSection title="3. Precio, pago y renovación">
         <ul>
-          <li>La suscripción cuesta 99 € al mes más IVA, salvo que se indique otro precio al contratar.</li>
-          <li>Se cobra por adelantado cada mes a través de Stripe y se renueva sola hasta que la canceles.</li>
+          <li>Todos los precios llevan el IVA incluido.</li>
+          <li>Levy Agentes cuesta 100 € al mes, salvo que se indique otro precio al contratar.</li>
+          <li>
+            LEVYFOUNDERS cuesta 150 € al mes o 1500 € al año. Solo se puede contratar el viernes 27 de noviembre de 2026 y
+            hay 10 plazas por modalidad. Hoy incluye lo mismo que Levy Agentes y, además, los módulos nuevos que lancemos se
+            añaden a tu plan sin coste extra. Mantienes ese precio y esos módulos mientras tu suscripción siga activa sin
+            interrupción; si la cancelas, o se cancela porque un pago no se resuelve, al volver se aplica el precio vigente.
+          </li>
+          <li>
+            Se cobra por adelantado cada mes o cada año, según el plan, a través de Stripe y se renueva sola hasta que la
+            canceles.
+          </li>
           <li>
             Si cambiamos el precio, te lo avisaremos con al menos 30 días de antelación; podrás cancelar antes de que se
             aplique.
@@ -49,8 +59,8 @@ export default function TermsPage() {
       <LegalSection title="4. Cancelación">
         <p>
           No hay permanencia. Puedes cancelar cuando quieras desde la sección de facturación del panel o escribiéndonos a{" "}
-          {legalMail}. La cancelación evita el siguiente cobro y mantienes el servicio hasta el final del mes ya pagado; no se
-          devuelve la parte proporcional de un mes empezado.
+          {legalMail}. La cancelación evita el siguiente cobro y mantienes el servicio hasta el final del periodo ya pagado (mes o
+          año); no se devuelve la parte proporcional de un periodo empezado.
         </p>
       </LegalSection>
 

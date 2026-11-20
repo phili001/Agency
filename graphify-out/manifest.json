@@ -360,9 +360,9 @@
     "semantic_hash": ""
   },
   "src/components/admin-console.tsx": {
-    "mtime": 1794802353.6316462,
-    "seen": 1794802363.5525382,
-    "ast_hash": "33b65c6bdd995f7be03b88f251d50591",
+    "mtime": 1794870808.0559878,
+    "seen": 1794870817.41068,
+    "ast_hash": "79df3ec6d7e148c8d7dfddc479a21206",
     "semantic_hash": ""
   },
   "src/components/agent-settings.tsx": {
@@ -1602,15 +1602,15 @@
     "semantic_hash": ""
   },
   "src/lib/billing/webhook.test.ts": {
-    "mtime": 1794248700.434633,
-    "seen": 1794248703.273184,
-    "ast_hash": "e31d0c57384757f57ce0e4dc58a500cc",
+    "mtime": 1795030505.487982,
+    "seen": 1795030610.0110972,
+    "ast_hash": "d7c01ba0b998beb5a8861dcb29a0e25c",
     "semantic_hash": ""
   },
   "src/lib/billing/webhook.ts": {
-    "mtime": 1794248700.4349544,
-    "seen": 1794248703.273184,
-    "ast_hash": "dd308192e4e761baa713d1259580807c",
+    "mtime": 1795030444.2429633,
+    "seen": 1795030610.0110981,
+    "ast_hash": "3fcc2a5e9e51bc34ec255d55cdce56e6",
     "semantic_hash": ""
   },
   "src/lib/welcome.ts": {
@@ -1758,9 +1758,9 @@
     "semantic_hash": ""
   },
   "src/app/inicio/page.tsx": {
-    "mtime": 1794248700.4061513,
-    "seen": 1794248703.273134,
-    "ast_hash": "e01b7e452d29b9c9c3c750837542ad21",
+    "mtime": 1795030479.7392313,
+    "seen": 1795030610.011032,
+    "ast_hash": "804004c1bb586e97ec1d08d05c963e2d",
     "semantic_hash": ""
   },
   "src/components/landing/loss-calculator.tsx": {
@@ -1824,9 +1824,9 @@
     "semantic_hash": ""
   },
   "src/app/terminos/page.tsx": {
-    "mtime": 1794248700.4085596,
-    "seen": 1794248703.27314,
-    "ast_hash": "c67fe4d7e7e484030f853f78f6d4fded",
+    "mtime": 1795030490.3234982,
+    "seen": 1795030610.011038,
+    "ast_hash": "393379e6e984db33e9f4f72c0b890ead",
     "semantic_hash": ""
   },
   "src/components/legal/legal-page.tsx": {
@@ -1836,9 +1836,27 @@
     "semantic_hash": ""
   },
   "src/lib/legal.ts": {
-    "mtime": 1794248700.4475882,
-    "seen": 1794248703.273215,
-    "ast_hash": "98e5f03eec1fc7a9bbc091152abd5c9a",
+    "mtime": 1795030490.323766,
+    "seen": 1795030610.011134,
+    "ast_hash": "c46b7ed46c271c5247fb789ec8d5a98f",
+    "semantic_hash": ""
+  },
+  "src/components/landing/founders-offer.tsx": {
+    "mtime": 1795030466.2847853,
+    "seen": 1795030610.0110521,
+    "ast_hash": "06ca11b084407e6df154f3fe910407e7",
+    "semantic_hash": ""
+  },
+  "src/lib/billing/founders.test.ts": {
+    "mtime": 1795030444.202878,
+    "seen": 1795030610.011092,
+    "ast_hash": "9da479b5bd4aa350f33a80339c9feba9",
+    "semantic_hash": ""
+  },
+  "src/lib/billing/founders.ts": {
+    "mtime": 1795030444.201103,
+    "seen": 1795030610.011093,
+    "ast_hash": "3458a9aa0a8d90ddc57498fc85f803c3",
     "semantic_hash": ""
   },
   "package-lock.json": {

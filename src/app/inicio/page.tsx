@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 
+import { FoundersOffer } from "@/components/landing/founders-offer";
 import { LossCalculator } from "@/components/landing/loss-calculator";
+import { FOUNDERS_DAY_LABEL, FOUNDERS_MONTHLY_EUR, FOUNDERS_SEATS, FOUNDERS_YEARLY_EUR, LEVY_MONTHLY_EUR } from "@/lib/billing/founders";
 import { publicPaymentLinkUrl } from "@/lib/billing/links";
 import { legalLinks } from "@/lib/legal";
 
@@ -41,7 +43,7 @@ const team = [
 const growth = [
   "Un agente de postventa para quien ya te compró",
   "Uno por sede o línea de negocio, con sus precios y horarios",
-  "Si no sabe algo, no inventa: pasa el chat a una persona",
+  "Está instruido para no inventar: si no tiene el dato, pasa el chat a una persona",
   "Todos los chats en una bandeja, y pausas la IA con un botón",
 ];
 
@@ -70,8 +72,12 @@ const faqs = [
     question: "¿Qué necesito y qué más pago?",
   },
   {
-    answer: "Sí. No hay permanencia: cancelas cuando quieras y no se renueva el mes siguiente.",
+    answer: "Sí. No hay permanencia: cancelas cuando quieras desde el panel y no se renueva el siguiente periodo (mes o año). Mantienes el servicio hasta el final de lo que ya pagaste.",
     question: "¿Puedo cancelar cuando quiera?",
+  },
+  {
+    answer: `Una oferta solo para el ${FOUNDERS_DAY_LABEL}, con ${FOUNDERS_SEATS} plazas por modalidad: ${FOUNDERS_MONTHLY_EUR} €/mes o ${FOUNDERS_YEARLY_EUR} €/año, IVA incluido. Hoy tienes lo mismo que en Levy Agentes y, además, cada módulo nuevo que lancemos (como grabar la pantalla con cámara o el agente de llamadas) entra en tu plan sin pagar más. Mantienes el precio mientras tu suscripción siga activa; si la cancelas, al volver pagas el precio vigente.`,
+    question: "¿Qué es LEVYFOUNDERS?",
   },
   {
     answer: "Las conversaciones se guardan en tu cuenta y solo las usan tus agentes para atender a tus clientes. No las vendemos ni las compartimos con terceros.",
@@ -105,6 +111,8 @@ export default function LandingPage() {
   // lleva al correo para no dejar un enlace roto.
   const paymentUrl = publicPaymentLinkUrl(process.env.STRIPE_PAYMENT_LINK_URL);
   const buyHref = paymentUrl ?? `mailto:${contactEmail}?subject=${encodeURIComponent("Quiero activar Levy")}`;
+  const foundersMonthlyUrl = publicPaymentLinkUrl(process.env.STRIPE_FOUNDERS_MONTHLY_URL);
+  const foundersYearlyUrl = publicPaymentLinkUrl(process.env.STRIPE_FOUNDERS_YEARLY_URL);
 
   return (
     <div className="bg-paper pb-20 text-ink sm:pb-0">
@@ -244,9 +252,10 @@ export default function LandingPage() {
             </div>
 
             <div className="rounded-2xl border-2 border-ink bg-white p-7">
-              <p className="flex items-baseline gap-2">
-                <span className="text-5xl font-extrabold tracking-tight">99 €</span>
-                <span className="text-ink-2">/mes + IVA</span>
+              <p className="text-xs font-bold tracking-[0.12em] text-muted uppercase">Levy Agentes</p>
+              <p className="mt-2 flex items-baseline gap-2">
+                <span className="text-5xl font-extrabold tracking-tight">{LEVY_MONTHLY_EUR} €</span>
+                <span className="text-ink-2">/mes, IVA incluido</span>
               </p>
               <p className="mt-3 leading-7 text-ink-2">Menos de lo que te cuesta perder una venta a la semana.</p>
               <a className={`${primaryButton} mt-6 w-full`} href={buyHref}>
@@ -265,6 +274,9 @@ export default function LandingPage() {
                 .
               </p>
             </div>
+          </div>
+          <div className="mx-auto mt-10 max-w-6xl">
+            <FoundersOffer contactEmail={contactEmail} monthlyUrl={foundersMonthlyUrl} yearlyUrl={foundersYearlyUrl} />
           </div>
         </section>
 
@@ -310,7 +322,7 @@ export default function LandingPage() {
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-white p-3 sm:hidden">
         <a className={`${primaryButton} w-full`} href={buyHref}>
-          Activar Levy hoy · 99 €/mes
+          Activar Levy · {LEVY_MONTHLY_EUR} €/mes
         </a>
       </div>
     </div>

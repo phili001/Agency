@@ -230,7 +230,8 @@ async function handleCheckout(event: Stripe.Event, deps: StripeWebhookDeps, now:
     email,
     fullName: session.customer_details?.name ?? null,
     phone: session.customer_details?.phone ?? null,
-    plan: planOf(subscription, priceIds.find(Boolean) ?? null),
+    // Cada Payment Link lleva metadata.plan (levy_agents_mensual, levyfounders_mensual, levyfounders_anual).
+    plan: session.metadata?.plan?.trim() || planOf(subscription, priceIds.find(Boolean) ?? null),
     status: subscription?.status ?? "paid",
     workspaceId,
   });

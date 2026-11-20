@@ -176,6 +176,15 @@ describe("checkout.session.completed", () => {
     assert.equal(fake.tables.billing_events[0]?.result, "processed");
   });
 
+  it("el plan del contacto en AAA001 sale de metadata.plan del Payment Link", async () => {
+    sessions.set("cs_f", session("cs_f", { metadata: { plan: "levyfounders_anual" } }));
+    const outcome = await processStripeEvent(signedEvent("evt_f", "checkout.session.completed", session("cs_f")), deps());
+
+    assert.equal(outcome.result, "processed", outcome.detail);
+    const agency = await agencyContact("ana@example.com");
+    assert.equal((agency.contact?.custom_fields as Record<string, unknown> | undefined)?.levy_plan, "levyfounders_anual");
+  });
+
   it("si el correo falla, el evento sigue procesado y el motivo queda registrado", async () => {
     const outcome = await processStripeEvent(signedEvent("evt_1", "checkout.session.completed", session("cs_1")), {
       ...deps(),

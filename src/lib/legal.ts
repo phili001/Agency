@@ -14,7 +14,7 @@ export const legalEntity = {
   email: "info@agentelevi.com",
   website: "agentelevi.com",
   /** Fecha de la última revisión de los textos. */
-  updatedAt: "8 de noviembre de 2026",
+  updatedAt: "18 de noviembre de 2026",
 };
 
 export const legalLinks = [
