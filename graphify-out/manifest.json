@@ -1836,9 +1836,9 @@
     "semantic_hash": ""
   },
   "src/lib/legal.ts": {
-    "mtime": 1795030490.323766,
-    "seen": 1795030610.011134,
-    "ast_hash": "c46b7ed46c271c5247fb789ec8d5a98f",
+    "mtime": 1795148804.173395,
+    "seen": 1795148810.487349,
+    "ast_hash": "e787328bbc147173ffd7774965670f94",
     "semantic_hash": ""
   },
   "src/components/landing/founders-offer.tsx": {

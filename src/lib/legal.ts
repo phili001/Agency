@@ -5,7 +5,7 @@
  */
 export const legalEntity = {
   /** Nombre y apellidos (autónomo) o razón social (p. ej. «Levy Tech S.L.»). */
-  name: "",
+  name: "Rafael Llorens Fabregat",
   /** NIF o CIF. */
   taxId: "",
   /** Domicilio completo. */
