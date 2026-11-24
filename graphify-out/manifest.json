@@ -1818,9 +1818,9 @@
     "semantic_hash": ""
   },
   "src/app/privacidad/page.tsx": {
-    "mtime": 1794248700.408045,
-    "seen": 1794248703.2731378,
-    "ast_hash": "55f853715021b19eb3d59d8e87be97a8",
+    "mtime": 1795534513.0402765,
+    "seen": 1795534529.238806,
+    "ast_hash": "62c050c1221cdbfe3497b62f62f1ac67",
     "semantic_hash": ""
   },
   "src/app/terminos/page.tsx": {
@@ -1857,6 +1857,24 @@
     "mtime": 1795030444.201103,
     "seen": 1795030610.011093,
     "ast_hash": "3458a9aa0a8d90ddc57498fc85f803c3",
+    "semantic_hash": ""
+  },
+  "VERIFICACION_GOOGLE.md": {
+    "mtime": 1795534523.1001728,
+    "seen": 1795534529.238921,
+    "ast_hash": "0a0e56f1b614ea2d3efe975a01bd939e",
+    "semantic_hash": ""
+  },
+  "src/app/apple-icon.png": {
+    "mtime": 1795540051.1735864,
+    "seen": 1795540114.594499,
+    "ast_hash": "5d32afa207259a66f0766bb3c7a9cc9f",
+    "semantic_hash": ""
+  },
+  "src/app/icon.png": {
+    "mtime": 1795540051.123415,
+    "seen": 1795540114.594502,
+    "ast_hash": "03effa53b68b7a43b166fa501ba2430a",
     "semantic_hash": ""
   },
   "package-lock.json": {

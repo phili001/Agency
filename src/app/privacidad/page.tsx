@@ -73,7 +73,8 @@ export default function PrivacyPage() {
           <li><strong>Stripe</strong>: cobro de la suscripción.</li>
           <li><strong>Hostinger</strong>: envío de los correos de la plataforma.</li>
           <li>
-            <strong>Google</strong>: solo si conectas Google Calendar, para crear y consultar citas en tu calendario.
+            <strong>Google</strong>: solo si conectas Google Calendar, para consultar tu disponibilidad y gestionar las
+            citas en tu calendario (detalle en el apartado 5).
           </li>
         </ul>
         <p>
@@ -88,7 +89,50 @@ export default function PrivacyPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="5. Cuánto tiempo los guardamos">
+      <LegalSection title="5. Datos de tu cuenta de Google">
+        <p>
+          Conectar Google Calendar es opcional. Si lo haces, Levy pide solo estos permisos y los usa solo para lo que
+          se indica:
+        </p>
+        <ul>
+          <li>
+            <strong>Ver tus calendarios</strong> (<code>calendar.readonly</code>): consultar cuándo estás ocupado para no
+            ofrecer a tus clientes horas que ya tienes comprometidas.
+          </li>
+          <li>
+            <strong>Gestionar eventos</strong> (<code>calendar.events</code>): crear, cambiar y cancelar en tu calendario
+            las citas que se agendan, reagendan o anulan desde Levy.
+          </li>
+        </ul>
+        <p>
+          Guardamos cifradas las credenciales de acceso que nos da Google y nunca vemos tu contraseña. Los datos de Google
+          no se venden, no se usan para publicidad, no se usan para entrenar modelos de inteligencia artificial y no se
+          comparten con terceros salvo lo necesario para prestar estas funciones o cuando la ley lo exija. Ninguna persona
+          de Levy los lee, salvo que nos des permiso expreso para resolver una incidencia o lo exija la ley.
+        </p>
+        <p>
+          El uso y la transferencia a cualquier otra aplicación de la información recibida de las API de Google por parte
+          de Levy se ajustará a la{" "}
+          <a
+            href="https://developers.google.com/terms/api-services-user-data-policy"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            Política de datos de usuario de los servicios de API de Google
+          </a>
+          , incluidos los requisitos de Uso limitado.
+        </p>
+        <p>
+          Puedes desconectar Google Calendar en cualquier momento desde el panel: revocamos el acceso y borramos las credenciales.
+          También puedes retirarlo desde{" "}
+          <a href="https://myaccount.google.com/permissions" rel="noopener noreferrer" target="_blank">
+            la configuración de tu cuenta de Google
+          </a>
+          .
+        </p>
+      </LegalSection>
+
+      <LegalSection title="6. Cuánto tiempo los guardamos">
         <p>
           Mientras tengas la cuenta activa. Si te das de baja, puedes pedirnos que borremos tus datos y los de tus clientes
           finales. Conservaremos bloqueado solo lo que la ley nos obliga a guardar, como las facturas, durante los plazos
@@ -100,7 +144,7 @@ export default function PrivacyPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="6. Tus derechos">
+      <LegalSection title="7. Tus derechos">
         <p>
           Puedes pedir acceso a tus datos, corregirlos, borrarlos, limitar u oponerte a su tratamiento y llevártelos a otro
           servicio. Escríbenos a {legalMail} indicando qué necesitas; te responderemos en un plazo máximo de un mes.
@@ -111,14 +155,14 @@ export default function PrivacyPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="7. Seguridad">
+      <LegalSection title="8. Seguridad">
         <p>
           Las conexiones van cifradas, las claves de tus integraciones (OpenAI, YCloud) se guardan cifradas y cada empresa
           solo ve sus propios datos. Dentro de cada empresa, cada persona accede según su rol.
         </p>
       </LegalSection>
 
-      <LegalSection title="8. Cambios">
+      <LegalSection title="9. Cambios">
         <p>
           Si cambiamos esta política de forma importante, te avisaremos por correo o en el panel antes de que se aplique.
         </p>
